@@ -185,6 +185,7 @@ struct State
 	virtual void resetLattice(real irho, real ivx, real ivy, real ivz); // called from State::reset
 	virtual void updateKernelVelocities() { } // called from core.h -- setup current velocity profile for the Kernel
 	virtual void computeBeforeLBMKernel() { } // called from core.h just before the main LBMKernel -- extra kernels e.g. for the non-Newtonian model
+	virtual void computeAfterLBMKernel() { } // called from core.h after the main LBMKernel -- extra kernels e.g. for the coupled LBM-MHFEM solver
 
 	template < typename... ARGS >
 	void mark(const char* fmt, ARGS... args);

@@ -535,6 +535,9 @@ void SimUpdate(STATE& state, typename STATE::T_LBM& lbm)
 template < typename STATE >
 void AfterSimUpdate(STATE& state, timespec& t1, timespec& t2, int& lbmPrevIterations)
 {
+	// call hook method (used e.g. for the coupled LBM-MHFEM solver)
+	state.computeAfterLBMKernel();
+
 	typename STATE::T_LBM& lbm = state.lbm;
 
 	#ifdef USE_CUDA
