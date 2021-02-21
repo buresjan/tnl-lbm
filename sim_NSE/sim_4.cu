@@ -61,6 +61,7 @@ struct StateLocal : State<LBM_TYPE>
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
+	using point_t = typename TRAITS::point_t;
 
 	dreal lbm_input_velocity=0.07;
 //	dreal start_velocity;
@@ -234,8 +235,8 @@ struct StateLocal : State<LBM_TYPE>
 		lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt)
+	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin)
+		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
 	{
 		lbm.data.inflow_rho = no1;
 		lbm.data.inflow_vx = 0;
@@ -318,6 +319,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 {
 	using idx = typename LBM_TYPE::TRAITS::idx;
 	using real = typename LBM_TYPE::TRAITS::real;
+	using point_t = typename LBM_TYPE::TRAITS::point_t;
 
 	int block_size=32;
 	real BALL_DIAMETER = 0.01;
@@ -327,6 +329,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	idx LBM_Z = LBM_Y;
 	real PHYS_DL = real_domain_height/((real)LBM_Y);
 	idx LBM_X = LBM_Y;//(int)(real_domain_length/PHYS_DL)+2;//block_size;//16*RESOLUTION;// width in pixels --- product of 128.
+	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	// zvolit Re + LBM VELOCITY + PHYS_VISCOSITY
 //	real i_Re = ;
@@ -346,7 +349,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 //	real INIT_TIME = 1.0; // [s]
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT);
+	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN);
 	state.lbm_input_velocity = i_LBM_VELOCITY;
 	state.lbm.block_size=block_size;
 	state.lbm.physCharLength = BALL_DIAMETER; // [m]

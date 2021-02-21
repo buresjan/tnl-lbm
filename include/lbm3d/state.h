@@ -84,6 +84,7 @@ struct State
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 	using real = typename TRAITS::real;
+	using point_t = typename TRAITS::point_t;
 
 	using T_PROBE3DCUT = probe3Dcut<idx>;
 	using T_PROBE2DCUT = probe2Dcut<idx>;
@@ -248,7 +249,7 @@ struct State
 	bool estimateMemoryDemands();
 
 	// constructors
-	State(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt) : lbm(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt)
+	State(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin) : lbm(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
 	{
 		bool local_estimate = estimateMemoryDemands();
 		bool global_result;

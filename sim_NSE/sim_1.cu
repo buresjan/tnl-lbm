@@ -15,6 +15,7 @@ struct StateLocal : State<LBM_TYPE>
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
+	using point_t = typename TRAITS::point_t;
 
 	real lbmInflowDensity = no1;
 
@@ -67,8 +68,8 @@ struct StateLocal : State<LBM_TYPE>
 		lbm.data.inflow_rho = lbmInflowDensity;
 	}
 
-	StateLocal(int iX, int iY, int iZ, real iphysViscosity, real iphysVelocity, real iphysDl, real iphysDt)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt)
+	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysVelocity, real iphysDl, real iphysDt, point_t iphysOrigin)
+		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
 	{
 		lbm.data.inflow_rho = no1;
 		lbm.data.inflow_vx = lbm.phys2lbmVelocity(iphysVelocity);
@@ -127,6 +128,7 @@ template < typename LBM_TYPE >
 int sim01_test(int RESOLUTION = 2)
 {
 	using real = typename LBM_TYPE::TRAITS::real;
+	using point_t = typename LBM_TYPE::TRAITS::point_t;
 
 	int block_size=32;
 	int X = 128*RESOLUTION;// width in pixels --- product of 128.
@@ -141,8 +143,9 @@ int sim01_test(int RESOLUTION = 2)
 	real PHYS_VELOCITY = 1.0; // this is only average velocity .... will be multiplied by 9/4 to get the correct value Um from Schafer Turek
 	real PHYS_DL = PHYS_HEIGHT/((real)Y-2);
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;//PHYS_HEIGHT/(real)LBM_HEIGHT;
+	point_t PHYS_ORIGIN = {0., 0., 0.};
 
-	StateLocal< LBM_TYPE > state(X, Y, Z, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DL, PHYS_DT);
+	StateLocal< LBM_TYPE > state(X, Y, Z, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN);
 	state.setid("sim_1_res%02d_np%03d", RESOLUTION, state.lbm.nproc);
 	state.lbm.block_size = 32;
 	state.lbm.physCharLength = 0.1; // [m]

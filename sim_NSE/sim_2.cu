@@ -38,6 +38,7 @@ struct StateLocal : State<LBM_TYPE>
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
+	using point_t = typename TRAITS::point_t;
 
 	real **an_cache=0;
 	int an_n=50;
@@ -233,8 +234,8 @@ struct StateLocal : State<LBM_TYPE>
 	}
 
 
-	StateLocal(int iX, int iY, int iZ, real iphysViscosity, real iphysDl, real iphysDt, int RES)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt)
+	StateLocal(int iX, int iY, int iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin, int RES)
+		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
 	{
 		errors_count = 10 * RES;
 		l1errors = new real[errors_count];
@@ -258,6 +259,7 @@ int sim02(int RES=1, bool use_forcing=true)
 {
 	using real = typename LBM_TYPE::TRAITS::real;
 	using dreal = typename LBM_TYPE::TRAITS::dreal;
+	using point_t = typename LBM_TYPE::TRAITS::point_t;
 
 	int block_size=32;
 	int LBM_X = block_size;
@@ -271,8 +273,9 @@ int sim02(int RES=1, bool use_forcing=true)
 	real PHYS_VISCOSITY = 1.5e-5;// [m^2/s] fluid viscosity air: 1.81e-5
 	real PHYS_DL = PHYS_HEIGHT/((real)LBM_Y-2);
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
+	point_t PHYS_ORIGIN = {0., 0., 0.};
 
-	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT, RES);
+	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN, RES);
 	state.lbm.block_size=block_size;
 //	state.lbm.use_multiple_gpus = false;
 	state.lbm.physCharLength = 0.125; // [m]

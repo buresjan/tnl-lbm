@@ -17,6 +17,8 @@ struct LBM
 	using dreal = typename TRAITS::dreal;
 	using real = typename TRAITS::real;
 	using map_t = typename TRAITS::map_t;
+	using point_t = typename TRAITS::point_t;
+	using idx3d = typename TRAITS::idx3d;
 
 	using hmap_array_t = typename LBM_TYPE::hmap_array_t;
 	using dmap_array_t = typename LBM_TYPE::dmap_array_t;
@@ -82,6 +84,7 @@ struct LBM
 #endif
 
 	// input parameters: constant in time
+	point_t physOrigin;			// spatial coordinates of the point at the center between (0,0,0) and (1,1,1) lattice sites
 	real physDl; 				// spatial step (fixed throughout the computation)
 	real physDt;				// temporal step (fixed or variable throughout the computation)
 	real physFilDl;				// spatial step for filaments(should be fixed throught the computation)
@@ -93,8 +96,6 @@ struct LBM
 	int iterations;			// number of lbm iterations
 
 	bool terminate;			// flag for terminal error detection
-
-//	bool noFlow;			// trigers no flow boundary condition
 
 //	real Re(real physvel) { return fabs(physvel) * physDl * (real)Y / physViscosity; } // TODO: change Y to charLength --- specify this explicitely
 	real Re(real physvel) { return fabs(physvel) * physCharLength / physViscosity; } // TODO: change Y to charLength --- specify this explicitely
@@ -110,6 +111,17 @@ struct LBM
 //	real physDensity(idx gi) { return hrho[gi]*physFluidDensity; }
 //	real physNormVelocity(idx GX, idx GY, idx GZ) { return physNormVelocity(pos(GX,GY,GZ)); }
 //	real physDensity(idx GX, idx GY, idx GZ) { return physDensity(pos(GX,GY,GZ)); }
+
+	// getters for physical coordinates (note that here x,y,z are *global* lattice indices)
+	point_t lbm2physPoint(idx x, idx y, idx z) { return physOrigin + (point_t(x, y, z) - 0.5) * physDl; }
+	real lbm2physX(idx x) { return physOrigin.x() + (x-0.5) * physDl; }
+	real lbm2physY(idx y) { return physOrigin.y() + (y-0.5) * physDl; }
+	real lbm2physZ(idx z) { return physOrigin.z() + (z-0.5) * physDl; }
+
+	idx phys2lbmPoint(point_t p) { return (p - physOrigin) / physDl + 0.5; }
+	idx phys2lbmX(real x) { return (x - physOrigin.x()) / physDl + 0.5; }
+	idx phys2lbmY(real y) { return (y - physOrigin.y()) / physDl + 0.5; }
+	idx phys2lbmZ(real z) { return (z - physOrigin.z()) / physDl + 0.5; }
 
 	void resetForces() { resetForces(0,0,0);}
 	void resetForces(real ifx, real ify, real ifz);
@@ -169,7 +181,7 @@ struct LBM
 	void allocateDeviceData();
 	void updateKernelData();		// copy physical parameters to data structure accessible by the CUDA kernel
 
-	LBM(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt);
+	LBM(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin);
 	~LBM();
 };
 

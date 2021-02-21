@@ -89,6 +89,7 @@ struct StateLocal : State<LBM_TYPE>
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
+	using point_t = typename TRAITS::point_t;
 
 //	dreal lbm_input_velocity=0.07;
 //	dreal start_velocity;
@@ -289,8 +290,8 @@ struct StateLocal : State<LBM_TYPE>
 		lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt)
+	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin)
+		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
 	{
 		lbm.data.inflow_rho = no1;
 		lbm.data.inflow_vx = 0;
@@ -374,6 +375,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 {
 	using idx = typename LBM_TYPE::TRAITS::idx;
 	using real = typename LBM_TYPE::TRAITS::real;
+	using point_t = typename LBM_TYPE::TRAITS::point_t;
 
 	int block_size=32;
 	real cylinder_diameter  = 0.10; // [m]
@@ -383,6 +385,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	idx LBM_Z = LBM_Y;
 	real PHYS_DL = real_domain_height/((real)LBM_Y-2.0);
 	idx LBM_X = (int)(real_domain_length/PHYS_DL)+2;
+	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	real PHYS_VISCOSITY = 0.001; // [m^2/s]
 //	real Umax = 0.45; // [m/s]
@@ -394,7 +397,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 //	printf("input phys velocity %f\ninput lbm velocity %f\nRe %f\nlbm viscosity %f\nphys viscosity %f\n", i_PHYS_VELOCITY, i_LBM_VELOCITY, i_Re, i_LBM_VISCOSITY, i_PHYS_VISCOSITY);
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT);
+	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN);
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
 	state.lbm.block_size=block_size;

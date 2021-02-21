@@ -431,7 +431,7 @@ void LBM<LBM_TYPE>::updateKernelData()
 
 
 template< typename LBM_TYPE >
-LBM<LBM_TYPE>::LBM(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt)
+LBM<LBM_TYPE>::LBM(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin)
 {
 	global_X = iX;
 	global_Y = iY;
@@ -448,6 +448,7 @@ LBM<LBM_TYPE>::LBM(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, re
 	local_Z = global_Z;
 	offset_Z = 0;
 
+	physOrigin = iphysOrigin;
 	physDl = iphysDl;
 	physDt = iphysDt;
 

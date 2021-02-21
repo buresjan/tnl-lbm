@@ -292,14 +292,14 @@ template< typename LBM_TYPE >
 template< typename... ARGS >
 void State<LBM_TYPE>::add1Dcut_X(real y, real z, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalY(y) || !lbm.isLocalZ(z)) return;
+	if (!lbm.isLocalY(lbm.phys2lbmY(y)) || !lbm.isLocalZ(lbm.phys2lbmZ(z))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	sprintf(probe1Dvec[last].name, fmt, args...);
 	probe1Dvec[last].type = 0;
-	probe1Dvec[last].pos1 = (int)(y/lbm.physDl);
-	probe1Dvec[last].pos2 = (int)(z/lbm.physDl);
+	probe1Dvec[last].pos1 = lbm.phys2lbmY(y);
+	probe1Dvec[last].pos2 = lbm.phys2lbmZ(z);
 	probe1Dvec[last].cycle = 0;
 }
 
@@ -307,14 +307,14 @@ template< typename LBM_TYPE >
 template< typename... ARGS >
 void State<LBM_TYPE>::add1Dcut_Y(real x, real z, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalX(x) || !lbm.isLocalZ(z)) return;
+	if (!lbm.isLocalX(lbm.phys2lbmX(x)) || !lbm.isLocalZ(lbm.phys2lbmZ(z))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	sprintf(probe1Dvec[last].name, fmt, args...);
 	probe1Dvec[last].type = 1;
-	probe1Dvec[last].pos1 = (int)(x/lbm.physDl);
-	probe1Dvec[last].pos2 = (int)(z/lbm.physDl);
+	probe1Dvec[last].pos1 = lbm.phys2lbmX(x);
+	probe1Dvec[last].pos2 = lbm.phys2lbmZ(z);
 	probe1Dvec[last].cycle = 0;
 }
 
@@ -322,14 +322,14 @@ template< typename LBM_TYPE >
 template< typename... ARGS >
 void State<LBM_TYPE>::add1Dcut_Z(real x, real y, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalX(x) || !lbm.isLocalY(y)) return;
+	if (!lbm.isLocalX(lbm.phys2lbmX(x)) || !lbm.isLocalY(lbm.phys2lbmY(y))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	sprintf(probe1Dvec[last].name, fmt, args...);
 	probe1Dvec[last].type = 2;
-	probe1Dvec[last].pos1 = (int)(x/lbm.physDl);
-	probe1Dvec[last].pos2 = (int)(y/lbm.physDl);
+	probe1Dvec[last].pos1 = lbm.phys2lbmX(x);
+	probe1Dvec[last].pos2 = lbm.phys2lbmY(y);
 	probe1Dvec[last].cycle = 0;
 }
 
@@ -397,7 +397,7 @@ void State<LBM_TYPE>::write1Dcut_X(idx y, idx z, const char * fname)
 	{
 		if (lbm.isFluid(i,y,z))
 		{
-			fprintf(fout, "%e",(i-0.5)*lbm.physDl);
+			fprintf(fout, "%e", lbm.lbm2physX(i));
 			index=0;
 			if (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
 			{
@@ -437,7 +437,7 @@ void State<LBM_TYPE>::write1Dcut_Y(idx x, idx z, const char * fname)
 	{
 		if (lbm.isFluid(x,i,z))
 		{
-			fprintf(fout, "%e",(i-0.5)*lbm.physDl);
+			fprintf(fout, "%e", lbm.lbm2physY(i));
 			int index=0;
 			while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
 			{
@@ -477,7 +477,7 @@ void State<LBM_TYPE>::write1Dcut_Z(idx x, idx y, const char * fname)
 	{
 		if (lbm.isFluid(x,y,i))
 		{
-			fprintf(fout, "%e",(i-0.5)*lbm.physDl);
+			fprintf(fout, "%e", lbm.lbm2physZ(i));
 			index=0;
 			while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
 			{
@@ -540,9 +540,10 @@ void State<LBM_TYPE>::write1Dcut(real fromx, real fromy, real fromz, real tox, r
 	for (real s=0;s<=1.0;s+=ds)
 	{
 		for (int k=0;k<3;k++) p[k] = i[k] + s*(f[k]-i[k]);
+		// FIXME: isFluid checks idx, not real !!!
 		if (lbm.isFluid(p[0],p[1],p[2]))
 		{
-			fprintf(fout, "%e",(s*dist-0.5)*lbm.physDl);
+			fprintf(fout, "%e", (s*dist-0.5)*lbm.physDl);
 			index=0;
 			while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
 			{
@@ -647,15 +648,18 @@ void State<LBM_TYPE>::writeVTK_3D(const char* name, real time, int cycle)
 		fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 		fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, (int)lbm.local_Z);
 		fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++) vtk.writeFloat(fp, x*lbm.physDl);
+		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+			vtk.writeFloat(fp, lbm.lbm2physX(x));
 		vtk.writeBuffer(fp);
 
 		fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++) vtk.writeFloat(fp, y*lbm.physDl);
+		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+			vtk.writeFloat(fp, lbm.lbm2physY(y));
 		vtk.writeBuffer(fp);
 
 		fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z; z++) vtk.writeFloat(fp, z*lbm.physDl);
+		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+			vtk.writeFloat(fp, lbm.lbm2physZ(z));
 		vtk.writeBuffer(fp);
 
 		fprintf(fp,"FIELD FieldData %d\n",2);
@@ -700,15 +704,18 @@ void State<LBM_TYPE>::writeVTK_3D(const char* name, real time, int cycle)
 			fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 			fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, (int)lbm.local_Z);
 			fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-			for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++) vtk.writeFloat(fp, x*lbm.physDl);
+			for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+				vtk.writeFloat(fp, lbm.lbm2physX(x));
 			vtk.writeBuffer(fp);
 
 			fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-			for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++) vtk.writeFloat(fp, y*lbm.physDl);
+			for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+				vtk.writeFloat(fp, lbm.lbm2physY(y));
 			vtk.writeBuffer(fp);
 
 			fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-			for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++) vtk.writeFloat(fp, z*lbm.physDl);
+			for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+				vtk.writeFloat(fp, lbm.lbm2physZ(z));
 			vtk.writeBuffer(fp);
 
 			fprintf(fp,"FIELD FieldData %d\n",2);
@@ -767,15 +774,18 @@ void State<LBM_TYPE>::writeVTK_3D_singlefile(const char* name, real time, int cy
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, (int)lbm.local_Z);
 	fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++) vtk.writeFloat(fp, x*lbm.physDl);
+	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+		vtk.writeFloat(fp, lbm.lbm2physX(x));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++) vtk.writeFloat(fp, y*lbm.physDl);
+	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+		vtk.writeFloat(fp, lbm.lbm2physY(y));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++) vtk.writeFloat(fp, z*lbm.physDl);
+	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+		vtk.writeFloat(fp, lbm.lbm2physZ(z));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"FIELD FieldData %d\n",2);
@@ -862,15 +872,18 @@ void State<LBM_TYPE>::writeVTK_3Dcut(const char* name, real time, int cycle, idx
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)X, (int)Y, (int)Z);
 	fprintf(fp,"X_COORDINATES %d float\n", (int)X);
-	for (idx x = ox; x < ox + lx; x += step) vtk.writeFloat(fp, x*lbm.physDl);
+	for (idx x = ox; x < ox + lx; x += step)
+		vtk.writeFloat(fp, lbm.lbm2physX(x));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Y_COORDINATES %d float\n", (int)Y);
-	for (idx y = oy; y < oy + ly; y += step) vtk.writeFloat(fp, y*lbm.physDl);
+	for (idx y = oy; y < oy + ly; y += step)
+		vtk.writeFloat(fp, lbm.lbm2physY(y));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Z_COORDINATES %d float\n", (int)Z);
-	for (idx z = oz; z < oz + lz; z += step) vtk.writeFloat(fp, z*lbm.physDl);
+	for (idx z = oz; z < oz + lz; z += step)
+		vtk.writeFloat(fp, lbm.lbm2physZ(z));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"FIELD FieldData %d\n",2);
@@ -1063,15 +1076,17 @@ void State<LBM_TYPE>::writeVTK_2DcutY(const char* name, real time, int cycle, id
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, 1, (int)lbm.local_Z);
 	fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++) vtk.writeFloat(fp, x*lbm.physDl);
+	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+		vtk.writeFloat(fp, lbm.lbm2physX(x));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Y_COORDINATES 1 float\n");
-	vtk.writeFloat(fp, YPOS*lbm.physDl);
+	vtk.writeFloat(fp, lbm.lbm2physY(YPOS));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++) vtk.writeFloat(fp, z*lbm.physDl);
+	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+		vtk.writeFloat(fp, lbm.lbm2physZ(z));
 	vtk.writeBuffer(fp);
 
 
@@ -1137,15 +1152,17 @@ void State<LBM_TYPE>::writeVTK_2DcutX(const char* name, real time, int cycle, id
 	fprintf(fp,"DIMENSIONS %d %d %d\n",1, (int)lbm.local_Y, (int)lbm.local_Z);
 
 	fprintf(fp,"X_COORDINATES %d float\n", 1);
-	vtk.writeFloat(fp, XPOS*lbm.physDl);
+	vtk.writeFloat(fp, lbm.lbm2physX(XPOS));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++) vtk.writeFloat(fp, y*lbm.physDl);
+	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+		vtk.writeFloat(fp, lbm.lbm2physY(y));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++) vtk.writeFloat(fp, z*lbm.physDl);
+	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+		vtk.writeFloat(fp, lbm.lbm2physZ(z));
 	vtk.writeBuffer(fp);
 
 
@@ -1210,15 +1227,17 @@ void State<LBM_TYPE>::writeVTK_2DcutZ(const char* name, real time, int cycle, id
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, 1);
 	fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++) vtk.writeFloat(fp, x*lbm.physDl);
+	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+		vtk.writeFloat(fp, lbm.lbm2physX(x));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++) vtk.writeFloat(fp, y*lbm.physDl);
+	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+		vtk.writeFloat(fp, lbm.lbm2physY(y));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"Z_COORDINATES %d float\n", 1);
-	vtk.writeFloat(fp, ZPOS*lbm.physDl);
+	vtk.writeFloat(fp, lbm.lbm2physZ(ZPOS));
 	vtk.writeBuffer(fp);
 
 	fprintf(fp,"FIELD FieldData %d\n",2);
