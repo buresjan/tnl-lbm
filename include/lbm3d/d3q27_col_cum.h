@@ -211,7 +211,7 @@ struct D3Q27_CUM : D3Q27_COMMON< TRAITS, LBM_EQ >
 		#ifdef USE_GEIER_CUM_ANTIALIAS
 			// derivatives of v: notation taken from Geier's paper 2017 part I: Eq 27-29
 //			const dreal Dxu = - omega1/no2/KS.rho * (no2*C_200-C_020-C_002) - omega2/no2/KS.rho*(C_200+C_020+C_002-k_000);
-			const dreal Dxu = - omega1/no2/KS.rho * (no2*C_200-C_020-C_002) - omega2/no2/KS.rho*(C_200+C_020+C_002-(no1-KS.rho)); // PE 2019_01_18 poznamka: rho je v tom clanku rho^(2), tj. rho^(2) = 1-rho = 1-k_000
+			const dreal Dxu = - omega1/no2/KS.rho * (no2*C_200-C_020-C_002) - omega2/no2/KS.rho*(C_200+C_020+C_002-(-no1+KS.rho)); // PE 2019_01_18 poznamka: rho je v tom clanku rho^(2), tj. rho^(2) = 1-rho = 1-k_000
 			const dreal Dyv = Dxu + n3o2*omega1/KS.rho *(C_200-C_020);
 			const dreal Dzw = Dxu + n3o2*omega1/KS.rho *(C_200-C_002);
 			// plus their combination: Eq 30 - 32
