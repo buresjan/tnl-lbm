@@ -598,7 +598,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 //		max_nz_per_row = TNL::max(max_nz_per_row, vr[el].size());
 //	}
 //	ws_tnl_hA->setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::CompressedRowLengthsVector hA_row_lengths( m );
+	typename hEllpack::RowsCapacitiesType hA_row_lengths( m );
 	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
 	ws_tnl_hA->setRowCapacities(hA_row_lengths);
 
@@ -703,7 +703,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 //	for (int el=0;el<m;el++)
 //		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
 //	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::CompressedRowLengthsVector hM_row_lengths( m );
+	typename hEllpack::RowsCapacitiesType hM_row_lengths( m );
 	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
 	ws_tnl_hM.setRowCapacities(hM_row_lengths);
 
@@ -732,7 +732,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 //	for (int el=0;el<n;el++)
 //		max_nz_per_row = TNL::max(max_nz_per_row, vn[el].size());
 //	ws_tnl_hMT.setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::CompressedRowLengthsVector hMT_row_lengths( n );
+	typename hEllpack::RowsCapacitiesType hMT_row_lengths( n );
 	for (int el=0; el<n; el++) hMT_row_lengths[el] = vn[el].size();
 	ws_tnl_hMT.setRowCapacities(hMT_row_lengths);
 
