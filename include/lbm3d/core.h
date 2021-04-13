@@ -52,7 +52,7 @@ void LBMKernel(
 #endif
 	map_t gi_map = SD.map(x, y, z);
 
-	typename NSE::KernelStruct<dreal> KS;
+	typename NSE::template KernelStruct<dreal> KS;
 
 	// copy quantities
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
@@ -82,7 +82,7 @@ void LBMKernel(
 	}
 
 	// optional computation of the forcing term (e.g. for the non-Newtonian model)
-	NSE::MACRO::template computeForcing<NSE::BC>(SD,KS,xm,x,xp,ym,y,yp,zm,z,zp);
+	NSE::MACRO::template computeForcing<typename NSE::BC>(SD,KS,xm,x,xp,ym,y,yp,zm,z,zp);
 
 	// Streaming
 	if (NSE::BC::isStreaming(gi_map))
@@ -142,7 +142,7 @@ void LBMKernelInit(
 
 	map_t gi_map = SD.map(x, y, z);
 
-	typename NSE::KernelStruct<dreal> KS;
+	typename NSE::template KernelStruct<dreal> KS;
 	for (int i=0;i<27;i++) KS.f[i] = SD.df(df_cur, i, x, y, z);
 
 	// copy quantities
@@ -190,7 +190,7 @@ void LBMComputeVelocitiesStar(
 	#endif
 	map_t gi_map = SD.map(x, y, z);
 
-	typename NSE::KernelStruct<dreal> KS;
+	typename NSE::template KernelStruct<dreal> KS;
 
 	// copy quantities
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
@@ -264,7 +264,7 @@ void LBMComputeVelocitiesStarAndZeroForce(
 	#endif
 	map_t gi_map = SD.map(x, y, z);
 
-	typename NSE::KernelStruct<dreal> KS;
+	typename NSE::template KernelStruct<dreal> KS;
 
 	// copy quantities
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);

@@ -314,7 +314,7 @@ void LBM<LBM_TYPE>::computeCPUMacroFromLat()
 		for (idx z=0; z<local_Z; z++)
 		for (idx y=0; y<local_Y; y++)
 		{
-			typename LBM_TYPE::KernelStruct<dreal> KS;
+			typename LBM_TYPE::template KernelStruct<dreal> KS;
 			KS.fx=0;
 			KS.fy=0;
 			KS.fz=0;
