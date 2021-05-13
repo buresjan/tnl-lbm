@@ -53,8 +53,9 @@ template < typename REAL >
 struct probe1Dlinecut
 {
 	char name[FILENAME_CHARS];
-	REAL from[3]; // physical units
-	REAL to[3];   // physical units
+	using point_t = TNL::Containers::StaticVector< 3, REAL >;
+	point_t from; // physical units
+	point_t to;   // physical units
 	int cycle;
 };
 
@@ -153,14 +154,14 @@ struct State
 	void writeVTKs_1D();
 
 	template < typename... ARGS >
-	void add1Dcut(real fromx, real fromy, real fromz, real tox, real toy, real toz, const char* fmt, ARGS... args);
+	void add1Dcut(point_t from, point_t to, const char* fmt, ARGS... args);
 	template < typename... ARGS >
 	void add1Dcut_X(real y, real z, const char* fmt, ARGS... args);
 	template < typename... ARGS >
 	void add1Dcut_Y(real x, real z, const char* fmt, ARGS... args);
 	template < typename... ARGS >
 	void add1Dcut_Z(real x, real y, const char* fmt, ARGS... args);
-	void write1Dcut(real fromx, real fromy, real fromz, real tox, real toy, real toz, const char * desc);
+	void write1Dcut(point_t from, point_t to, const char * desc);
 	void write1Dcut_X(idx y, idx z, const char * desc);
 	void write1Dcut_Y(idx y, idx z, const char * desc);
 	void write1Dcut_Z(idx x, idx y, const char * desc);

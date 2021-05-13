@@ -270,21 +270,13 @@ void State<LBM_TYPE>::writeVTK_Points(const char* name, real time, int cycle, La
 
 template< typename LBM_TYPE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add1Dcut(real fromx, real fromy, real fromz, real tox, real toy, real toz, const char* fmt, ARGS... args)
+void State<LBM_TYPE>::add1Dcut(point_t from, point_t to, const char* fmt, ARGS... args)
 {
-	if (lbm.rank > 0) log("TODO: add1Dcut is not implemented for MPI.");
-
 	probe1Dlinevec.push_back( T_PROBE1DLINECUT() );
 	int last = probe1Dlinevec.size()-1;
 	sprintf(probe1Dlinevec[last].name, fmt, args...);
-	probe1Dlinevec[last].from[0] = fromx;
-	probe1Dlinevec[last].from[1] = fromy;
-	probe1Dlinevec[last].from[2] = fromz;
-
-	probe1Dlinevec[last].to[0] = tox;
-	probe1Dlinevec[last].to[1] = toy;
-	probe1Dlinevec[last].to[2] = toz;
-
+	probe1Dlinevec[last].from = from;
+	probe1Dlinevec[last].to = to;
 	probe1Dlinevec[last].cycle = 0;
 }
 
@@ -368,7 +360,7 @@ void State<LBM_TYPE>::writeVTKs_1D()
 		sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dlinevec[i].name, lbm.rank, probe1Dlinevec[i].cycle);
 		// create parent directories
 		create_file(fname);
-		write1Dcut(probe1Dlinevec[i].from[0],probe1Dlinevec[i].from[1],probe1Dlinevec[i].from[2],probe1Dlinevec[i].to[0],probe1Dlinevec[i].to[1],probe1Dlinevec[i].to[2],fname);
+		write1Dcut(probe1Dlinevec[i].from, probe1Dlinevec[i].to, fname);
 		probe1Dlinevec[i].cycle++;
 	}
 }
@@ -493,27 +485,13 @@ void State<LBM_TYPE>::write1Dcut_Z(idx x, idx y, const char * fname)
 	fclose(fout);
 }
 
-// line projection from[3] to[3]
 template< typename LBM_TYPE >
-void State<LBM_TYPE>::write1Dcut(real fromx, real fromy, real fromz, real tox, real toy, real toz, const char * fname)
+void State<LBM_TYPE>::write1Dcut(point_t from, point_t to, const char * fname)
 {
-	if (lbm.rank > 0) log("TODO: write1Dcut is not implemented for MPI.");
-
-//		char dir[FILENAME_CHARS];
-//		sprintf(dir,"results_%s/probes1D",id);
-//		mkdir_p(dir,0777);
-//		char fname[FILENAME_CHARS];
-//		sprintf(fname,"%s/%s_it%08d_t%f",dir,desc,lbm.iterations,lbm.physTime());
 	FILE*fout = fopen(fname,"wt"); // append information
 	log("[probe %s]",fname);
-	// probe vertical profile at x_m
-	real i[3],f[3],p[3];
-	i[0]=fromx/lbm.physDl;
-	i[1]=fromy/lbm.physDl;
-	i[2]=fromz/lbm.physDl;
-	f[0]=tox/lbm.physDl;
-	f[1]=toy/lbm.physDl;
-	f[2]=toz/lbm.physDl;
+	point_t i = lbm.phys2lbmPoint(from);
+	point_t f = lbm.phys2lbmPoint(to);
 	real dist = NORM(i[0]-f[0],i[1]-f[1],i[2]-f[2]);
 	real ds = 1.0/(dist*2.0); // rozliseni najit
 	// special case: sampling along an axis
@@ -539,9 +517,9 @@ void State<LBM_TYPE>::write1Dcut(real fromx, real fromy, real fromz, real tox, r
 
 	for (real s=0;s<=1.0;s+=ds)
 	{
-		for (int k=0;k<3;k++) p[k] = i[k] + s*(f[k]-i[k]);
-		// FIXME: isFluid checks idx, not real !!!
-		if (lbm.isFluid(p[0],p[1],p[2]))
+		point_t p = i + s * (f - i);
+		if (!lbm.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z())) continue;
+		if (lbm.isFluid((idx) p.x(), (idx) p.y(), (idx) p.z()))
 		{
 			fprintf(fout, "%e", (s*dist-0.5)*lbm.physDl);
 			index=0;
@@ -549,7 +527,7 @@ void State<LBM_TYPE>::write1Dcut(real fromx, real fromy, real fromz, real tox, r
 			{
 				for (int dof=0;dof<dofs;dof++)
 				{
-					outputData(index-1,dof,idd,p[0],p[1],p[2],value,dofs);
+					outputData(index-1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
 					fprintf(fout, "\t%e", value);
 				}
 			}
