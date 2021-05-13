@@ -118,10 +118,11 @@ struct LBM
 	real lbm2physY(idx y) { return physOrigin.y() + (y-0.5) * physDl; }
 	real lbm2physZ(idx z) { return physOrigin.z() + (z-0.5) * physDl; }
 
-	idx phys2lbmPoint(point_t p) { return (p - physOrigin) / physDl + 0.5; }
-	idx phys2lbmX(real x) { return (x - physOrigin.x()) / physDl + 0.5; }
-	idx phys2lbmY(real y) { return (y - physOrigin.y()) / physDl + 0.5; }
-	idx phys2lbmZ(real z) { return (z - physOrigin.z()) / physDl + 0.5; }
+	// physical to lattice coordinates (but still real rather than idx, rounding can be done later)
+	point_t phys2lbmPoint(point_t p) { return (p - physOrigin) / physDl + 0.5; }
+	real phys2lbmX(real x) { return (x - physOrigin.x()) / physDl + 0.5; }
+	real phys2lbmY(real y) { return (y - physOrigin.y()) / physDl + 0.5; }
+	real phys2lbmZ(real z) { return (z - physOrigin.z()) / physDl + 0.5; }
 
 	void resetForces() { resetForces(0,0,0);}
 	void resetForces(real ifx, real ify, real ifz);
