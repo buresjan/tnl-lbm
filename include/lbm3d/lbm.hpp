@@ -221,7 +221,7 @@ void LBM<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_offset
 	// empty view, but with correct sizes
 	#ifdef HAVE_MPI
 	typename sync_array_t::LocalViewType localView(nullptr, data.indexer);
-	typename sync_array_t::ViewType view(localView, dmap.getSizes(), dmap.getLocalBegins(), dmap.getLocalEnds(), dmap.getCommunicationGroup());
+	typename sync_array_t::ViewType view(localView, dmap.getSizes(), dmap.getLocalBegins(), dmap.getLocalEnds(), dmap.getCommunicator());
 	#else
 	typename sync_array_t::ViewType view(nullptr, data.indexer);
 	#endif
@@ -335,7 +335,7 @@ void LBM<LBM_TYPE>::allocateHostData()
 	{
 		hfs[dfty].setSizes(0, global_X, global_Y, global_Z);
 		#ifdef HAVE_MPI
-		hfs[dfty].template setDistribution< 1 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+		hfs[dfty].template setDistribution< 1 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 		hfs[dfty].allocate();
 		#endif
 	}
@@ -343,9 +343,9 @@ void LBM<LBM_TYPE>::allocateHostData()
 	hmap.setSizes(global_X, global_Y, global_Z);
 	wall.setSizes(global_X, global_Y, global_Z);
 #ifdef HAVE_MPI
-	hmap.template setDistribution< 0 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+	hmap.template setDistribution< 0 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 	hmap.allocate();
-	wall.template setDistribution< 0 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+	wall.template setDistribution< 0 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 	wall.allocate();
 #endif
 	wall.setValue(false);
@@ -353,9 +353,9 @@ void LBM<LBM_TYPE>::allocateHostData()
 	hmacro.setSizes(0, global_X, global_Y, global_Z);
 	cpumacro.setSizes(0, global_X, global_Y, global_Z);
 #ifdef HAVE_MPI
-	hmacro.template setDistribution< 1 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+	hmacro.template setDistribution< 1 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 	hmacro.allocate();
-	cpumacro.template setDistribution< 1 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+	cpumacro.template setDistribution< 1 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 	cpumacro.allocate();
 #endif
 	hmacro.setValue(0);
@@ -370,7 +370,7 @@ void LBM<LBM_TYPE>::allocateDeviceData()
 #ifdef USE_CUDA
 	dmap.setSizes(global_X, global_Y, global_Z);
 	#ifdef HAVE_MPI
-	dmap.template setDistribution< 0 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+	dmap.template setDistribution< 0 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 	dmap.allocate();
 	#endif
 
@@ -378,14 +378,14 @@ void LBM<LBM_TYPE>::allocateDeviceData()
 	{
 		dfs[dfty].setSizes(0, global_X, global_Y, global_Z);
 		#ifdef HAVE_MPI
-		dfs[dfty].template setDistribution< 1 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+		dfs[dfty].template setDistribution< 1 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 		dfs[dfty].allocate();
 		#endif
 	}
 
 	dmacro.setSizes(0, global_X, global_Y, global_Z);
 	#ifdef HAVE_MPI
-	dmacro.template setDistribution< 1 >(offset_X, offset_X + local_X, TNL::MPI::AllGroup());
+	dmacro.template setDistribution< 1 >(offset_X, offset_X + local_X, MPI_COMM_WORLD);
 	dmacro.allocate();
 	#endif
 #else
@@ -440,7 +440,7 @@ LBM<LBM_TYPE>::LBM(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, re
 	// initialize MPI info
 	rank = TNL::MPI::GetRank();
 	nproc = TNL::MPI::GetSize();
-	auto local_range = TNL::Containers::Partitioner<idx>::splitRange(global_X, TNL::MPI::AllGroup());
+	auto local_range = TNL::Containers::Partitioner<idx>::splitRange(global_X, MPI_COMM_WORLD);
 	local_X = local_range.getEnd() - local_range.getBegin();
 	offset_X = local_range.getBegin();
 	local_Y = global_Y;

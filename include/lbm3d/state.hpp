@@ -171,7 +171,7 @@ bool State<LBM_TYPE>::isMark()
 			result = false;
 		}
 	}
-	TNL::MPI::Bcast(&result, 1, 0, TNL::MPI::AllGroup());
+	TNL::MPI::Bcast(&result, 1, 0, MPI_COMM_WORLD);
 	return result;
 }
 
@@ -1748,9 +1748,7 @@ bool State<LBM_TYPE>::wallTimeReached()
 			local_result = true;
 		}
 	}
-	bool result;
-	TNL::MPI::Allreduce(&local_result, &result, 1, MPI_LOR, TNL::MPI::AllGroup());
-	return result;
+	return TNL::MPI::reduce(local_result, MPI_LOR, MPI_COMM_WORLD);
 }
 
 template< typename LBM_TYPE >
@@ -1766,7 +1764,7 @@ double State<LBM_TYPE>::getWallTime(bool collective)
 	if (collective)
 	{
 		// collective operation - make sure that all MPI processes return the same walltime (taken from rank 0)
-		TNL::MPI::Bcast(&walltime, 1, 0, TNL::MPI::AllGroup());
+		TNL::MPI::Bcast(&walltime, 1, 0, MPI_COMM_WORLD);
 	}
 	return walltime;
 }

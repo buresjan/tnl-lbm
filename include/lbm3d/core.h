@@ -801,8 +801,7 @@ void execute(STATE& state)
 		}
 
 		// distribute quit among all MPI processes
-		bool local_quit = quit;
-		TNL::MPI::Allreduce(&local_quit, &quit, 1, MPI_LOR, TNL::MPI::AllGroup());
+		quit = TNL::MPI::reduce(quit, MPI_LOR, MPI_COMM_WORLD);
 	}
 
 #ifdef HAVE_MPI

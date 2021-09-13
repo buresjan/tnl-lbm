@@ -190,14 +190,10 @@ struct StateLocal : State<LBM_TYPE>
 		}
 
 		// MPI reduction of the local results
-		real l1sum=0;
-		real l2sum=0;
-		real la1sum=0;
-		real la2sum=0;
-		TNL::MPI::Allreduce(&local_l1sum, &l1sum, 1, MPI_SUM, TNL::MPI::AllGroup());
-		TNL::MPI::Allreduce(&local_l2sum, &l2sum, 1, MPI_SUM, TNL::MPI::AllGroup());
-		TNL::MPI::Allreduce(&local_la1sum, &la1sum, 1, MPI_SUM, TNL::MPI::AllGroup());
-		TNL::MPI::Allreduce(&local_la2sum, &la2sum, 1, MPI_SUM, TNL::MPI::AllGroup());
+		real l1sum=TNL::MPI::reduce(local_l1sum, MPI_SUM, MPI_COMM_WORLD);
+		real l2sum=TNL::MPI::reduce(local_l2sum, MPI_SUM, MPI_COMM_WORLD);
+		real la1sum=TNL::MPI::reduce(local_la1sum, MPI_SUM, MPI_COMM_WORLD);
+		real la2sum=TNL::MPI::reduce(local_la2sum, MPI_SUM, MPI_COMM_WORLD);
 
 		// Chinese version
 		real l1error_chinese = l1sum / la1sum;

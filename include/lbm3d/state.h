@@ -254,8 +254,7 @@ struct State
 	State(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin) : lbm(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
 	{
 		bool local_estimate = estimateMemoryDemands();
-		bool global_result;
-		TNL::MPI::Allreduce(&local_estimate, &global_result, 1, MPI_LAND, TNL::MPI::AllGroup());
+		bool global_result = TNL::MPI::reduce(local_estimate, MPI_LAND, MPI_COMM_WORLD);
 		if (!local_estimate)
 			log("Not enough memory available (CPU or GPU). [disable this check in lbm3d/state.h -> State constructor]");
 		if (!global_result)
