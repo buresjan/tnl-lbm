@@ -592,6 +592,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	printf("tnl wushu construct loop 1: end\n");
 
 	// allocate matrix A
+	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
 //	int max_nz_per_row=0;
 //	for (int el=0;el<m;el++) {
@@ -751,8 +752,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 
 	#ifdef USE_CUDA
 	// copy matrices from host to the GPU
+	ws_tnl_dA = std::make_shared< dEllpack >();
 	*ws_tnl_dA = *ws_tnl_hA;
-	ws_tnl_dA.synchronize();
 	ws_tnl_dM = ws_tnl_hM;
 	ws_tnl_dMT = ws_tnl_hMT;
 

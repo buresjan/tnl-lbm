@@ -12,7 +12,6 @@
 	#include <TNL/Matrices/SparseMatrix.h>
 	#include <TNL/Algorithms/Segments/SlicedEllpack.h>
 	#include <TNL/Pointers/DevicePointer.h>
-	#include <TNL/Pointers/SharedPointer.h>
 	#include <TNL/Algorithms/ParallelFor.h>
 	#include <TNL/Solvers/Linear/CG.h>
 	#include <TNL/Solvers/Linear/Preconditioners/Diagonal.h>
@@ -94,8 +93,8 @@ struct Lagrange3D
 //	using hEllpack = SlicedEllpack< real, TNL::Devices::Host, idx >;
 	using hEllpack = SlicedEllpack< dreal, TNL::Devices::Host, idx >;
 	using dEllpack = SlicedEllpack< dreal, TNL::Devices::Cuda, idx >;
-	using hEllpackPtr = TNL::Pointers::SharedPointer< hEllpack >;
-	using dEllpackPtr = TNL::Pointers::SharedPointer< dEllpack >;
+	using hEllpackPtr = std::shared_ptr< hEllpack >;
+	using dEllpackPtr = std::shared_ptr< dEllpack >;
 
 	// ws_ using sparse matrices
 	hEllpackPtr ws_tnl_hA;
