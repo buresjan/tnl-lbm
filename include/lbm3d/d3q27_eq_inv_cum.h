@@ -45,5 +45,5 @@ struct D3Q27_EQ_INV_CUM
 	CUDA_HOSTDEV static dreal eq_mpp(dreal rho, dreal vx, dreal vy, dreal vz) {return n1o216*rho*((no3 * vx * vx - no3 * vx + no1) * (no3 * vy * vy + no3 * vy + no1) * (no3 * vz * vz + no3 * vz + no1));}
 	CUDA_HOSTDEV static dreal eq_mpm(dreal rho, dreal vx, dreal vy, dreal vz) {return n1o216*rho*((no3 * vx * vx - no3 * vx + no1) * (no3 * vy * vy + no3 * vy + no1) * (no3 * vz * vz - no3 * vz + no1));}
 	CUDA_HOSTDEV static dreal eq_mmp(dreal rho, dreal vx, dreal vy, dreal vz) {return n1o216*rho*((no3 * vx * vx - no3 * vx + no1) * (no3 * vz * vz + no3 * vz + no1) * (no3 * vy * vy - no3 * vy + no1));}
-	CUDA_HOSTDEV static dreal eq_pmm(dreal rho, dreal vx, dreal vy, dreal vz) {return n1o216*rho*((no3 * vx * vx + no3 * vx + no1) * (no3 * vz * vz - no3 * vz + no1) * rho * (no3 * vy * vy - no3 * vy + no1));}
+	CUDA_HOSTDEV static dreal eq_pmm(dreal rho, dreal vx, dreal vy, dreal vz) {return n1o216*rho*((no3 * vx * vx + no3 * vx + no1) * (no3 * vz * vz - no3 * vz + no1) * (no3 * vy * vy - no3 * vy + no1));}
 };
