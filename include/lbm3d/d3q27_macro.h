@@ -10,18 +10,20 @@ struct D3Q27_MACRO_Base
 	// all quantities after `N` are ignored
 	enum { N, e_rho, e_vx, e_vy, e_vz, e_fx, e_fy, e_fz };
 
-	static const bool use_kernelWorker = false;
 	static const bool use_syncMacro = false;
 
-	// compulsory method, void here
+	// called from LBMKernelInit
+	template < typename LBM_KS >
+	CUDA_HOSTDEV static void zeroForcesInKS(LBM_KS &KS)
+	{
+		KS.fx = 0;
+		KS.fy = 0;
+		KS.fz = 0;
+	}
+
+	// compulsory method -- called from cudaLBMComputeVelocitiesStarAndZeroForce kernel
 	template < typename LBM_DATA >
 	CUDA_HOSTDEV static void zeroForces(LBM_DATA &SD, idx x, idx y, idx z) {}
-
-	template <
-		typename LBM_TYPE,
-		typename LBM_DATA
-	>
-	CUDA_HOSTDEV static void kernelWorker(LBM_DATA &SD, idx x, idx y, idx z) {}
 
 	template < typename LBM_BC, typename LBM_DATA, typename LBM_KS >
 	CUDA_HOSTDEV static void computeForcing(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp) {}

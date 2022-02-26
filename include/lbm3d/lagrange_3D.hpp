@@ -5,9 +5,9 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMinDist()
 {
 	minDist=1e10;
 	maxDist=-1e10;
-	for (int i=0;i<LL.size()-1;i++)
+	for (std::size_t i=0;i<LL.size()-1;i++)
 	{
-	for (int j=i+1;j<LL.size();j++)
+	for (std::size_t j=i+1;j<LL.size();j++)
 	{
 		real d = dist(LL[j],LL[i]);
 		if (d>maxDist) maxDist=d;
@@ -23,10 +23,10 @@ template< typename LBM >
 typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename LBM::TRAITS::real mindist)
 {
 	maxDist=-1e10;
-	for (int i=0;i<LL.size()-1;i++)
+	for (std::size_t i=0;i<LL.size()-1;i++)
 	{
 		real search_dist = 2.0*mindist;
-		for (int j=i+1;j<LL.size();j++)
+		for (std::size_t j=i+1;j<LL.size();j++)
 		{
 			real d = dist(LL[j],LL[i]);
 			if (d < search_dist)
@@ -67,7 +67,7 @@ int Lagrange3D<LBM>::createIndexArray()
 	if (lag_X<=0 || lag_Y<=0) return 0;
 	index_array = new int*[lag_X];
 	for (int i=0;i<lag_X;i++) index_array[i] = new int[lag_Y];
-	for (int k=0;k<LL.size();k++) index_array[LL[k].lag_x][LL[k].lag_y] = k;
+	for (std::size_t k=0;k<LL.size();k++) index_array[LL[k].lag_x][LL[k].lag_y] = k;
 	indexed=true;
 	return 1;
 }
@@ -80,7 +80,7 @@ int Lagrange3D<LBM>::findIndex(int i, int j)
 	if (!indexed) return 0;
 	return index_array[i][j];
 	// brute force
-//	for (int k=0;k<LL.size();k++) if (LL[k].lag_x == i && LL[k].lag_y == j) return k;
+//	for (std::size_t k=0;k<LL.size();k++) if (LL[k].lag_x == i && LL[k].lag_y == j) return k;
 //	printf("findIndex(%d,%d): not found\n",i,j);
 //	return 0;
 }
@@ -91,7 +91,7 @@ int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
 	int imin=0;
 	real xmindist=fabs(LL[imin].x-x);
 	// brute force
-	for (int k=1;k<LL.size();k++)
+	for (std::size_t k=1;k<LL.size();k++)
 	if (fabs(LL[k].x - x) < xmindist)
 	{
 		imin=k;
@@ -157,7 +157,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	int rDirac=1;
 	// count non zero elements in matrix ws_A
 	int m=LL.size();	// number of lagrangian nodes
-	int n=lbm.global_X*lbm.global_Y*lbm.global_Z;	// number of eulerian nodes
+	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
 	// projdi veskery filament a najdi sousedni body (ve vzdaelenosti mensi nez je prekryv delta funkci)
 	struct DD_struct
 	{
@@ -203,13 +203,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 			if (!proceed) continue;
 			if (ws_regularDirac)
 			{
-				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.physDl);
+				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.lat.physDl);
 				if (d1>0)
 				{
-					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.physDl);
+					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.lat.physDl);
 					if (d2>0)
 					{
-						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.physDl);
+						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.lat.physDl);
 						if (ddd>0)
 						{
 							v[el].push_back(ka);
@@ -222,13 +222,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 				}
 			} else
 			{
-				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.physDl/2.0);
+				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.lat.physDl/2.0);
 				if (d1>0)
 				{
-					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.physDl/2.0);
+					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.lat.physDl/2.0);
 					if (d2>0)
 					{
-						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.physDl/2.0);
+						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.lat.physDl/2.0);
 						if (ddd>0)
 						{
 							v[el].push_back(ka);
@@ -291,7 +291,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		ws_dA->Ap[i+1] = ws_dA->Ap[i] + v[i].size();
 		#endif
 //		printf("Ap[%d]=%d (%d)\n",i+1,ws_A->Ap[i+1],nz);
-		for (int j=0;j<v[i].size();j++)
+		for (std::size_t j=0;j<v[i].size();j++)
 		{
 			ws_A->Ai[count]=v[i][j];
 			#ifdef USE_CUSPARSE
@@ -314,11 +314,11 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (int i=0;i<m;i++)
 	{
 //		if (i%20==0) printf("\r progress: %04d of %04d",i,m);
-		for (int gz=0;gz<lbm.local_Z;gz++)
-		for (int gy=0;gy<lbm.local_Y;gy++)
-		for (int gx=0;gx<lbm.local_X;gx++)
+		for (int gz=0;gz<lbm.blocks.front().local.z();gz++)
+		for (int gy=0;gy<lbm.blocks.front().local.y();gy++)
+		for (int gx=0;gx<lbm.blocks.front().local.x();gx++)
 		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.physDl);
+			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 			if (dd>0)
 			{
 				d_i[i].push_back(lbm.pos(gx,gy,gz));
@@ -334,19 +334,20 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-		idx fi_x = floor(LL[i].x/lbm.physDl);
-		idx fi_y = floor(LL[i].y/lbm.physDl);
-		idx fi_z = floor(LL[i].z/lbm.physDl);
+		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
+		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
+		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
 
-		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.local_Z, fi_z + support);gz++)
-		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.local_Y, fi_y + support);gy++)
-		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.local_X, fi_x + support);gx++)
+		// FIXME: iterate over LBM blocks
+		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
+		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
+		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
 		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.physDl);
+			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 			if (dd>0)
 			{
 				// FIXME: local vs global indices
-				d_i[i].push_back(lbm.hmap.getStorageIndex(gx,gy,gz));
+				d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
 				d_x[i].push_back(dd);
 			}
 		}
@@ -359,7 +360,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (int i=0;i<m;i++)
 	{
 		if (i%100==0)printf("progress %5.2f %%    \r",100.0*i/(real)m);
-		for (int ka=0;ka<vr[i].size();ka++)
+		for (std::size_t ka=0;ka<vr[i].size();ka++)
 		{
 			int j=vr[i][ka].ka;
 			real ddd = vr[i][ka].DD;
@@ -374,9 +375,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 				if (ddd>0) // we have non-zero element at i,j
 				{
 					real val=0;
-					for (int in1=0;in1<d_i[i].size();in1++)
+					for (std::size_t in1=0;in1<d_i[i].size();in1++)
 					{
-						for (int in2=0;in2<d_i[j].size();in2++)
+						for (std::size_t in2=0;in2<d_i[j].size();in2++)
 						{
 							if (d_i[i][in1]==d_i[j][in2])
 							{
@@ -425,7 +426,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	// create Matrix M: matrix realizing projection of u* to lagrange desc.
 	nz=0;
 	for (int el=0;el<m;el++)
-	for (int in1=0;in1<d_i[el].size();in1++)
+	for (std::size_t in1=0;in1<d_i[el].size();in1++)
 		nz++;
 	#ifdef USE_CUSPARSE
 	ws_M = new SpRectMatrix<dreal>();
@@ -444,7 +445,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (int i=0;i<m;i++)
 	{
 		ws_M->Ap[i+1] = ws_M->Ap[i] + d_i[i].size();
-		for (int j=0;j<d_i[i].size();j++)
+		for (std::size_t j=0;j<d_i[i].size();j++)
 		{
 			ws_M->Ai[count]=d_i[i][j];
 			ws_M->Ax[count]=(dreal)d_x[i][j];
@@ -469,7 +470,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	VEC *vn = new VEC[n];
 	VECR *vx = new VECR[n];
 	for (int i=0;i<m;i++)
-	for (int j=0;j<d_i[i].size();j++)
+	for (std::size_t j=0;j<d_i[i].size();j++)
 	{
 		vn[ d_i[i][j] ].push_back( i );
 		vx[ d_i[i][j] ].push_back( d_x[i][j] );
@@ -479,7 +480,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (int i=0;i<n;i++)
 	{
 		ws_MT->Ap[i+1] = ws_MT->Ap[i] + vn[i].size();
-		for (int j=0;j<vn[i].size();j++)
+		for (std::size_t j=0;j<vn[i].size();j++)
 		{
 			ws_MT->Ai[count]=vn[i][j];
 			ws_MT->Ax[count]=vx[i][j];
@@ -502,7 +503,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	int rDirac=1;
 	// count non zero elements in matrix A
 	int m=LL.size();	// number of lagrangian nodes
-	int n=lbm.global_X*lbm.global_Y*lbm.global_Z;	// number of eulerian nodes
+	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
 	// projdi veskery filament a najdi sousedni body (ve vzdaelenosti mensi nez je prekryv delta funkci)
 	struct DD_struct
 	{
@@ -545,13 +546,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			if (!proceed) continue;
 			if (ws_regularDirac)
 			{
-				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.physDl);
+				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.lat.physDl);
 				if (d1>0)
 				{
-					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.physDl);
+					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.lat.physDl);
 					if (d2>0)
 					{
-						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.physDl);
+						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.lat.physDl);
 						if (ddd>0)
 						{
 							v[el].push_back(ka);
@@ -564,13 +565,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				}
 			} else
 			{
-				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.physDl/2.0);
+				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.lat.physDl/2.0);
 				if (d1>0)
 				{
-					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.physDl/2.0);
+					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.lat.physDl/2.0);
 					if (d2>0)
 					{
-						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.physDl/2.0);
+						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.lat.physDl/2.0);
 						if (ddd>0)
 						{
 							v[el].push_back(ka);
@@ -606,7 +607,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int i=0;i<m;i++)
 	{
 		auto row = ws_tnl_hA->getRow(i);
-		for (int j=0;j<v[i].size();j++)
+		for (std::size_t j=0;j<v[i].size();j++)
 			row.setElement(j, v[i][j], 1);
 	}
 	delete [] v;
@@ -622,19 +623,20 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-		idx fi_x = floor(LL[i].x/lbm.physDl);
-		idx fi_y = floor(LL[i].y/lbm.physDl);
-		idx fi_z = floor(LL[i].z/lbm.physDl);
+		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
+		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
+		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
 
-		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.local_Z, fi_z + support);gz++)
-		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.local_Y, fi_y + support);gy++)
-		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.local_X, fi_x + support);gx++)
+		// FIXME: iterate over LBM blocks
+		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
+		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
+		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
 		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.physDl);
+			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 			if (dd>0)
 			{
 				// FIXME: local vs global indices
-				d_i[i].push_back(lbm.hmap.getStorageIndex(gx,gy,gz));
+				d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
 				d_x[i].push_back(dd);
 			}
 		}
@@ -646,7 +648,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int i=0;i<m;i++)
 	{
 		if (i%100==0)printf("progress %5.2f %%    \r",100.0*i/(real)m);
-		for (int ka=0;ka<vr[i].size();ka++)
+		for (std::size_t ka=0;ka<vr[i].size();ka++)
 		{
 			int j=vr[i][ka].ka;
 			real ddd = vr[i][ka].DD;
@@ -658,9 +660,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				if (ddd>0) // we have non-zero element at i,j
 				{
 					real val=0;
-					for (int in1=0;in1<d_i[i].size();in1++)
+					for (std::size_t in1=0;in1<d_i[i].size();in1++)
 					{
-						for (int in2=0;in2<d_i[j].size();in2++)
+						for (std::size_t in2=0;in2<d_i[j].size();in2++)
 						{
 							if (d_i[i][in1]==d_i[j][in2])
 							{
@@ -712,7 +714,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int i=0;i<m;i++)
 	{
 		auto row = ws_tnl_hM.getRow(i);
-		for (int j=0;j<d_i[i].size();j++)
+		for (std::size_t j=0;j<d_i[i].size();j++)
 			row.setElement(j, d_i[i][j], (dreal)d_x[i][j]);
 	}
 
@@ -723,7 +725,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	VEC *vn = new VEC[n];
 	VECR *vx = new VECR[n];
 	for (int i=0;i<m;i++)
-	for (int j=0;j<d_i[i].size();j++)
+	for (std::size_t j=0;j<d_i[i].size();j++)
 	{
 		vn[ d_i[i][j] ].push_back( i );
 		vx[ d_i[i][j] ].push_back( d_x[i][j] );
@@ -740,7 +742,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int i=0;i<n;i++)
 	{
 		auto row = ws_tnl_hMT.getRow(i);
-		for (int j=0;j<vn[i].size();j++)
+		for (std::size_t j=0;j<vn[i].size();j++)
 			row.setElement(j, vn[i][j], vx[i][j]);
 	}
 	delete [] vn;
@@ -815,7 +817,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 	}
 
 	int m=LL.size();
-	idx n=lbm.global_X*lbm.global_Y*lbm.global_Z;
+	idx n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
 
 	#ifdef USE_TNL
 	using VectorView = TNL::Containers::VectorView< dreal, TNL::Devices::Cuda, idx >;
@@ -829,9 +831,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		{
 			#ifdef USE_TNL
 			// no Device--Host copy is required
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvx(), n), ws_tnl_db[0], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvy(), n), ws_tnl_db[1], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvz(), n), ws_tnl_db[2], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_db[0], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_db[1], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_db[2], -1.0);
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -844,10 +846,10 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			ConstVectorView x1(ws_tnl_dx[0].getData(), ws_tnl_dx[0].getSize());
 			ConstVectorView x2(ws_tnl_dx[1].getData(), ws_tnl_dx[1].getSize());
 			ConstVectorView x3(ws_tnl_dx[2].getData(), ws_tnl_dx[2].getSize());
-			ConstVectorView rho(lbm.drho(), n);
-			VectorView fx(lbm.dfx(), n);
-			VectorView fy(lbm.dfy(), n);
-			VectorView fz(lbm.dfz(), n);
+			ConstVectorView rho(lbm.blocks.front().drho(), n);
+			VectorView fx(lbm.blocks.front().dfx(), n);
+			VectorView fy(lbm.blocks.front().dfy(), n);
+			VectorView fz(lbm.blocks.front().dfz(), n);
 			//TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
 			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
 			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
@@ -870,9 +872,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		case ws_computeHybrid_TNL:
 		{
 			#ifdef USE_TNL
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvx(), n), ws_tnl_db[0], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvy(), n), ws_tnl_db[1], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvz(), n), ws_tnl_db[2], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_db[0], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_db[1], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_db[2], -1.0);
 			// copy to Host
 			for (int k=0;k<3;k++) ws_tnl_hb[k] = ws_tnl_db[k];
 			// solve on CPU
@@ -890,10 +892,10 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			ConstVectorView x1(ws_tnl_dx[0].getData(), ws_tnl_dx[0].getSize());
 			ConstVectorView x2(ws_tnl_dx[1].getData(), ws_tnl_dx[1].getSize());
 			ConstVectorView x3(ws_tnl_dx[2].getData(), ws_tnl_dx[2].getSize());
-			ConstVectorView rho(lbm.drho(), n);
-			VectorView fx(lbm.dfx(), n);
-			VectorView fy(lbm.dfy(), n);
-			VectorView fz(lbm.dfz(), n);
+			ConstVectorView rho(lbm.blocks.front().drho(), n);
+			VectorView fx(lbm.blocks.front().dfx(), n);
+			VectorView fy(lbm.blocks.front().dfy(), n);
+			VectorView fz(lbm.blocks.front().dfz(), n);
 //			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
 			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
 			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
@@ -916,9 +918,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		case ws_computeHybrid_TNL_zerocopy:
 		{
 			#ifdef USE_TNL
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvx(), n), ws_tnl_hbz[0], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvy(), n), ws_tnl_hbz[1], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.dvz(), n), ws_tnl_hbz[2], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_hbz[0], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_hbz[1], -1.0);
+			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_hbz[2], -1.0);
 			// solve on CPU
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -932,10 +934,10 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			ConstVectorView x1(ws_tnl_hxz[0].getData(), ws_tnl_hxz[0].getSize());
 			ConstVectorView x2(ws_tnl_hxz[1].getData(), ws_tnl_hxz[1].getSize());
 			ConstVectorView x3(ws_tnl_hxz[2].getData(), ws_tnl_hxz[2].getSize());
-			ConstVectorView rho(lbm.drho(), n);
-			VectorView fx(lbm.dfx(), n);
-			VectorView fy(lbm.dfy(), n);
-			VectorView fz(lbm.dfz(), n);
+			ConstVectorView rho(lbm.blocks.front().drho(), n);
+			VectorView fx(lbm.blocks.front().dfx(), n);
+			VectorView fy(lbm.blocks.front().dfy(), n);
+			VectorView fz(lbm.blocks.front().dfz(), n);
 //			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
 			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
 			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
@@ -960,18 +962,18 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			#ifdef USE_CUSPARSE
 			// no Device--Host copy is required
 			// HOKUS POKUS
-			ws_M->dmultiply(lbm.dvx(), ws_db[0], -1.0);
-			ws_M->dmultiply(lbm.dvy(), ws_db[1], -1.0);
-			ws_M->dmultiply(lbm.dvz(), ws_db[2], -1.0);
+			ws_M->dmultiply(lbm.blocks.front().dvx(), ws_db[0], -1.0);
+			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[1], -1.0);
+			ws_M->dmultiply(lbm.blocks.front().dvz(), ws_db[2], -1.0);
 			// solver
 			for (int k=0;k<3;k++) ws_dA->dsolve(ws_db[k], ws_dx[k]);
 			// now compute delta u
 			ws_MT->dmultiply(ws_dx[0], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.drho(), 1.0, lbm.dfx());
+			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfx());
 			ws_MT->dmultiply(ws_dx[1], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.drho(), 1.0, lbm.dfy());
+			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfy());
 			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.drho(), 1.0, lbm.dfz());
+			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfz());
 			#else
 			printf("ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build. \n");
 			#endif
@@ -980,9 +982,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		case ws_computeHybrid_CUSPARSE:
 		{
 			#ifdef USE_CUSPARSE
-			ws_M->dmultiply(lbm.dvx(), ws_db[0], -1.0);
-			ws_M->dmultiply(lbm.dvy(), ws_db[1], -1.0);
-			ws_M->dmultiply(lbm.dvy(), ws_db[2], -1.0);
+			ws_M->dmultiply(lbm.blocks.front().dvx(), ws_db[0], -1.0);
+			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[1], -1.0);
+			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[2], -1.0);
 			// copy to Host
 			for (int k=0;k<3;k++) cudaMemcpy(ws_hb[k],ws_db[k],m*sizeof(dreal), cudaMemcpyDeviceToHost);
 			// retype
@@ -1000,11 +1002,11 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				cudaMemcpy(ws_dx[k],ws_hx[k],m*sizeof(dreal), cudaMemcpyHostToDevice);
 			// continue on GPU
 			ws_MT->dmultiply(ws_dx[0], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.drho(),1.0, lbm.dfx());
+			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfx());
 			ws_MT->dmultiply(ws_dx[1], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.drho(),1.0, lbm.dfy());
+			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfy());
 			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.drho(),1.0, lbm.dfz());
+			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfz());
 			#else
 			printf("ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build. \n");
 			#endif
@@ -1015,9 +1017,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		{
 			#ifdef USE_TNL
 			// vx, vy, vz, rho must be copied from the device
-			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.hvx(), n), ws_tnl_hb[0], -1.0);
-			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.hvy(), n), ws_tnl_hb[1], -1.0);
-			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.hvz(), n), ws_tnl_hb[2], -1.0);
+			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvx(), n), ws_tnl_hb[0], -1.0);
+			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvy(), n), ws_tnl_hb[1], -1.0);
+			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvz(), n), ws_tnl_hb[2], -1.0);
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -1031,9 +1033,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			{
 				// skipping empty rows explicitly is much faster
 				if( ws_tnl_hMT.getRowCapacity(i) > 0 ) {
-					lbm.hfx()[i] += 2 * lbm.hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[0]);
-					lbm.hfy()[i] += 2 * lbm.hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[1]);
-					lbm.hfz()[i] += 2 * lbm.hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
+					lbm.blocks.front().hfx()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[0]);
+					lbm.blocks.front().hfy()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[1]);
+					lbm.blocks.front().hfz()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
 				}
 			};
 			TNL::Algorithms::ParallelFor< TNL::Devices::Host >::exec((idx) 0, n, kernel);
@@ -1050,12 +1052,12 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			{
 				for (int k=0;k<3;k++)
 					ws_b[k][el]=0;
-				for (int in1=0;in1<d_i[el].size();in1++)
+				for (std::size_t in1=0;in1<d_i[el].size();in1++)
 				{
 					int gi=d_i[el][in1];
-					ws_b[0][el] -= (real)lbm.hvx()[gi] * d_x[el][in1];
-					ws_b[1][el] -= (real)lbm.hvy()[gi] * d_x[el][in1];
-					ws_b[2][el] -= (real)lbm.hvz()[gi] * d_x[el][in1];
+					ws_b[0][el] -= (real)lbm.blocks.front().hvx()[gi] * d_x[el][in1];
+					ws_b[1][el] -= (real)lbm.blocks.front().hvy()[gi] * d_x[el][in1];
+					ws_b[2][el] -= (real)lbm.blocks.front().hvz()[gi] * d_x[el][in1];
 				}
 			}
 			//solver
@@ -1063,12 +1065,12 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			// transfer to fx fy
 			for (int el=0;el<m;el++)
 			{
-				for (int in1=0;in1<d_i[el].size();in1++)
+				for (std::size_t in1=0;in1<d_i[el].size();in1++)
 				{
 					int gi=d_i[el][in1];
-					lbm.hfx()[gi] += (dreal)(ws_x[0][el]*d_x[el][in1] * 2.0 * lbm.hrho()[gi]);
-					lbm.hfy()[gi] += (dreal)(ws_x[1][el]*d_x[el][in1] * 2.0 * lbm.hrho()[gi]);
-					lbm.hfz()[gi] += (dreal)(ws_x[2][el]*d_x[el][in1] * 2.0 * lbm.hrho()[gi]);
+					lbm.blocks.front().hfx()[gi] += (dreal)(ws_x[0][el]*d_x[el][in1] * 2.0 * lbm.blocks.front().hrho()[gi]);
+					lbm.blocks.front().hfy()[gi] += (dreal)(ws_x[1][el]*d_x[el][in1] * 2.0 * lbm.blocks.front().hrho()[gi]);
+					lbm.blocks.front().hfz()[gi] += (dreal)(ws_x[2][el]*d_x[el][in1] * 2.0 * lbm.blocks.front().hrho()[gi]);
 				}
 			}
 			break;

@@ -7,8 +7,9 @@ struct StateLocal : State<LBM_TYPE>
 	using TRAITS = typename LBM_TYPE::TRAITS;
 	using BC = typename LBM_TYPE::BC;
 	using MACRO = typename LBM_TYPE::MACRO;
+	using BLOCK = LBM_BLOCK< LBM_TYPE >;
 
-	using State<LBM_TYPE>::lbm;
+	using State<LBM_TYPE>::nse;
 	using State<LBM_TYPE>::vtk_helper;
 	using State<LBM_TYPE>::log;
 
@@ -16,31 +17,38 @@ struct StateLocal : State<LBM_TYPE>
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
 	using point_t = typename TRAITS::point_t;
+	using lat_t = Lattice<3, real, idx>;
 
 	real lbmInflowDensity = no1;
 
 	virtual void setupBoundaries()
 	{
-		lbm.setBoundaryX(0, BC::GEO_INFLOW); 		// left
-//		lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_RIGHT);		// right
-		lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_EQ);
-		lbm.setBoundaryZ(0, BC::GEO_WALL);		// top
-		lbm.setBoundaryZ(lbm.global_Z-1, BC::GEO_WALL);	// bottom
-		lbm.setBoundaryY(0, BC::GEO_WALL); 		// back
-		lbm.setBoundaryY(lbm.global_Y-1, BC::GEO_WALL);		// front
+		nse.setBoundaryX(0, BC::GEO_INFLOW); 		// left
+		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);
+
+		nse.setBoundaryZ(1, BC::GEO_WALL);		// top
+		nse.setBoundaryZ(nse.lat.global.z()-2, BC::GEO_WALL);	// bottom
+		nse.setBoundaryY(1, BC::GEO_WALL); 		// back
+		nse.setBoundaryY(nse.lat.global.y()-2, BC::GEO_WALL);		// front
+
+		// extra layer needed due to A-A pattern
+		nse.setBoundaryZ(0, BC::GEO_NOTHING);		// top
+		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_NOTHING);	// bottom
+		nse.setBoundaryY(0, BC::GEO_NOTHING); 		// back
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);		// front
 	}
 
-	virtual bool outputData(int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
+	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
 		int k=0;
-		if (index==k++) return vtk_helper("lbm_density", lbm.hmacro(MACRO::e_rho,x,y,z), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_density", block.hmacro(MACRO::e_rho,x,y,z), 1, desc, value, dofs);
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("velocity", lbm.hmacro(MACRO::e_vx,x,y,z), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", lbm.hmacro(MACRO::e_vy,x,y,z), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", lbm.hmacro(MACRO::e_vz,x,y,z), 3, desc, value, dofs);
+				case 0: return vtk_helper("velocity", block.hmacro(MACRO::e_vx,x,y,z), 3, desc, value, dofs);
+				case 1: return vtk_helper("velocity", block.hmacro(MACRO::e_vy,x,y,z), 3, desc, value, dofs);
+				case 2: return vtk_helper("velocity", block.hmacro(MACRO::e_vz,x,y,z), 3, desc, value, dofs);
 			}
 		}
 		return false;
@@ -48,16 +56,17 @@ struct StateLocal : State<LBM_TYPE>
 
 	virtual void probe1()
 	{
-		if (lbm.iterations != 0)
+		if (nse.iterations != 0)
 		{
 			// inflow density extrapolation
 			idx x = 5;
-			idx y = lbm.global_Y/2;
-			idx z = lbm.global_Z/2;
-			if (lbm.isLocalIndex(x, y, z))
+			idx y = nse.lat.global.y()/2;
+			idx z = nse.lat.global.z()/2;
+			for (auto& block : nse.blocks)
+			if (block.isLocalIndex(x, y, z))
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = lbm.dmacro.getElement(MACRO::e_rho, x, y, z);
+				lbmInflowDensity = block.dmacro.getElement(MACRO::e_rho, x, y, z);
 				log("[probe: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
@@ -65,16 +74,20 @@ struct StateLocal : State<LBM_TYPE>
 
 	virtual void updateKernelVelocities()
 	{
-		lbm.data.inflow_rho = lbmInflowDensity;
+		for (auto& block : nse.blocks)
+			block.data.inflow_rho = lbmInflowDensity;
 	}
 
-	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysVelocity, real iphysDl, real iphysDt, point_t iphysOrigin)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
+	StateLocal(lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt)
+		: State<LBM_TYPE>(ilat, iphysViscosity, iphysDt)
 	{
-		lbm.data.inflow_rho = no1;
-		lbm.data.inflow_vx = lbm.phys2lbmVelocity(iphysVelocity);
-		lbm.data.inflow_vy = 0;
-		lbm.data.inflow_vz = 0;
+		for (auto& block : nse.blocks)
+		{
+			block.data.inflow_rho = no1;
+			block.data.inflow_vx = nse.phys2lbmVelocity(iphysVelocity);
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
+		}
 	}
 
 	virtual void saveState(bool forced=false)
@@ -92,12 +105,13 @@ struct StateLocal : State<LBM_TYPE>
 
 			// set lbmInflowDensity from hmacro -- for consistency with restarted computations
 			idx x = 5;
-			idx y = lbm.global_Y/2;
-			idx z = lbm.global_Z/2;
-			if (lbm.isLocalIndex(x, y, z))
+			idx y = nse.lat.global.y()/2;
+			idx z = nse.lat.global.z()/2;
+			for (auto& block : nse.blocks)
+			if (block.isLocalIndex(x, y, z))
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = lbm.hmacro(MACRO::e_rho, x, y, z);
+				lbmInflowDensity = block.hmacro(MACRO::e_rho, x, y, z);
 				log("[loadState: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
@@ -112,12 +126,13 @@ struct StateLocal : State<LBM_TYPE>
 
 			// set lbmInflowDensity from hmacro
 			idx x = 5;
-			idx y = lbm.global_Y/2;
-			idx z = lbm.global_Z/2;
-			if (lbm.isLocalIndex(x, y, z))
+			idx y = nse.lat.global.y()/2;
+			idx z = nse.lat.global.z()/2;
+			for (auto& block : nse.blocks)
+			if (block.isLocalIndex(x, y, z))
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = lbm.hmacro(MACRO::e_rho, x, y, z);
+				lbmInflowDensity = block.hmacro(MACRO::e_rho, x, y, z);
 				log("[loadState: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
@@ -127,8 +142,10 @@ struct StateLocal : State<LBM_TYPE>
 template < typename LBM_TYPE >
 int sim01_test(int RESOLUTION = 2)
 {
+	using idx = typename LBM_TYPE::TRAITS::idx;
 	using real = typename LBM_TYPE::TRAITS::real;
 	using point_t = typename LBM_TYPE::TRAITS::point_t;
+	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
 	int X = 128*RESOLUTION;// width in pixels --- product of 128.
@@ -145,34 +162,43 @@ int sim01_test(int RESOLUTION = 2)
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;//PHYS_HEIGHT/(real)LBM_HEIGHT;
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
-	StateLocal< LBM_TYPE > state(X, Y, Z, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN);
-	state.setid("sim_1_res%02d_np%03d", RESOLUTION, state.lbm.nproc);
-	state.lbm.block_size = 32;
-	state.lbm.physCharLength = 0.1; // [m]
+	// initialize the lattice
+	lat_t lat;
+	lat.global = typename lat_t::CoordinatesType( X, Y, Z );
+	lat.physOrigin = PHYS_ORIGIN;
+	lat.physDl = PHYS_DL;
+
+	StateLocal< LBM_TYPE > state(lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
+	state.setid("sim_1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
+#ifdef USE_CUDA
+	for (auto& block : state.nse.blocks)
+		block.block_size.y = block_size;
+#endif
+	state.nse.physCharLength = 0.1; // [m]
 //	state.printIter = 100;
 //	state.printIter = 100;
-//	state.vtk.writePeriod = 0.01;
-//	state.cnt[PRINT].period = 0.001;
-//	state.cnt[PROBE1].period = 0.001;
+	state.nse.physFinalTime = 1.0;
+	state.cnt[PRINT].period = 0.001;
+	state.cnt[PROBE1].period = 0.001;
 	// test
-	state.cnt[PRINT].period = 100*PHYS_DT;
-	state.lbm.physFinalTime = 1000*PHYS_DT;
+//	state.cnt[PRINT].period = 100*PHYS_DT;
+//	state.nse.physFinalTime = 1000*PHYS_DT;
 //	state.cnt[VTK3D].period = 1000*PHYS_DT;
 //	state.cnt[SAVESTATE].period = 600;  // save state every [period] of wall time
 //	state.check_savestate_flag = false;
 //	state.wallTime = 60;
 	// RCI
-//	state.lbm.physFinalTime = 0.5;
+//	state.nse.physFinalTime = 0.5;
 //	state.cnt[VTK3D].period = 0.5;
 //	state.cnt[SAVESTATE].period = 3600;  // save state every [period] of wall time
 //	state.check_savestate_flag = false;
 //	state.wallTime = 3600 * 23.5;
 
 	// add cuts
-//	state.cnt[VTK2D].period = 0.001;
-//	state.add2Dcut_X(X/2,"cutsX/cut_X");
-//	state.add2Dcut_Y(Y/2,"cutsY/cut_Y");
-//	state.add2Dcut_Z(Z/2,"cutsZ/cut_Z");
+	state.cnt[VTK2D].period = 0.001;
+	state.add2Dcut_X(X/2,"cutsX/cut_X");
+	state.add2Dcut_Y(Y/2,"cutsY/cut_Y");
+	state.add2Dcut_Z(Z/2,"cutsZ/cut_Z");
 
 //	state.cnt[VTK3DCUT].period = 0.01;
 //	state.add3Dcut(X/4,Y/4,Z/4, X/2,Y/2,Z/2, 2, "box");
@@ -189,7 +215,7 @@ int sim01_test(int RESOLUTION = 2)
 		for (int pz=cz-range;pz<=cz+range;pz++)
 		for (int px=cx-range;px<=cx+range;px++)
 			if (NORM( (real)(px-cx)*PHYS_DL, (real)(py-cy)*PHYS_DL, (real)(pz-cz)*PHYS_DL) < radius )
-				state.lbm.defineWall(px,py,pz,true);
+				state.nse.defineWall(px,py,pz,true);
 	}
 
 	// draw a cylinder
@@ -205,7 +231,7 @@ int sim01_test(int RESOLUTION = 2)
 		for (int px=cx-range;px<=cx+range;px++)
 		for (int py=0;py<=Y-1;py++)
 			if (NORM( (real)(px-cx)*PHYS_DL,0, (real)(pz-cz)*PHYS_DL) < radius )
-				state.lbm.defineWall(px,py,pz,true);
+				state.nse.defineWall(px,py,pz,true);
 	}
 
 	// draw a block
@@ -219,10 +245,10 @@ int sim01_test(int RESOLUTION = 2)
 		//		for (int py=cy-range;py<=cy+range;py++)
 		//		for (int pz=0;pz<=cz;pz++)
 		for (int px=cx;px<=cx+width;px++)
-		for (int pz=0;pz<=Z-1;pz++)
-		for (int py=0;py<=Y-1;py++)
+		for (int pz=1;pz<=Z-2;pz++)
+		for (int py=1;py<=Y-2;py++)
 			if (!((pz>=Z*4/10 &&  pz<=Z*6/10) && (py>=Y*4/10 && py<=Y*6/10)))
-				state.lbm.defineWall(px,py,pz,true);
+				state.nse.defineWall(px,py,pz,true);
 	}
 
 	execute(state);
@@ -233,12 +259,12 @@ int sim01_test(int RESOLUTION = 2)
 template < typename TRAITS=TraitsSP >
 void run(int RES)
 {
-	using COLL = D3Q27_CUM< TRAITS >;
-//	using COLL = D3Q27_CUM< TRAITS, D3Q27_EQ_INV_CUM<TRAITS> >;
+//	using COLL = D3Q27_CUM< TRAITS >;
+	using COLL = D3Q27_CUM< TRAITS, D3Q27_EQ_INV_CUM<TRAITS> >;
 
 	using NSE_TYPE = D3Q27<
 				COLL,
-				LBM_Data_ConstInflow< TRAITS >,
+				NSE_Data_ConstInflow< TRAITS >,
 				D3Q27_BC_All,
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
@@ -250,7 +276,7 @@ void run(int RES)
 	sim01_test<NSE_TYPE>(RES);
 }
 
-int Main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
 

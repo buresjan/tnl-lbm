@@ -1,5 +1,6 @@
 #pragma once
 
+// only a base type - common for all D3Q* models, cannot be used directly
 template < typename TRAITS >
 struct LBM_Data
 {
@@ -8,21 +9,20 @@ struct LBM_Data
 	using map_t = typename TRAITS::map_t;
 	using indexer_t = typename TRAITS::xyz_indexer_t;
 
+	// even/odd iteration indicator for the A-A pattern
+	bool even_iter = true;
+
 	// indexing
 	indexer_t indexer;
 	idx XYZ;	// precomputed indexer.getStorageSize(), i.e. product of (X+overlaps_x)*(Y+overlaps_y)*(Z+overlaps_z)
+
+	// scalars
+	dreal lbmViscosity;
 
 	// array pointers
 	dreal* dfs[DFMAX];
 	dreal* dmacro;
 	map_t* dmap;
-
-	// scalars
-	dreal lbmViscosity;
-	// homogeneous force field
-	dreal fx = 0;
-	dreal fy = 0;
-	dreal fz = 0;
 
 	// sizes NOT including overlaps
 	CUDA_HOSTDEV idx X() { return indexer.template getSize<0>(); }
@@ -51,16 +51,28 @@ struct LBM_Data
 };
 
 
+// base type for all NSE_Data_* types
 template < typename TRAITS >
-struct LBM_Data_ConstInflow : LBM_Data<TRAITS>
+struct NSE_Data : LBM_Data<TRAITS>
+{
+	using dreal = typename LBM_Data<TRAITS>::dreal;
+
+	// homogeneous force field
+	dreal fx = 0;
+	dreal fy = 0;
+	dreal fz = 0;
+};
+
+template < typename TRAITS >
+struct NSE_Data_ConstInflow : NSE_Data<TRAITS>
 {
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 
-	dreal inflow_rho=no1;
-	dreal inflow_vx=0;
-	dreal inflow_vy=0;
-	dreal inflow_vz=0;
+	dreal inflow_rho = no1;
+	dreal inflow_vx = 0;
+	dreal inflow_vy = 0;
+	dreal inflow_vz = 0;
 
 	template < typename LBM_KS >
 	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
@@ -73,7 +85,7 @@ struct LBM_Data_ConstInflow : LBM_Data<TRAITS>
 };
 
 template < typename TRAITS >
-struct LBM_Data_NoInflow : LBM_Data<TRAITS>
+struct NSE_Data_NoInflow : NSE_Data<TRAITS>
 {
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
@@ -85,5 +97,30 @@ struct LBM_Data_NoInflow : LBM_Data<TRAITS>
 		KS.vx  = 0;
 		KS.vy  = 0;
 		KS.vz  = 0;
+	}
+};
+
+
+// base type for all ADE_Data_* types
+template < typename TRAITS >
+struct ADE_Data : LBM_Data<TRAITS>
+{
+	using dreal = typename LBM_Data<TRAITS>::dreal;
+
+	// TODO: source term on the rhs of the ADE
+};
+
+template < typename TRAITS >
+struct ADE_Data_ConstInflow : ADE_Data<TRAITS>
+{
+	using idx = typename TRAITS::idx;
+	using dreal = typename TRAITS::dreal;
+
+	dreal inflow_phi = no1;
+
+	template < typename LBM_KS >
+	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
+	{
+		KS.phi = inflow_phi;
 	}
 };

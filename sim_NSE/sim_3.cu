@@ -46,7 +46,7 @@ struct MacroLocal : D3Q27_MACRO_Base< TRAITS >
 };
 
 template < typename TRAITS >
-struct LBM_Data_SpecialInflow : LBM_Data< TRAITS >
+struct NSE_Data_SpecialInflow : NSE_Data< TRAITS >
 {
 	using dreal = typename TRAITS::dreal;
 	using idx = typename TRAITS::idx;
@@ -79,8 +79,9 @@ struct StateLocal : State<LBM_TYPE>
 	using TRAITS = typename LBM_TYPE::TRAITS;
 	using BC = typename LBM_TYPE::BC;
 	using MACRO = typename LBM_TYPE::MACRO;
+	using BLOCK = LBM_BLOCK< LBM_TYPE >;
 
-	using State<LBM_TYPE>::lbm;
+	using State<LBM_TYPE>::nse;
 	using State<LBM_TYPE>::log;
 	using State<LBM_TYPE>::vtk_helper;
 	using State<LBM_TYPE>::id;
@@ -90,6 +91,7 @@ struct StateLocal : State<LBM_TYPE>
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
 	using point_t = typename TRAITS::point_t;
+	using lat_t = Lattice<3, real, idx>;
 
 //	dreal lbm_input_velocity=0.07;
 //	dreal start_velocity;
@@ -103,48 +105,48 @@ struct StateLocal : State<LBM_TYPE>
 	real cylinder_c[3];
 
 	// virtualize
-	virtual bool outputData(int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
+	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
 		int k=0;
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("lbm_velocity", lbm.hmacro(MACRO::e_vx,x,y,z), 3, desc, value, dofs);
-				case 1: return vtk_helper("lbm_velocity", lbm.hmacro(MACRO::e_vy,x,y,z), 3, desc, value, dofs);
-				case 2: return vtk_helper("lbm_velocity", lbm.hmacro(MACRO::e_vz,x,y,z), 3, desc, value, dofs);
+				case 0: return vtk_helper("lbm_velocity", block.hmacro(MACRO::e_vx,x,y,z), 3, desc, value, dofs);
+				case 1: return vtk_helper("lbm_velocity", block.hmacro(MACRO::e_vy,x,y,z), 3, desc, value, dofs);
+				case 2: return vtk_helper("lbm_velocity", block.hmacro(MACRO::e_vz,x,y,z), 3, desc, value, dofs);
 			}
 		}
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("lbm_force", lbm.hmacro(MACRO::e_fx,x,y,z), 3, desc, value, dofs);
-				case 1: return vtk_helper("lbm_force", lbm.hmacro(MACRO::e_fy,x,y,z), 3, desc, value, dofs);
-				case 2: return vtk_helper("lbm_force", lbm.hmacro(MACRO::e_fz,x,y,z), 3, desc, value, dofs);
+				case 0: return vtk_helper("lbm_force", block.hmacro(MACRO::e_fx,x,y,z), 3, desc, value, dofs);
+				case 1: return vtk_helper("lbm_force", block.hmacro(MACRO::e_fy,x,y,z), 3, desc, value, dofs);
+				case 2: return vtk_helper("lbm_force", block.hmacro(MACRO::e_fz,x,y,z), 3, desc, value, dofs);
 			}
 		}
-		if (index==k++) return vtk_helper("lbm_density", lbm.hmacro(MACRO::e_rho,x,y,z), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_density_fluctuation", lbm.hmacro(MACRO::e_rho,x,y,z)-1.0, 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_density", block.hmacro(MACRO::e_rho,x,y,z), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_density_fluctuation", block.hmacro(MACRO::e_rho,x,y,z)-1.0, 1, desc, value, dofs);
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("velocity", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("force", lbm.lbm2physForce(lbm.hmacro(MACRO::e_fx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("force", lbm.lbm2physForce(lbm.hmacro(MACRO::e_fy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("force", lbm.lbm2physForce(lbm.hmacro(MACRO::e_fz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("force", nse.lbm2physForce(block.hmacro(MACRO::e_fx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("force", nse.lbm2physForce(block.hmacro(MACRO::e_fy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("force", nse.lbm2physForce(block.hmacro(MACRO::e_fz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
-		if (index==k++) return vtk_helper("density", lbm.hmacro(MACRO::e_rho,x,y,z)*lbm.physFluidDensity, 1, desc, value, dofs);
+		//if (index==k++) return vtk_helper("density", block.hmacro(MACRO::e_rho,x,y,z)*nse.physFluidDensity, 1, desc, value, dofs);
 		return false;
 	}
 
@@ -155,68 +157,68 @@ struct StateLocal : State<LBM_TYPE>
 	virtual void probe1()
 	{
 		// compute drag
-		real Fx=0, Fy=0, Fz=0, dV=lbm.physDl*lbm.physDl*lbm.physDl;
-		real rho = 1.0;//lbm.physFluidDensity;
-//		real target_velocity = lbm.lbm2physVelocity(lbm_input_velocity);
-		real lbm_input_velocity = lbm.phys2lbmVelocity(phys_input_U_bar);
-		log("Reynolds = %f lbmvel %f physvel %f (phys_input_U_bar %f)",lbm_input_velocity*cylinder_diameter/lbm.physDl/lbm.lbmViscosity(), lbm_input_velocity, lbm.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
+		real Fx=0, Fy=0, Fz=0, dV=nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
+		real rho = 1.0;//nse.physFluidDensity;
+//		real target_velocity = nse.lbm2physVelocity(lbm_input_velocity);
+		real lbm_input_velocity = nse.phys2lbmVelocity(phys_input_U_bar);
+		log("Reynolds = %f lbmvel %f physvel %f (phys_input_U_bar %f)",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
 
 		// FIXME: MPI !!!
 		// todo: compute C_D: integrate over the whole domain
-		for (int x=0; x<lbm.global_X; x++)
-		for (int y=0; y<lbm.global_Y; y++)
-		for (int z=0; z<lbm.global_Z; z++)
+		for (int x=0; x<nse.lat.global.x(); x++)
+		for (int y=0; y<nse.lat.global.y(); y++)
+		for (int z=0; z<nse.lat.global.z(); z++)
 		{
 			// test if outside the ball
-//			if (NORM(x*lbm.physDl - cylinder_c[0], y*lbm.physDl - cylinder_c[1], z*lbm.physDl - cylinder_c[2]) > 2.0*cylinder_diameter/2.0)
-//			if (NORM(x*lbm.physDl - cylinder_c[0], y*lbm.physDl - cylinder_c[1], z*lbm.physDl - cylinder_c[2]) > cylinder_diameter/2.0)
+//			if (NORM(x*nse.lat.physDl - cylinder_c[0], y*nse.lat.physDl - cylinder_c[1], z*nse.lat.physDl - cylinder_c[2]) > 2.0*cylinder_diameter/2.0)
+//			if (NORM(x*nse.lat.physDl - cylinder_c[0], y*nse.lat.physDl - cylinder_c[1], z*nse.lat.physDl - cylinder_c[2]) > cylinder_diameter/2.0)
 			{
-				Fx += lbm.hmacro(MACRO::e_fx,x,y,z);
-				Fy += lbm.hmacro(MACRO::e_fy,x,y,z);
-				Fz += lbm.hmacro(MACRO::e_fz,x,y,z);
+				Fx += nse.blocks.front().hmacro(MACRO::e_fx,x,y,z);
+				Fy += nse.blocks.front().hmacro(MACRO::e_fy,x,y,z);
+				Fz += nse.blocks.front().hmacro(MACRO::e_fz,x,y,z);
 			}
 		}
 
-		real lbm_cd_full = -Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/lbm.data.H*lbm.physDl*lbm.physDl;
-		real phys_cd_full = -lbm.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/lbm.data.H;
-		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/lbm.data.H*lbm.physDl*lbm.physDl;
-		real phys_cl_full = -lbm.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/lbm.data.H;
-		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!lbm.terminate) log("nan detected"); lbm.terminate=true; }
+		real lbm_cd_full = -Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
+		real phys_cd_full = -nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
+		real phys_cl_full = -nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
 		log("FULL: u0 %e Fx %e Fy %e Fz %e C_D{phys} %e C_D{LB} %f C_L{phys} %e C_L{LB} %f", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
 
 // not used for evaluation of the results
 //		// FIXME: MPI !!!
-//		for (int x=0; x<lbm.global_X; x++)
-//		for (int y=0; y<lbm.global_Y; y++)
-//		for (int z=0; z<lbm.global_Z; z++)
+//		for (int x=0; x<nse.lat.global.x(); x++)
+//		for (int y=0; y<nse.lat.global.y(); y++)
+//		for (int z=0; z<nse.lat.global.z(); z++)
 //		{
 //			// test if outside the ball
-////			if (NORM(x*lbm.physDl - cylinder_c[0], y*lbm.physDl - cylinder_c[1], z*lbm.physDl - cylinder_c[2]) < 2.0*cylinder_diameter/2.0)
-//			if (NORM(x*lbm.physDl - cylinder_c[0], 0, z*lbm.physDl - cylinder_c[2]) > cylinder_diameter/2.0)
+////			if (NORM(x*nse.lat.physDl - cylinder_c[0], y*nse.lat.physDl - cylinder_c[1], z*nse.lat.physDl - cylinder_c[2]) < 2.0*cylinder_diameter/2.0)
+//			if (NORM(x*nse.lat.physDl - cylinder_c[0], 0, z*nse.lat.physDl - cylinder_c[2]) > cylinder_diameter/2.0)
 //			{
-//				Fx += lbm.hmacro(MACRO::e_fx,x,y,z);
-//				Fy += lbm.hmacro(MACRO::e_fy,x,y,z);
-//				Fz += lbm.hmacro(MACRO::e_fz,x,y,z);
+//				Fx += nse.hmacro(MACRO::e_fx,x,y,z);
+//				Fy += nse.hmacro(MACRO::e_fy,x,y,z);
+//				Fz += nse.hmacro(MACRO::e_fz,x,y,z);
 //			}
 //		}
-//		real lbm_cd=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/lbm.data.H*lbm.physDl*lbm.physDl;
-//		real phys_cd=-lbm.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/lbm.data.H;
-//		real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/lbm.data.H*lbm.physDl*lbm.physDl;
-//		real phys_cl=-lbm.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/lbm.data.H;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!lbm.terminate) log("nan detected"); lbm.terminate=true; }
+//		real lbm_cd=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
+//		real phys_cd=-nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
+//		real phys_cl=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
 //		log("INNN: u0 %e Fx %e Fy %e Fz %e C_D{phys} %e C_D{LB} %f", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-////		log("Reynolds = %f lbmvel 0.07 physvel %f",0.07*cylinder_diameter/lbm.physDl/lbm.lbmViscosity(), lbm_input_velocity);
+////		log("Reynolds = %f lbmvel 0.07 physvel %f",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
 
 // not used for evaluation of the results
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
 //		Fx=Fy=Fz=0;
 //		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
 ////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)FF[FIL_INDEX].LL.size());
-//		real lbm_cd_lagr=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/lbm.data.H*lbm.physDl*lbm.physDl;
-//		real phys_cd_lagr=-lbm.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/lbm.data.H;
-//		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/lbm.data.H*lbm.physDl*lbm.physDl;
-//		real phys_cl_lagr=-lbm.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/lbm.data.H;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!lbm.terminate) log("nan detected"); lbm.terminate=true; }
+//		real lbm_cd_lagr=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
+//		real phys_cd_lagr=-nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
+//		real phys_cl_lagr=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
 //		log("LAGR: u0 %e Fx %e Fy %e Fz %e C_D{phys} %e C_D{LB} %f", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
 
@@ -228,7 +230,7 @@ struct StateLocal : State<LBM_TYPE>
 		FILE*f;
 		char str[200], dir[200];
 		char txt[200];
-		real total = (real)(lbm.global_X*lbm.global_Y*lbm.global_Z), ratio, area;
+		real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
 		sprintf(dir,"results_%s",id);
 		mkdir(dir,0755);
 		sprintf(dir,"results_%s/probes",id);
@@ -236,73 +238,73 @@ struct StateLocal : State<LBM_TYPE>
 
 		sprintf(str,"%s/probe_cd_full",dir);
 		f = fopen(str,iotype);
-		fprintf(f,"%e\t%e\n",lbm.physTime(),lbm_cd_full);
+		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cd_full);
 		fclose(f);
 
 //		sprintf(str,"%s/probe_cd",dir);
 //		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",lbm.physTime(),lbm_cd);
+//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cd);
 //		fclose(f);
 
 //		sprintf(str,"%s/probe_cd_lagr",dir);
 //		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",lbm.physTime(),lbm_cd_lagr);
+//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cd_lagr);
 //		fclose(f);
 
 //		sprintf(str,"%s/probe_cd_all",dir);
 //		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\t%e\t%e\n",lbm.physTime(),lbm_cd_full, lbm_cd, lbm_cd_lagr);
+//		fprintf(f,"%e\t%e\t%e\t%e\n",nse.physTime(),lbm_cd_full, lbm_cd, lbm_cd_lagr);
 //		fclose(f);
 
 		sprintf(str,"%s/probe_cl_full",dir);
 		f = fopen(str,iotype);
-		fprintf(f,"%e\t%e\n",lbm.physTime(),lbm_cl_full);
+		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cl_full);
 		fclose(f);
 
 //		sprintf(str,"%s/probe_cl",dir);
 //		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",lbm.physTime(),lbm_cl);
+//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cl);
 //		fclose(f);
 
 //		sprintf(str,"%s/probe_cl_lagr",dir);
 //		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",lbm.physTime(),lbm_cl_lagr);
+//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cl_lagr);
 //		fclose(f);
 
 //		sprintf(str,"%s/probe_cl_all",dir);
 //		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\t%e\t%e\n",lbm.physTime(),lbm_cl_full, lbm_cl, lbm_cl_lagr);
+//		fprintf(f,"%e\t%e\t%e\t%e\n",nse.physTime(),lbm_cl_full, lbm_cl, lbm_cl_lagr);
 //		fclose(f);
 	}
 
 	virtual void updateKernelVelocities()
 	{
-		lbm.data.inflow_vx = lbm.phys2lbmVelocity(phys_input_U_max);
+		for (auto& block : nse.blocks)
+			block.data.inflow_vx = nse.phys2lbmVelocity(phys_input_U_max);
 	}
 
 	virtual void setupBoundaries()
 	{
-		lbm.setBoundaryZ(0, BC::GEO_WALL);// top
-		lbm.setBoundaryZ(lbm.global_Z-1, BC::GEO_WALL);// bottom
-		lbm.setBoundaryY(0, BC::GEO_WALL); // back
-		lbm.setBoundaryY(lbm.global_Y-1, BC::GEO_WALL);// front
-		lbm.setBoundaryX(0, BC::GEO_INFLOW); // left
-		lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_EQ);// right
+		nse.setBoundaryZ(0, BC::GEO_WALL);// top
+		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_WALL);// bottom
+		nse.setBoundaryY(0, BC::GEO_WALL); // back
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_WALL);// front
+		nse.setBoundaryX(0, BC::GEO_INFLOW); // left
+		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
+	StateLocal(lat_t ilat, real iphysViscosity, real iphysDt)
+		: State<LBM_TYPE>(ilat, iphysViscosity, iphysDt)
 	{
-		lbm.data.inflow_rho = no1;
-		lbm.data.inflow_vx = 0;
-		lbm.data.inflow_vy = 0;
-		lbm.data.inflow_vz = 0;
-		lbm.data.physDl = iphysDl;
-		lbm.data.H = (iY-2.0)*iphysDl; // domain width and height
-	}
-
-	~StateLocal()
-	{
+		for (auto& block : nse.blocks)
+		{
+			block.data.inflow_rho = no1;
+			block.data.inflow_vx = 0;
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
+			block.data.physDl = ilat.physDl;
+			block.data.H = (ilat.global.y()-2.0)*ilat.physDl; // domain width and height
+		}
 	}
 };
 
@@ -319,7 +321,7 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 	// the points do not have to be between y=0 and y=Y-1 sharp, but equidistantly spaced as ckose to sigma as possible
 	int N2 = ceil(sqrt(2.0) * PI * diameter / sigma  ); // minimal number of N2 points
 	real dx = PI*diameter/((real)N2);
-	real W = state.lbm.physDl*(state.lbm.global_Y-2);
+	real W = state.nse.lat.physDl*(state.nse.lat.global.y()-2);
 	int N1 = floor( W / dx );
 	real dm = (W - N1*dx)/2.0;
 	real radius = diameter/2.0;
@@ -362,8 +364,8 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 	state.log("Cylinder: wanted sigma %e dx=%e dm=%e (%d points total, N1=%d N2=%d) sigma_min %e, sigma_max %e",sigma,dx,dm,points,N1,N2,sigma_min, sigma_max);
 //	state.log("Added %d Lagrangian points (requested %d) partial area %e",Ncount, N, a);
 //	state.log("Lagrange created: WuShuCompute %d ws_regularDirac %s",state.FF[INDEX].WuShuCompute,(state.FF[INDEX].ws_regularDirac)?"true":"false");
-	state.log("h=physdl %e sigma min %e sigma_ku_h %e",state.lbm.physDl, sigma_min, sigma_min/state.lbm.physDl);
-	state.log("h=physdl %e sigma max %e sigma_ku_h %e",state.lbm.physDl, sigma_max, sigma_max/state.lbm.physDl);
+	state.log("h=physdl %e sigma min %e sigma_ku_h %e",state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
+	state.log("h=physdl %e sigma max %e sigma_ku_h %e",state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
 
 	state.writeVTK_Points("cylinder",0,0,state.FF[INDEX]);
 	return INDEX;
@@ -376,6 +378,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	using idx = typename LBM_TYPE::TRAITS::idx;
 	using real = typename LBM_TYPE::TRAITS::real;
 	using point_t = typename LBM_TYPE::TRAITS::point_t;
+	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
 	real cylinder_diameter  = 0.10; // [m]
@@ -397,18 +400,27 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 //	printf("input phys velocity %f\ninput lbm velocity %f\nRe %f\nlbm viscosity %f\nphys viscosity %f\n", i_PHYS_VELOCITY, i_LBM_VELOCITY, i_Re, i_LBM_VISCOSITY, i_PHYS_VISCOSITY);
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN);
+	// initialize the lattice
+	lat_t lat;
+	lat.global = typename lat_t::CoordinatesType( LBM_X, LBM_Y, LBM_Z );
+	lat.physOrigin = PHYS_ORIGIN;
+	lat.physDl = PHYS_DL;
+
+	StateLocal<LBM_TYPE> state(lat, PHYS_VISCOSITY, PHYS_DT);
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
-	state.lbm.block_size=block_size;
-	state.lbm.physCharLength = cylinder_diameter; // [m]
+#ifdef USE_CUDA
+	for (auto& block : state.nse.blocks)
+		block.block_size.y = block_size;
+#endif
+	state.nse.physCharLength = cylinder_diameter; // [m]
 	state.cylinder_diameter = cylinder_diameter; // [m]
-	state.lbm.physFluidDensity = 1000.0; // [kg/m^3]
+	//state.nse.physFluidDensity = 1000.0; // [kg/m^3]
 
 	state.cnt[PRINT].period = 0.1;
 	state.cnt[PROBE1].period = 0.1;
 	state.cnt[STAT_RESET].period = 500.0;
-	state.lbm.physFinalTime = 10.0;
+	state.nse.physFinalTime = 10.0;
 
 //	state.cnt[VTK3D].period = 1.0;
 	state.cnt[VTK2D].period = 1.0;
@@ -455,7 +467,7 @@ void run(int res, double Re, double h, int dirac, int method, int compute)
 	using COLL = D3Q27_CUM<TRAITS>;
 	using NSE_TYPE = D3Q27<
 				COLL,
-				LBM_Data_SpecialInflow< TRAITS >,
+				NSE_Data_SpecialInflow< TRAITS >,
 				D3Q27_BC_All,
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
@@ -467,7 +479,7 @@ void run(int res, double Re, double h, int dirac, int method, int compute)
 	sim<NSE_TYPE>(res, Re, h, dirac, method, compute);
 }
 
-int Main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
 

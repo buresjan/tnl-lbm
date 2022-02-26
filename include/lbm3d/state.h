@@ -1,17 +1,16 @@
 #pragma once
 
+#include <vector>
 #include <deque>
 #include <limits>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-// spawn process vtkZip
-//#include <unistd.h>
-//#include <spawn.h>
-
+#include <TNL/Timer.h>
 
 #include "defs.h"
+#include "kernels.h"
 #include "lbm.h"
 #include "vtk_writer.h"
 #include "png_tool.h"
@@ -70,16 +69,15 @@ struct counter
 
 enum { STAT_RESET, STAT2_RESET, PRINT, VTK1D, VTK2D, VTK3D, PROBE1, PROBE2, PROBE3, SAVESTATE, VTK3DCUT, MAX_COUNTER };
 enum { MemoryToFile, FileToMemory };
-enum { vtk3DsingleFile, vtk3DmanyFiles, vtk3DmanyFilesExtraHeader };
 
 
-template< typename T_LBM_TYPE >
+template< typename T_NSE >
 struct State
 {
-	using LBM_TYPE = T_LBM_TYPE;
-	using T_LBM = LBM<LBM_TYPE>;
-	using TRAITS = typename LBM_TYPE::TRAITS;
-	using Lagrange3D = Lagrange3D< T_LBM >;
+	using NSE = T_NSE;
+	using T_LBM_NSE = LBM<NSE>;
+	using TRAITS = typename NSE::TRAITS;
+	using Lagrange3D = ::Lagrange3D< T_LBM_NSE >;
 
 	using map_t = typename TRAITS::map_t;
 	using idx = typename TRAITS::idx;
@@ -93,7 +91,7 @@ struct State
 	using T_PROBE1DLINECUT = probe1Dlinecut<real>;
 	using T_COUNTER = counter<real>;
 
-	T_LBM lbm;
+	T_LBM_NSE nse;
 
 	std::vector< T_PROBE3DCUT > probe3Dvec;
 	std::vector< T_PROBE2DCUT > probe2Dvec;
@@ -126,10 +124,7 @@ struct State
 		value=ivalue;
 		return true;
 	}
-	void writeVTKs_2D();
-	void writeVTK_2DcutX(const char* name, real time, int cycle, idx XPOS);
-	void writeVTK_2DcutY(const char* name, real time, int cycle, idx YPOS);
-	void writeVTK_2DcutZ(const char* name, real time, int cycle, idx ZPOS);
+	virtual void writeVTKs_2D();
 	template < typename... ARGS >
 	void add2Dcut_X(idx x, const char* fmt, ARGS... args);
 	template < typename... ARGS >
@@ -137,21 +132,14 @@ struct State
 	template < typename... ARGS >
 	void add2Dcut_Z(idx z, const char* fmt, ARGS... args);
 
-	//bool VTK3D_write_separate_header=true; // true = split 3D vtks to ".prevtk" files header + data ... false = single standalone vtks
-	int vtk3Dstyle = vtk3DsingleFile; // enum { vtk3DsingleFile, vtk3DmanyFiles, vtk3DmanyFilesExtraHeader };
-
-	void writeVTKs_3D();
-	void writeVTK_3D(const char* name, real time, int cycle);
-	void writeVTK_3D_singlefile(const char* name, real time, int cycle);
+	virtual void writeVTKs_3D();
 
 	// 3D cuts
-	void writeVTKs_3Dcut();
+	virtual void writeVTKs_3Dcut();
 	template < typename... ARGS >
 	void add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step, const char* fmt, ARGS... args);
-//	void writeVTK_3Dcut(const char* name, real time, int cycle);
-	void writeVTK_3Dcut(const char* name, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step);
 
-	void writeVTKs_1D();
+	virtual void writeVTKs_1D();
 
 	template < typename... ARGS >
 	void add1Dcut(point_t from, point_t to, const char* fmt, ARGS... args);
@@ -169,7 +157,7 @@ struct State
 	int verbosity=1;
 	char id[FILENAME_CHARS] = "default";
 
-	virtual bool outputData(int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) { return false; }
+	virtual bool outputData(const typename T_LBM_NSE::BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) { return false; }
 
 	bool getPNGdimensions(const char * filename, int &w, int &h);
 
@@ -181,12 +169,19 @@ struct State
 	                  real amin=0, real amax=1, real bmin=0, real bmax=1);  // amin, amax, bmin, bmax ... used for cropping, see the code
 
 	// simulation control
-	void reset();
+	virtual bool estimateMemoryDemands(); // called from State constructor
+	virtual void reset();
 	virtual void setupBoundaries() { } // called from State::reset
 	virtual void resetLattice(real irho, real ivx, real ivy, real ivz); // called from State::reset
+	virtual void SimInit(); // called from core.h -- before time loop
+	virtual void updateKernelData(); // called from core.h -- calls updateKernelData on all LBM blocks
 	virtual void updateKernelVelocities() { } // called from core.h -- setup current velocity profile for the Kernel
+	virtual void SimUpdate(); // called from core.h -- from the time loop, once per time step
+	virtual void AfterSimUpdate(timespec& t1, timespec& t2); // called from core.h -- once before the time loop and then after each SimUpdate() call
 	virtual void computeBeforeLBMKernel() { } // called from core.h just before the main LBMKernel -- extra kernels e.g. for the non-Newtonian model
 	virtual void computeAfterLBMKernel() { } // called from core.h after the main LBMKernel -- extra kernels e.g. for the coupled LBM-MHFEM solver
+	virtual void copyAllToDevice(); // called from SimInit -- copy the initial state to the GPU
+	virtual void copyAllToHost(); // called from core.h -- inside the time loop before saving state
 
 	template < typename... ARGS >
 	void mark(const char* fmt, ARGS... args);
@@ -243,15 +238,18 @@ struct State
 	std::string getSaveLoadFmt(ARG0 arg0, ARGS... args) {	return getFmt(arg0) + "\n" + getSaveLoadFmt(args...); }
 	// JK magic ends here
 
+	// timer for walltime and ETA calculation
 	timespec t_init;
 	long wallTime=-1; //wallTime in seconds, use negative value to disable wall time check
 	bool wallTimeReached();
 	double getWallTime(bool collective=false);	// collective: must be true when called by all MPI ranks and false otherwise (e.g. when called only by rank 0)
 
-	bool estimateMemoryDemands();
+	// timers for profiling
+	TNL::Timer timer_SimInit, timer_SimUpdate, timer_AfterSimUpdate, timer_compute, timer_compute_overlaps, timer_wait_communication, timer_wait_computation;
 
 	// constructors
-	State(idx iX, idx iY, idx iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin) : lbm(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
+	template< typename... ARGS >
+	State(typename T_LBM_NSE::lat_t ilat, ARGS&&... args) : nse(ilat, std::forward<ARGS>(args)...)
 	{
 		bool local_estimate = estimateMemoryDemands();
 		bool global_result = TNL::MPI::reduce(local_estimate, MPI_LAND, MPI_COMM_WORLD);
@@ -261,7 +259,7 @@ struct State
 			throw std::runtime_error("Not enough memory available (CPU or GPU).");
 
 		// allocate host data -- after the estimate
-		lbm.allocateHostData();
+		nse.allocateHostData();
 
 		//initial time of current simulation
 		clock_gettime(CLOCK_REALTIME, &t_init);

@@ -1,27 +1,29 @@
+#pragma once
+
 #include "state.h"
 
 #include "fileutils.h"
 #include "timeutils.h"
 
-template< typename LBM_TYPE >
-int State<LBM_TYPE>::addLagrange3D()
+template< typename NSE >
+int State<NSE>::addLagrange3D()
 {
 	char dir[FILENAME_CHARS];
 	sprintf(dir,"results_%s",id);
-	FF.emplace_back(lbm, dir);
+	FF.emplace_back(nse, dir);
 	return FF.size()-1;
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::computeAllLagrangeForces()
+template< typename NSE >
+void State<NSE>::computeAllLagrangeForces()
 {
-	for (int i=0;i<FF.size();i++)
+	for (std::size_t i=0;i<FF.size();i++)
 		if (FF[i].implicitWuShuForcing)
-			FF[i].computeWuShuForcesSparse(lbm.physTime());
+			FF[i].computeWuShuForcesSparse(nse.physTime());
 }
 
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::getPNGdimensions(const char * filename, int &w, int &h)
+template< typename NSE >
+bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
 {
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
 	FILE *fp = fopen(filename, "rb");
@@ -48,15 +50,15 @@ bool State<LBM_TYPE>::getPNGdimensions(const char * filename, int &w, int &h)
 }
 
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::log(const char* fmt, ARGS... args)
+void State<NSE>::log(const char* fmt, ARGS... args)
 {
 	char dir[FILENAME_CHARS];
 	sprintf(dir,"results_%s",id);
 	mkdir(dir,0777);
 	char fname[FILENAME_CHARS];
-	sprintf(fname,"%s/log_rank%03d",dir,lbm.rank);
+	sprintf(fname,"%s/log_rank%03d",dir,nse.rank);
 
 	FILE*f = fopen(fname,"at"); // append information
 	if (f==0)
@@ -78,17 +80,17 @@ void State<LBM_TYPE>::log(const char* fmt, ARGS... args)
 }
 
 /// outputs information into log file "type"
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::setid(const char* fmt, ARGS... args)
+void State<NSE>::setid(const char* fmt, ARGS... args)
 {
 	sprintf(id, fmt, args...);
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::flagCreate(const char*flagname)
+template< typename NSE >
+void State<NSE>::flagCreate(const char*flagname)
 {
-	if (lbm.rank != 0) return;
+	if (nse.rank != 0) return;
 
 	char fname[FILENAME_CHARS];
 	sprintf(fname,"results_%s/%s",id,flagname);
@@ -107,29 +109,29 @@ void State<LBM_TYPE>::flagCreate(const char*flagname)
 	fclose(f);
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::flagDelete(const char*flagname)
+template< typename NSE >
+void State<NSE>::flagDelete(const char*flagname)
 {
-	if (lbm.rank != 0) return;
+	if (nse.rank != 0) return;
 
 	char fname[FILENAME_CHARS];
 	sprintf(fname,"results_%s/%s",id,flagname);
 	if (fileExists(fname)) remove(fname);
 }
 
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::flagExists(const char*flagname)
+template< typename NSE >
+bool State<NSE>::flagExists(const char*flagname)
 {
 	char fname[FILENAME_CHARS];
 	sprintf(fname,"results_%s/%s",id,flagname);
 	return fileExists(fname);
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::mark(const char* fmt, ARGS... args)
+void State<NSE>::mark(const char* fmt, ARGS... args)
 {
-	if (lbm.rank != 0) return;
+	if (nse.rank != 0) return;
 
 	char fname[FILENAME_CHARS];
 	sprintf(fname,"results_%s/mark",id);
@@ -151,11 +153,11 @@ void State<LBM_TYPE>::mark(const char* fmt, ARGS... args)
 }
 
 /// checks/creates mark and return status
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::isMark()
+template< typename NSE >
+bool State<NSE>::isMark()
 {
 	bool result;
-	if (lbm.rank == 0)
+	if (nse.rank == 0)
 	{
 		char fname[FILENAME_CHARS];
 		sprintf(fname,"results_%s/mark", id);
@@ -185,13 +187,13 @@ bool State<LBM_TYPE>::isMark()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_Surface(const char* name, real time, int cycle, Lagrange3D &fil)
+template< typename NSE >
+void State<NSE>::writeVTK_Surface(const char* name, real time, int cycle, Lagrange3D &fil)
 {
 	VTKWriter vtk;
 
 	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/vtk3D/rank%03d_%s.vtk",id,lbm.rank,name);
+	sprintf(fname,"results_%s/vtk3D/rank%03d_%s.vtk",id,nse.rank,name);
 	create_file(fname);
 
 	FILE* fp = fopen(fname, "w+");
@@ -200,7 +202,7 @@ void State<LBM_TYPE>::writeVTK_Surface(const char* name, real time, int cycle, L
 	fprintf(fp, "DATASET POLYDATA\n");
 
 	fprintf(fp, "POINTS %d float\n", fil.LL.size());
-	for (int i=0;i<fil.LL.size();i++)
+	for (std::size_t i=0;i<fil.LL.size();i++)
 	{
 		vtk.writeFloat(fp, fil.LL[i].x);
 		vtk.writeFloat(fp, fil.LL[i].y);
@@ -233,13 +235,13 @@ void State<LBM_TYPE>::writeVTK_Surface(const char* name, real time, int cycle, L
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil)
+template< typename NSE >
+void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil)
 {
 	VTKWriter vtk;
 
 	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/vtk3D/rank%03d_%s.vtk",id,lbm.rank,name);
+	sprintf(fname,"results_%s/vtk3D/rank%03d_%s.vtk",id,nse.rank,name);
 	create_file(fname);
 
 	FILE* fp = fopen(fname, "w+");
@@ -248,7 +250,7 @@ void State<LBM_TYPE>::writeVTK_Points(const char* name, real time, int cycle, La
 	fprintf(fp, "DATASET POLYDATA\n");
 
 	fprintf(fp, "POINTS %d float\n", fil.LL.size());
-	for (int i=0;i<fil.LL.size();i++)
+	for (std::size_t i=0;i<fil.LL.size();i++)
 	{
 		vtk.writeFloat(fp, fil.LL[i].x);
 		vtk.writeFloat(fp, fil.LL[i].y);
@@ -268,9 +270,9 @@ void State<LBM_TYPE>::writeVTK_Points(const char* name, real time, int cycle, La
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add1Dcut(point_t from, point_t to, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut(point_t from, point_t to, const char* fmt, ARGS... args)
 {
 	probe1Dlinevec.push_back( T_PROBE1DLINECUT() );
 	int last = probe1Dlinevec.size()-1;
@@ -280,64 +282,64 @@ void State<LBM_TYPE>::add1Dcut(point_t from, point_t to, const char* fmt, ARGS..
 	probe1Dlinevec[last].cycle = 0;
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add1Dcut_X(real y, real z, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut_X(real y, real z, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalY(lbm.phys2lbmY(y)) || !lbm.isLocalZ(lbm.phys2lbmZ(z))) return;
+	if (!nse.isAnyLocalY(nse.lat.phys2lbmY(y)) || !nse.isAnyLocalZ(nse.lat.phys2lbmZ(z))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	sprintf(probe1Dvec[last].name, fmt, args...);
 	probe1Dvec[last].type = 0;
-	probe1Dvec[last].pos1 = lbm.phys2lbmY(y);
-	probe1Dvec[last].pos2 = lbm.phys2lbmZ(z);
+	probe1Dvec[last].pos1 = nse.lat.phys2lbmY(y);
+	probe1Dvec[last].pos2 = nse.lat.phys2lbmZ(z);
 	probe1Dvec[last].cycle = 0;
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add1Dcut_Y(real x, real z, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut_Y(real x, real z, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalX(lbm.phys2lbmX(x)) || !lbm.isLocalZ(lbm.phys2lbmZ(z))) return;
+	if (!nse.isAnyLocalX(nse.lat.phys2lbmX(x)) || !nse.isAnyLocalZ(nse.lat.phys2lbmZ(z))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	sprintf(probe1Dvec[last].name, fmt, args...);
 	probe1Dvec[last].type = 1;
-	probe1Dvec[last].pos1 = lbm.phys2lbmX(x);
-	probe1Dvec[last].pos2 = lbm.phys2lbmZ(z);
+	probe1Dvec[last].pos1 = nse.lat.phys2lbmX(x);
+	probe1Dvec[last].pos2 = nse.lat.phys2lbmZ(z);
 	probe1Dvec[last].cycle = 0;
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add1Dcut_Z(real x, real y, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut_Z(real x, real y, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalX(lbm.phys2lbmX(x)) || !lbm.isLocalY(lbm.phys2lbmY(y))) return;
+	if (!nse.isAnyLocalX(nse.lat.phys2lbmX(x)) || !nse.isAnyLocalY(nse.lat.phys2lbmY(y))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	sprintf(probe1Dvec[last].name, fmt, args...);
 	probe1Dvec[last].type = 2;
-	probe1Dvec[last].pos1 = lbm.phys2lbmX(x);
-	probe1Dvec[last].pos2 = lbm.phys2lbmY(y);
+	probe1Dvec[last].pos1 = nse.lat.phys2lbmX(x);
+	probe1Dvec[last].pos2 = nse.lat.phys2lbmY(y);
 	probe1Dvec[last].cycle = 0;
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTKs_1D()
+template< typename NSE >
+void State<NSE>::writeVTKs_1D()
 {
 	if (probe1Dvec.size()>0)
 	{
 		// browse all 1D probeline cuts
-		for (int i=0;i<probe1Dvec.size(); i++)
+		for (std::size_t i=0;i<probe1Dvec.size(); i++)
 		{
 			char fname[FILENAME_CHARS];
-//			sprintf(fname,"results_%s/probes1D/%s_%06d_t%f", id, probe1Dvec[i].name, probe1Dvec[i].cycle, lbm.physTime());
-			sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dvec[i].name, lbm.rank, probe1Dvec[i].cycle);
+			sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dvec[i].name, nse.rank, probe1Dvec[i].cycle);
 			// create parent directories
 			create_file(fname);
+			log("[1dcut %s]",fname);
 //			probeLine(probe1Dvec[i].from[0],probe1Dvec[i].from[1],probe1Dvec[i].from[2],probe1Dvec[i].to[0],probe1Dvec[i].to[1],probe1Dvec[i].to[2],fname);
 			switch (probe1Dvec[i].type)
 			{
@@ -353,145 +355,25 @@ void State<LBM_TYPE>::writeVTKs_1D()
 	}
 
 	// browse all 1D probe cuts
-	for (int i=0;i<probe1Dlinevec.size(); i++)
+	for (std::size_t i=0;i<probe1Dlinevec.size(); i++)
 	{
 		char fname[FILENAME_CHARS];
-//		sprintf(fname,"results_%s/probes1D/%s_%06d_t%f", id, probe1Dvec[i].name, probe1Dvec[i].cycle, lbm.physTime());
-		sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dlinevec[i].name, lbm.rank, probe1Dlinevec[i].cycle);
+//		sprintf(fname,"results_%s/probes1D/%s_%06d_t%f", id, probe1Dvec[i].name, probe1Dvec[i].cycle, nse.physTime());
+		sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
 		// create parent directories
 		create_file(fname);
+		log("[1dcut %s]",fname);
 		write1Dcut(probe1Dlinevec[i].from, probe1Dlinevec[i].to, fname);
 		probe1Dlinevec[i].cycle++;
 	}
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::write1Dcut_X(idx y, idx z, const char * fname)
+template< typename NSE >
+void State<NSE>::write1Dcut(point_t from, point_t to, const char * fname)
 {
 	FILE*fout = fopen(fname,"wt"); // append information
-	log("[probe %s]",fname);
-	// probe vertical profile at x_m
-	char idd[500];
-	real value;
-	int dofs;
-	fprintf(fout,"#time %f s\n", lbm.physTime());
-	fprintf(fout,"#1:x");
-	int count=2, index=0;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
-		else
-		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
-	}
-	fprintf(fout,"\n");
-
-	for (idx i = lbm.offset_X; i < lbm.offset_X + lbm.local_X; i++)
-	{
-		if (lbm.isFluid(i,y,z))
-		{
-			fprintf(fout, "%e", lbm.lbm2physX(i));
-			index=0;
-			if (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(index-1,dof,idd,i,y,z,value,dofs);
-					fprintf(fout, "\t%e", value);
-				}
-			}
-			fprintf(fout, "\n");
-		}
-	}
-	fclose(fout);
-}
-
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::write1Dcut_Y(idx x, idx z, const char * fname)
-{
-	FILE*fout = fopen(fname,"wt"); // append information
-	log("[probe %s]",fname);
-	// probe vertical profile at x_m
-	char idd[500];
-	real value;
-	int dofs;
-	fprintf(fout,"#time %f s\n", lbm.physTime());
-	fprintf(fout,"#1:y");
-	int count=2, index=0;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
-		else
-		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
-	}
-	fprintf(fout,"\n");
-
-	for (idx i=0;i<lbm.local_Y;i++)
-	{
-		if (lbm.isFluid(x,i,z))
-		{
-			fprintf(fout, "%e", lbm.lbm2physY(i));
-			int index=0;
-			while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(index-1,dof,idd,x,i,z,value,dofs);
-					fprintf(fout, "\t%e", value);
-				}
-			}
-			fprintf(fout, "\n");
-		}
-	}
-	fclose(fout);
-}
-
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::write1Dcut_Z(idx x, idx y, const char * fname)
-{
-	FILE*fout = fopen(fname,"wt"); // append information
-	log("[probe %s]",fname);
-	// probe vertical profile at x_m
-	char idd[500];
-	real value;
-	int dofs;
-	fprintf(fout,"#time %f s\n", lbm.physTime());
-	fprintf(fout,"#1:z");
-	int count=2, index=0;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
-		else
-		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
-	}
-	fprintf(fout,"\n");
-
-	for (idx i = lbm.offset_Z; i < lbm.offset_Z + lbm.local_Z; i++)
-	{
-		if (lbm.isFluid(x,y,i))
-		{
-			fprintf(fout, "%e", lbm.lbm2physZ(i));
-			index=0;
-			while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(index-1,dof,idd,x,y,i,value,dofs);
-					fprintf(fout, "\t%e", value);
-				}
-			}
-			fprintf(fout, "\n");
-		}
-	}
-	fclose(fout);
-}
-
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::write1Dcut(point_t from, point_t to, const char * fname)
-{
-	FILE*fout = fopen(fname,"wt"); // append information
-	log("[probe %s]",fname);
-	point_t i = lbm.phys2lbmPoint(from);
-	point_t f = lbm.phys2lbmPoint(to);
+	point_t i = nse.lat.phys2lbmPoint(from);
+	point_t f = nse.lat.phys2lbmPoint(to);
 	real dist = NORM(i[0]-f[0],i[1]-f[1],i[2]-f[2]);
 	real ds = 1.0/(dist*2.0); // rozliseni najit
 	// special case: sampling along an axis
@@ -503,11 +385,11 @@ void State<LBM_TYPE>::write1Dcut(point_t from, point_t to, const char * fname)
 	char idd[500];
 	real value;
 	int dofs;
-	fprintf(fout,"#time %f s\n", lbm.physTime());
+	fprintf(fout,"#time %f s\n", nse.physTime());
 	fprintf(fout,"#1:rel_pos");
 
 	int count=2, index=0;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
+	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
 	{
 		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
 		else
@@ -518,16 +400,139 @@ void State<LBM_TYPE>::write1Dcut(point_t from, point_t to, const char * fname)
 	for (real s=0;s<=1.0;s+=ds)
 	{
 		point_t p = i + s * (f - i);
-		if (!lbm.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z())) continue;
-		if (lbm.isFluid((idx) p.x(), (idx) p.y(), (idx) p.z()))
+		for (const auto& block : nse.blocks)
 		{
-			fprintf(fout, "%e", (s*dist-0.5)*lbm.physDl);
+			if (!block.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z())) continue;
+			if (block.isFluid((idx) p.x(), (idx) p.y(), (idx) p.z()))
+			{
+				fprintf(fout, "%e", (s*dist-0.5)*nse.lat.physDl);
+				index=0;
+				while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+				{
+					for (int dof=0;dof<dofs;dof++)
+					{
+						outputData(block, index-1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
+						fprintf(fout, "\t%e", value);
+					}
+				}
+				fprintf(fout, "\n");
+			}
+		}
+	}
+	fclose(fout);
+}
+
+template< typename NSE >
+void State<NSE>::write1Dcut_X(idx y, idx z, const char * fname)
+{
+	FILE*fout = fopen(fname,"wt"); // append information
+	// probe vertical profile at x_m
+	char idd[500];
+	real value;
+	int dofs;
+	fprintf(fout,"#time %f s\n", nse.physTime());
+	fprintf(fout,"#1:x");
+	int count=2, index=0;
+	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	{
+		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		else
+		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
+	}
+	fprintf(fout,"\n");
+
+	for (const auto& block : nse.blocks)
+	for (idx i = block.offset.x(); i < block.offset.x() + block.local.x(); i++)
+	{
+		if (block.isFluid(i,y,z))
+		{
+			fprintf(fout, "%e", nse.lat.lbm2physX(i));
 			index=0;
-			while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
+			if (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
 			{
 				for (int dof=0;dof<dofs;dof++)
 				{
-					outputData(index-1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
+					outputData(block, index-1,dof,idd,i,y,z,value,dofs);
+					fprintf(fout, "\t%e", value);
+				}
+			}
+			fprintf(fout, "\n");
+		}
+	}
+	fclose(fout);
+}
+
+template< typename NSE >
+void State<NSE>::write1Dcut_Y(idx x, idx z, const char * fname)
+{
+	FILE*fout = fopen(fname,"wt"); // append information
+	// probe vertical profile at x_m
+	char idd[500];
+	real value;
+	int dofs;
+	fprintf(fout,"#time %f s\n", nse.physTime());
+	fprintf(fout,"#1:y");
+	int count=2, index=0;
+	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	{
+		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		else
+		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
+	}
+	fprintf(fout,"\n");
+
+	for (const auto& block : nse.blocks)
+	for (idx i = block.offset.y(); i < block.offset.y() + block.local.y(); i++)
+	{
+		if (block.isFluid(x,i,z))
+		{
+			fprintf(fout, "%e", nse.lat.lbm2physY(i));
+			int index=0;
+			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+			{
+				for (int dof=0;dof<dofs;dof++)
+				{
+					outputData(block, index-1,dof,idd,x,i,z,value,dofs);
+					fprintf(fout, "\t%e", value);
+				}
+			}
+			fprintf(fout, "\n");
+		}
+	}
+	fclose(fout);
+}
+
+template< typename NSE >
+void State<NSE>::write1Dcut_Z(idx x, idx y, const char * fname)
+{
+	FILE*fout = fopen(fname,"wt"); // append information
+	// probe vertical profile at x_m
+	char idd[500];
+	real value;
+	int dofs;
+	fprintf(fout,"#time %f s\n", nse.physTime());
+	fprintf(fout,"#1:z");
+	int count=2, index=0;
+	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	{
+		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		else
+		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
+	}
+	fprintf(fout,"\n");
+
+	for (const auto& block : nse.blocks)
+	for (idx i = block.offset.z(); i < block.offset.z() + block.local.z(); i++)
+	{
+		if (block.isFluid(x,y,i))
+		{
+			fprintf(fout, "%e", nse.lat.lbm2physZ(i));
+			index=0;
+			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+			{
+				for (int dof=0;dof<dofs;dof++)
+				{
+					outputData(block, index-1,dof,idd,x,y,i,value,dofs);
 					fprintf(fout, "\t%e", value);
 				}
 			}
@@ -547,274 +552,48 @@ void State<LBM_TYPE>::write1Dcut(point_t from, point_t to, const char * fname)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTKs_3D()
+template< typename NSE >
+void State<NSE>::writeVTKs_3D()
 {
-	// only one 3D vtk is written now
 	char dir[FILENAME_CHARS], filename[FILENAME_CHARS], basename[FILENAME_CHARS];
 	sprintf(dir,"results_%s/vtk3D", id);
-//	sprintf(dir,"results_%s/vtk_%s",id,State::T_LBM_TYPE::id);
 	mkdir_p(dir,0755);
 
-	char tmp_dirname[FILENAME_CHARS];
-	const char* local_scratch = getenv("LOCAL_SCRATCH");
-	if (!local_scratch || local_scratch[0] == '\0')
+	for (const auto& block : nse.blocks)
 	{
-		// $LOCAL_SCRATCH is not defined or empty - default to regular subdirectory in results_*
-		sprintf(tmp_dirname, dir);
-		local_scratch = NULL;
-	}
-	else
-	{
-		// Write files temporarily into the local scratch and move them to final_dirname at
-		// the end, after all MPI processes have completed. This avoids small buffered writes
-		// into the shared filesystem on clusters as well as corruption of previous state due
-		// to MPI errors...
-		sprintf(tmp_dirname, "%s/%s", local_scratch, dir);
-	}
-	mkdir_p(tmp_dirname,0755);
-
-//	int vtk3Dstyle = vtk3DsingleFile; // enum { vtk3DsingleFile, vtk3DmanyFiles, vtk3DmanyFilesExtraHeader };
-	if (vtk3Dstyle == vtk3DsingleFile)
-	{
-		sprintf(basename,"rank%03d_data_%d.vtk", lbm.rank, cnt[VTK3D].count);
-		sprintf(filename,"%s/%s", tmp_dirname, basename);
-		writeVTK_3D_singlefile(filename,lbm.physTime(),cnt[VTK3D].count);
-	} else
-	{
-		sprintf(basename,"rank%03d_", lbm.rank);//, cnt[VTK3D].count);
-		sprintf(filename,"%s/%s", tmp_dirname, basename);
-		writeVTK_3D(filename,lbm.physTime(),cnt[VTK3D].count);
-	}
-
-	if (local_scratch)
-	{
-		// move the files from local_scratch into final_dirname and create a backup of the existing files
-		move(tmp_dirname, dir, basename, basename);
-	}
-}
-
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_3D(const char* name, real time, int cycle)
-{
-	bool VTK3D_write_separate_header=(vtk3Dstyle==vtk3DmanyFiles) ? false : true;
-	// determine max objects to write
-	int max_objects=0;
-	{
-		int index=0;
-		char idd[500];
-		real value;
-		int dofs;
-		while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-			max_objects++;
-		log("[vtk preparing to write %d objects]",max_objects);
-	}
-
-//	state.log("number of CPU cores:\t%d", omp_get_num_procs());
-//	omp_set_num_threads(num_cpu_threads);
-	int max_thr = MIN(max_objects, omp_get_num_procs());
-	log("[vtk3d %d threads for vtk 3D write]", max_thr);
-
-	if (VTK3D_write_separate_header)
-	{
-		VTKWriter vtk; // local vtkwriter
-		char fname[500];
-		sprintf(fname,"%sheader_%d.prevtk",name,cycle);
-		// browse output
-		FILE* fp = fopen(fname, "w+");
-		vtk.writeHeader(fp);
-		fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-		fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, (int)lbm.local_Z);
-		fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-			vtk.writeFloat(fp, lbm.lbm2physX(x));
-		vtk.writeBuffer(fp);
-
-		fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-			vtk.writeFloat(fp, lbm.lbm2physY(y));
-		vtk.writeBuffer(fp);
-
-		fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-			vtk.writeFloat(fp, lbm.lbm2physZ(z));
-		vtk.writeBuffer(fp);
-
-		fprintf(fp,"FIELD FieldData %d\n",2);
-		fprintf(fp,"TIME %d %d float\n",1,1);
-		vtk.writeFloat(fp, time);
-		vtk.writeBuffer(fp);
-
-		fprintf(fp,"CYCLE %d %d float\n",1,1);
-		vtk.writeFloat(fp, cycle);
-		vtk.writeBuffer(fp);
-
-		fprintf(fp,"POINT_DATA %d\n", (int)(lbm.local_X*lbm.local_Y*lbm.local_Z));
-
-		fprintf(fp,"SCALARS wall int 1\n");
-		fprintf(fp,"LOOKUP_TABLE default\n");
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-			vtk.writeInt(fp, lbm.map(x,y,z));
-
-		fclose(fp);
-	}
-
-	#pragma omp parallel for schedule(static) num_threads(max_thr)
-	for (int i=0;i<max_objects;i++)
-	{
-		VTKWriter vtk; // local vtkwriter
-		char idd[500];
-		real value;
-		int dofs;
-//		int index=0;
-		char fname[500];
-		outputData(i, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs); // read idd and dofs
-//		{
-		sprintf(fname,"%s%s_%d.%s",name,idd,cycle,(VTK3D_write_separate_header)?"prevtk":"vtk");
-		log("[vtk3d: writing %s, time %f, cycle %d] ", fname, time, cycle);
-		// browse output
-		FILE* fp = fopen(fname, "w+");
-		if (!VTK3D_write_separate_header)
+		char tmp_dirname[FILENAME_CHARS];
+		const char* local_scratch = getenv("LOCAL_SCRATCH");
+		if (!local_scratch || local_scratch[0] == '\0')
 		{
-			vtk.writeHeader(fp);
-			fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-			fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, (int)lbm.local_Z);
-			fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-			for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-				vtk.writeFloat(fp, lbm.lbm2physX(x));
-			vtk.writeBuffer(fp);
-
-			fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-			for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-				vtk.writeFloat(fp, lbm.lbm2physY(y));
-			vtk.writeBuffer(fp);
-
-			fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-			for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-				vtk.writeFloat(fp, lbm.lbm2physZ(z));
-			vtk.writeBuffer(fp);
-
-			fprintf(fp,"FIELD FieldData %d\n",2);
-			fprintf(fp,"TIME %d %d float\n",1,1);
-			vtk.writeFloat(fp, time);
-			vtk.writeBuffer(fp);
-
-			fprintf(fp,"CYCLE %d %d float\n",1,1);
-			vtk.writeFloat(fp, cycle);
-			vtk.writeBuffer(fp);
-
-			fprintf(fp,"POINT_DATA %d\n", (int)(lbm.local_X*lbm.local_Y*lbm.local_Z));
-
-			fprintf(fp,"SCALARS wall int 1\n");
-			fprintf(fp,"LOOKUP_TABLE default\n");
-			for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-			for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-			for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-				vtk.writeInt(fp, lbm.map(x,y,z));
-		}
-
-		// insert description
-		if (dofs==1)
-		{
-			fprintf(fp,"SCALARS %s float 1\n",idd);
-			fprintf(fp,"LOOKUP_TABLE default\n");
+			// $LOCAL_SCRATCH is not defined or empty - default to regular subdirectory in results_*
+			sprintf(tmp_dirname, dir);
+			local_scratch = NULL;
 		}
 		else
 		{
-			fprintf(fp,"VECTORS %s float\n",idd);
+			// Write files temporarily into the local scratch and move them to final_dirname at
+			// the end, after all MPI processes have completed. This avoids small buffered writes
+			// into the shared filesystem on clusters as well as corruption of previous state due
+			// to MPI errors...
+			sprintf(tmp_dirname, "%s/%s", local_scratch, dir);
 		}
+		mkdir_p(tmp_dirname,0755);
 
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+		sprintf(basename,"block%03d_%d.vtk", block.id, cnt[VTK3D].count);
+		sprintf(filename,"%s/%s", tmp_dirname, basename);
+		auto outputData = [this] (const typename T_LBM_NSE::BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(i,dof,idd,x,y,z,value,dofs);
-				vtk.writeFloat(fp, value);
-			}
+			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
+		};
+		block.writeVTK_3D(nse.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
+		log("[vtk %s written, time %f, cycle %d] ", filename, nse.physTime(), cnt[VTK3D].count);
+
+		if (local_scratch)
+		{
+			// move the files from local_scratch into final_dirname and create a backup of the existing files
+			move(tmp_dirname, dir, basename, basename);
 		}
-		vtk.writeBuffer(fp);
-		fclose(fp);
-//		log("[vtk3d %s written, time %f, cycle %d] ", fname, time, cycle);
 	}
-}
-
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_3D_singlefile(const char* name, real time, int cycle)
-{
-	VTKWriter vtk;
-
-	FILE* fp = fopen(name, "w+");
-	vtk.writeHeader(fp);
-	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, (int)lbm.local_Z);
-	fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		vtk.writeFloat(fp, lbm.lbm2physX(x));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		vtk.writeFloat(fp, lbm.lbm2physY(y));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		vtk.writeFloat(fp, lbm.lbm2physZ(z));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"FIELD FieldData %d\n",2);
-	fprintf(fp,"TIME %d %d float\n",1,1);
-	vtk.writeFloat(fp, time);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"CYCLE %d %d float\n",1,1);
-	vtk.writeFloat(fp, cycle);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"POINT_DATA %d\n", (int)(lbm.local_X*lbm.local_Y*lbm.local_Z));
-
-	fprintf(fp,"SCALARS wall int 1\n");
-	fprintf(fp,"LOOKUP_TABLE default\n");
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		vtk.writeInt(fp, lbm.map(x,y,z));
-
-	char idd[500];
-	real value;
-	int dofs;
-	int count=0, index=0;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		// insert description
-		if (dofs==1)
-		{
-			fprintf(fp,"SCALARS %s float 1\n",idd);
-			fprintf(fp,"LOOKUP_TABLE default\n");
-		}
-		else
-			fprintf(fp,"VECTORS %s float\n",idd);
-
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(index-1,dof,idd,x,y,z,value,dofs);
-				vtk.writeFloat(fp, value);
-			}
-		}
-		vtk.writeBuffer(fp);
-		count++;
-	}
-
-	fclose(fp);
-	log("[vtk %s written, time %f, cycle %d] ", name, time, cycle);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -826,98 +605,9 @@ void State<LBM_TYPE>::writeVTK_3D_singlefile(const char* name, real time, int cy
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_3Dcut(const char* name, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step)
-{
-	VTKWriter vtk;
-
-	// intersection of the local domain with the box
-	lx = MIN(ox + lx, lbm.offset_X + lbm.local_X) - MAX(ox, lbm.offset_X);
-	ly = MIN(oy + ly, lbm.offset_Y + lbm.local_Y) - MAX(oy, lbm.offset_Y);
-	lz = MIN(oz + lz, lbm.offset_Z + lbm.local_Z) - MAX(oz, lbm.offset_Z);
-	ox = MAX(ox, lbm.offset_X);
-	oy = MAX(oy, lbm.offset_Y);
-	oz = MAX(oz, lbm.offset_Z);
-
-	// box dimensions (round-up integer division)
-	idx X = lx / step + (lx % step != 0);
-	idx Y = ly / step + (ly % step != 0);
-	idx Z = lz / step + (lz % step != 0);
-//	log("debug: writeVTK3Dcut X %d Y %d Z %d",(int)X,(int)Y,(int)Z);
-
-	FILE* fp = fopen(name, "w+");
-	vtk.writeHeader(fp);
-	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)X, (int)Y, (int)Z);
-	fprintf(fp,"X_COORDINATES %d float\n", (int)X);
-	for (idx x = ox; x < ox + lx; x += step)
-		vtk.writeFloat(fp, lbm.lbm2physX(x));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Y_COORDINATES %d float\n", (int)Y);
-	for (idx y = oy; y < oy + ly; y += step)
-		vtk.writeFloat(fp, lbm.lbm2physY(y));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Z_COORDINATES %d float\n", (int)Z);
-	for (idx z = oz; z < oz + lz; z += step)
-		vtk.writeFloat(fp, lbm.lbm2physZ(z));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"FIELD FieldData %d\n",2);
-	fprintf(fp,"TIME %d %d float\n",1,1);
-	vtk.writeFloat(fp, time);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"CYCLE %d %d float\n",1,1);
-	vtk.writeFloat(fp, cycle);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"POINT_DATA %d\n", (int)(X*Y*Z));
-
-	fprintf(fp,"SCALARS wall int 1\n");
-	fprintf(fp,"LOOKUP_TABLE default\n");
-	for (idx z = oz; z < oz + lz; z += step)
-	for (idx y = oy; y < oy + ly; y += step)
-	for (idx x = ox; x < ox + lx; x += step)
-		vtk.writeInt(fp, lbm.map(x,y,z));
-
-	char idd[500];
-	real value;
-	int dofs;
-	int count=0, index=0;
-	while (outputData(index++, 0, idd, ox,oy,oz, value, dofs))
-	{
-		// insert description
-		if (dofs==1)
-		{
-			fprintf(fp,"SCALARS %s float 1\n",idd);
-			fprintf(fp,"LOOKUP_TABLE default\n");
-		}
-		else
-			fprintf(fp,"VECTORS %s float\n",idd);
-
-		for (idx z = oz; z < oz + lz; z += step)
-		for (idx y = oy; y < oy + ly; y += step)
-		for (idx x = ox; x < ox + lx; x += step)
-		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(index-1,dof,idd,x,y,z,value,dofs);
-				vtk.writeFloat(fp, value);
-			}
-		}
-		vtk.writeBuffer(fp);
-		count++;
-	}
-
-	fclose(fp);
-	log("[vtk %s written, time %f, cycle %d] ", name, time, cycle);
-}
-
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step, const char* fmt, ARGS... args)
+void State<NSE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step, const char* fmt, ARGS... args)
 {
 	probe3Dvec.push_back( T_PROBE3DCUT() );
 	int last = probe3Dvec.size()-1;
@@ -934,30 +624,40 @@ void State<LBM_TYPE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, i
 	probe3Dvec[last].cycle = 0;
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTKs_3Dcut()
+template< typename NSE >
+void State<NSE>::writeVTKs_3Dcut()
 {
 	if (probe3Dvec.size()<=0) return;
 	// browse all 3D vtk cuts
-	for (int i=0;i<probe3Dvec.size(); i++)
+	for (auto& probevec : probe3Dvec)
 	{
-		char fname[FILENAME_CHARS];
-		sprintf(fname,"results_%s/vtk3Dcut/%s_rank%03d_%d.vtk", id, probe3Dvec[i].name, lbm.rank, probe3Dvec[i].cycle);
-		// create parent directories
-		create_file(fname);
-		writeVTK_3Dcut(
-			fname,
-			lbm.physTime(),
-			probe3Dvec[i].cycle,
-			probe3Dvec[i].ox,
-			probe3Dvec[i].oy,
-			probe3Dvec[i].oz,
-			probe3Dvec[i].lx,
-			probe3Dvec[i].ly,
-			probe3Dvec[i].lz,
-			probe3Dvec[i].step
+		for (const auto& block : nse.blocks)
+		{
+			char fname[FILENAME_CHARS];
+			sprintf(fname,"results_%s/vtk3Dcut/%s_block%03d_%d.vtk", id, probevec.name, block.id, probevec.cycle);
+			// create parent directories
+			create_file(fname);
+			auto outputData = [this] (const typename T_LBM_NSE::BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+			{
+				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
+			};
+			block.writeVTK_3Dcut(
+				nse.lat,
+				outputData,
+				fname,
+				nse.physTime(),
+				probevec.cycle,
+				probevec.ox,
+				probevec.oy,
+				probevec.oz,
+				probevec.lx,
+				probevec.ly,
+				probevec.lz,
+				probevec.step
 			);
-		probe3Dvec[i].cycle++;
+			log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+		}
+		probevec.cycle++;
 	}
 }
 
@@ -970,11 +670,11 @@ void State<LBM_TYPE>::writeVTKs_3Dcut()
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add2Dcut_X(idx x, const char* fmt, ARGS... args)
+void State<NSE>::add2Dcut_X(idx x, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalX(x)) return;
+	if (!nse.isAnyLocalX(x)) return;
 
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
@@ -986,11 +686,11 @@ void State<LBM_TYPE>::add2Dcut_X(idx x, const char* fmt, ARGS... args)
 	probe2Dvec[last].position = x;
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add2Dcut_Y(idx y, const char* fmt, ARGS... args)
+void State<NSE>::add2Dcut_Y(idx y, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalY(y)) return;
+	if (!nse.isAnyLocalY(y)) return;
 
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
@@ -1002,11 +702,11 @@ void State<LBM_TYPE>::add2Dcut_Y(idx y, const char* fmt, ARGS... args)
 	probe2Dvec[last].position = y;
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-void State<LBM_TYPE>::add2Dcut_Z(idx z, const char* fmt, ARGS... args)
+void State<NSE>::add2Dcut_Z(idx z, const char* fmt, ARGS... args)
 {
-	if (!lbm.isLocalZ(z)) return;
+	if (!nse.isAnyLocalZ(z)) return;
 
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
@@ -1019,252 +719,36 @@ void State<LBM_TYPE>::add2Dcut_Z(idx z, const char* fmt, ARGS... args)
 }
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTKs_2D()
+template< typename NSE >
+void State<NSE>::writeVTKs_2D()
 {
 	if (probe2Dvec.size()<=0) return;
 	// browse all 2D vtk cuts
-	for (int i=0;i<probe2Dvec.size(); i++)
+	for (auto& probevec : probe2Dvec)
 	{
-		char fname[FILENAME_CHARS];
-		sprintf(fname,"results_%s/vtk2D/%s_rank%03d_%d.vtk", id, probe2Dvec[i].name, lbm.rank, probe2Dvec[i].cycle);
-		// create parent directories
-		create_file(fname);
-		switch (probe2Dvec[i].type)
+		for (const auto& block : nse.blocks)
 		{
-			case 0: writeVTK_2DcutX(fname,lbm.physTime(),probe2Dvec[i].cycle,probe2Dvec[i].position);
-				break;
-			case 1: writeVTK_2DcutY(fname,lbm.physTime(),probe2Dvec[i].cycle,probe2Dvec[i].position);
-				break;
-			case 2: writeVTK_2DcutZ(fname,lbm.physTime(),probe2Dvec[i].cycle,probe2Dvec[i].position);
-				break;
-		}
-		probe2Dvec[i].cycle++;
-	}
-}
-
-// X-Z plane for Y=YPOS
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_2DcutY(const char* name, real time, int cycle, idx YPOS)
-{
-	VTKWriter vtk;
-
-	FILE* fp = fopen(name, "w+");
-	vtk.writeHeader(fp);
-	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, 1, (int)lbm.local_Z);
-	fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		vtk.writeFloat(fp, lbm.lbm2physX(x));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Y_COORDINATES 1 float\n");
-	vtk.writeFloat(fp, lbm.lbm2physY(YPOS));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		vtk.writeFloat(fp, lbm.lbm2physZ(z));
-	vtk.writeBuffer(fp);
-
-
-	fprintf(fp,"FIELD FieldData %d\n",2);
-	fprintf(fp,"TIME %d %d float\n",1,1);
-	vtk.writeFloat(fp, time);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"CYCLE %d %d float\n",1,1);
-	vtk.writeFloat(fp, cycle);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"POINT_DATA %d\n", (int)(1*lbm.local_X*lbm.local_Z));
-
-	fprintf(fp,"SCALARS wall int 1\n");
-	fprintf(fp,"LOOKUP_TABLE default\n");
-	idx y=YPOS;
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		vtk.writeInt(fp, lbm.map(x,y,z));
-
-	int count=0, index=0;
-	char idd[500];
-	real value;
-	int dofs;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		// insert description
-		if (dofs==1)
-		{
-			fprintf(fp,"SCALARS %s float 1\n",idd);
-			fprintf(fp,"LOOKUP_TABLE default\n");
-		} else
-			fprintf(fp,"VECTORS %s float\n",idd);
-
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		{
-			for (int dof=0;dof<dofs;dof++)
+			char fname[FILENAME_CHARS];
+			sprintf(fname,"results_%s/vtk2D/%s_block%03d_%d.vtk", id, probevec.name, block.id, probevec.cycle);
+			// create parent directories
+			create_file(fname);
+			auto outputData = [this] (const typename T_LBM_NSE::BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
-				outputData(index-1,dof,idd,x,y,z,value,dofs);
-				vtk.writeFloat(fp, value);
-			}
-		}
-		vtk.writeBuffer(fp);
-		count++;
-
-	}
-
-	fclose(fp);
-	log("[vtk %s written, time %f, cycle %d] ", name, time, cycle);
-}
-
-// Y-Z plane for X=XPOS
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_2DcutX(const char* name, real time, int cycle, idx XPOS)
-{
-	VTKWriter vtk;
-
-	FILE* fp = fopen(name, "w+");
-	vtk.writeHeader(fp);
-	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-	fprintf(fp,"DIMENSIONS %d %d %d\n",1, (int)lbm.local_Y, (int)lbm.local_Z);
-
-	fprintf(fp,"X_COORDINATES %d float\n", 1);
-	vtk.writeFloat(fp, lbm.lbm2physX(XPOS));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		vtk.writeFloat(fp, lbm.lbm2physY(y));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Z_COORDINATES %d float\n", (int)lbm.local_Z);
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		vtk.writeFloat(fp, lbm.lbm2physZ(z));
-	vtk.writeBuffer(fp);
-
-
-	fprintf(fp,"FIELD FieldData %d\n",2);
-	fprintf(fp,"TIME %d %d float\n",1,1);
-	vtk.writeFloat(fp, time);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"CYCLE %d %d float\n",1,1);
-	vtk.writeFloat(fp, cycle);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"POINT_DATA %d\n", (int)(1*lbm.local_Y*lbm.local_Z));
-
-	fprintf(fp,"SCALARS wall int 1\n");
-	fprintf(fp,"LOOKUP_TABLE default\n");
-	idx x=XPOS;
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		vtk.writeInt(fp, lbm.map(x,y,z));
-
-	int count=0, index=0;
-	char idd[500];
-	real value;
-	int dofs;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		// insert description
-		if (dofs==1)
-		{
-			fprintf(fp,"SCALARS %s float 1\n",idd);
-			fprintf(fp,"LOOKUP_TABLE default\n");
-		} else
-		{
-			fprintf(fp,"VECTORS %s float\n",idd);
-		}
-		for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		{
-			for (int dof=0;dof<dofs;dof++)
+				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
+			};
+			switch (probevec.type)
 			{
-				outputData(index-1,dof,idd,x,y,z,value,dofs);
-				vtk.writeFloat(fp, value);
+				case 0: block.writeVTK_2DcutX(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
+					break;
+				case 1: block.writeVTK_2DcutY(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
+					break;
+				case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
+					break;
 			}
+			log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
 		}
-		vtk.writeBuffer(fp);
-		count++;
+		probevec.cycle++;
 	}
-
-	fclose(fp);
-	log("[vtk %s written, time %f, cycle %d] ", name, time, cycle);
-}
-
-// X-Y plane for Z=ZPOS
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::writeVTK_2DcutZ(const char* name, real time, int cycle, idx ZPOS)
-{
-	VTKWriter vtk;
-
-	FILE* fp = fopen(name, "w+");
-	vtk.writeHeader(fp);
-	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
-	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)lbm.local_X, (int)lbm.local_Y, 1);
-	fprintf(fp,"X_COORDINATES %d float\n", (int)lbm.local_X);
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		vtk.writeFloat(fp, lbm.lbm2physX(x));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Y_COORDINATES %d float\n", (int)lbm.local_Y);
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		vtk.writeFloat(fp, lbm.lbm2physY(y));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"Z_COORDINATES %d float\n", 1);
-	vtk.writeFloat(fp, lbm.lbm2physZ(ZPOS));
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"FIELD FieldData %d\n",2);
-	fprintf(fp,"TIME %d %d float\n",1,1);
-	vtk.writeFloat(fp, time);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"CYCLE %d %d float\n",1,1);
-	vtk.writeFloat(fp, cycle);
-	vtk.writeBuffer(fp);
-
-	fprintf(fp,"POINT_DATA %d\n", (int)(1*lbm.local_X*lbm.local_Y));
-
-	fprintf(fp,"SCALARS wall int 1\n");
-	fprintf(fp,"LOOKUP_TABLE default\n");
-	idx z=ZPOS;
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		vtk.writeInt(fp, lbm.map(x,y,z));
-
-	int count=0, index=0;
-	char idd[500];
-	real value;
-	int dofs;
-	while (outputData(index++, 0, idd, lbm.offset_X,lbm.offset_Y,lbm.offset_Z, value, dofs))
-	{
-		// insert description
-		if (dofs==1)
-		{
-			fprintf(fp,"SCALARS %s float 1\n",idd);
-			fprintf(fp,"LOOKUP_TABLE default\n");
-		} else
-			fprintf(fp,"VECTORS %s float\n",idd);
-
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(index-1,dof,idd,x,y,z,value,dofs);
-				vtk.writeFloat(fp, value);
-			}
-		}
-		vtk.writeBuffer(fp);
-		count++;
-	}
-
-	fclose(fp);
-	log("[vtk %s written, time %f, cycle %d] ", name, time, cycle);
 }
 
 
@@ -1277,66 +761,69 @@ void State<LBM_TYPE>::writeVTK_2DcutZ(const char* name, real time, int cycle, id
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::projectPNG_X(const char * filename, idx x0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
+template< typename NSE >
+bool State<NSE>::projectPNG_X(const char * filename, idx x0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!lbm.isLocalX(x0)) return true;
+	if (!nse.isLocalX(x0)) return true;
 
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
 	PNGTool P(filename);
 
 	// plane y-z
 	idx x = x0;
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+	for (idx z = nse.lat.offset.z(); z < nse.lat.offset.z() + nse.lat.local.z(); z++)
 	{
-		real a = (real)z/(real)(lbm.global_Z - 1); // a in [0,1]
+		real a = (real)z/(real)(nse.lat.global.z() - 1); // a in [0,1]
 		a = amin + a * (amax - amin); // a in [amin, amax]
 		if (mirror) a = 1.0 - a;
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+		for (idx y = nse.lat.offset.y(); y < nse.lat.offset.y() + nse.lat.local.y(); y++)
 		{
-			real b = (real)y/(real)(lbm.global_Y - 1); // b in [0,1]
+			real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
 			b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
 			if (flip) b = 1.0 - b;
 			if (rotate)
 			{
-				if (P.intensity(b,a) > 0) lbm.defineWall(x, y, z, true);
+				if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
 			}
 			else
 			{
-				if (P.intensity(a,b) > 0) lbm.defineWall(x, y, z, true);
+				if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
 			}
 		}
 	}
 	return true;
 }
 
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::projectPNG_Y(const char * filename, idx y0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
+template< typename NSE >
+bool State<NSE>::projectPNG_Y(const char * filename, idx y0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!lbm.isLocalY(y0)) return true;
-
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
 	PNGTool P(filename);
 
-	// plane x-z
-	idx y=y0;
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
+	for (auto& block : nse.blocks)
 	{
-		real a = (real)z/(real)(lbm.global_Z - 1); // a in [0,1]
-		a = amin + a * (amax - amin); // a in [amin, amax]
-		if (mirror) a = 1.0 - a;
-		for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+		if (!block.isLocalY(y0)) continue;
+
+		// plane x-z
+		idx y=y0;
+		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++)
 		{
-			real b = (real)x/(real)(lbm.global_X - 1); // b in [0,1]
-			b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
-			if (flip) b = 1.0 - b;
-			if (rotate)
+			real a = (real)z/(real)(nse.lat.global.z() - 1); // a in [0,1]
+			a = amin + a * (amax - amin); // a in [amin, amax]
+			if (mirror) a = 1.0 - a;
+			for (idx x = block.offset.x(); x < block.offset.x() + block.local.x(); x++)
 			{
-				if (P.intensity(b,a) > 0) lbm.defineWall(x, y, z, true);
-			}
-			else
-			{
-				if (P.intensity(a,b) > 0) lbm.defineWall(x, y, z, true);
+				real b = (real)x/(real)(nse.lat.global.x() - 1); // b in [0,1]
+				b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
+				if (flip) b = 1.0 - b;
+				if (rotate)
+				{
+					if (P.intensity(b,a) > 0) block.defineWall(x, y, z, true);
+				}
+				else
+				{
+					if (P.intensity(a,b) > 0) block.defineWall(x, y, z, true);
+				}
 			}
 		}
 	}
@@ -1344,33 +831,33 @@ bool State<LBM_TYPE>::projectPNG_Y(const char * filename, idx y0, bool rotate, b
 }
 
 
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::projectPNG_Z(const char * filename, idx z0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
+template< typename NSE >
+bool State<NSE>::projectPNG_Z(const char * filename, idx z0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!lbm.isLocalZ(z0)) return true;
+	if (!nse.isLocalZ(z0)) return true;
 
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
 	PNGTool P(filename);
 
 	// plane x-y
 	idx z=z0;
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
+	for (idx x = nse.lat.offset.x(); x < nse.lat.offset.x() + nse.lat.local.x(); x++)
 	{
-		real a = (real)x/(real)(lbm.global_X - 1); // a in [0,1]
+		real a = (real)x/(real)(nse.lat.global.x() - 1); // a in [0,1]
 		a = amin + a * (amax - amin); // a in [amin, amax]
 		if (mirror) a = 1.0 - a;
-		for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
+		for (idx y = nse.lat.offset.y(); y < nse.lat.offset.y() + nse.lat.local.y(); y++)
 		{
-			real b = (real)y/(real)(lbm.global_Y - 1); // b in [0,1]
+			real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
 			b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
 			if (flip) b = 1.0 - b;
 			if (rotate)
 			{
-				if (P.intensity(b,a) > 0) lbm.defineWall(x, y, z, true);
+				if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
 			}
 			else
 			{
-				if (P.intensity(a,b) > 0) lbm.defineWall(x, y, z, true);
+				if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
 			}
 		}
 	}
@@ -1387,8 +874,8 @@ bool State<LBM_TYPE>::projectPNG_Z(const char * filename, idx z0, bool rotate, b
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::move(const char* srcdir, const char* dstdir, const char* srcfilename, const char* dstfilename)
+template< typename NSE >
+void State<NSE>::move(const char* srcdir, const char* dstdir, const char* srcfilename, const char* dstfilename)
 {
 	char src[FILENAME_CHARS];
 	char dst[FILENAME_CHARS];
@@ -1414,14 +901,14 @@ void State<LBM_TYPE>::move(const char* srcdir, const char* dstdir, const char* s
 		log("move: manual move failed");
 }
 
-//template< typename LBM_TYPE >
+//template< typename NSE >
 //template< typename... ARGS >
-//int State<LBM_TYPE>::saveLoadTextData(int direction, const char*dirname, const char*filename, const char*fmt, ARGS&... args)
+//int State<NSE>::saveLoadTextData(int direction, const char*dirname, const char*filename, const char*fmt, ARGS&... args)
 //{
 //	// check if main dir exists
 //	mkdir_p(dirname, 0777);
 //	char fname[FILENAME_CHARS];
-//	sprintf(fname,"%s/%s_rank%03d", dirname, filename, lbm.rank);
+//	sprintf(fname,"%s/%s_rank%03d", dirname, filename, nse.rank);
 //
 //	if (direction==MemoryToFile)
 //	{
@@ -1450,14 +937,14 @@ void State<LBM_TYPE>::move(const char* srcdir, const char* dstdir, const char* s
 //	return 1;
 //}
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename... ARGS >
-int State<LBM_TYPE>::saveLoadTextData(int direction, const char*dirname, const char*filename, ARGS&... args)
+int State<NSE>::saveLoadTextData(int direction, const char*dirname, const char*filename, ARGS&... args)
 {
 	// check if main dir exists
 	mkdir_p(dirname, 0777);
 	char fname[FILENAME_CHARS];
-	sprintf(fname,"%s/%s_rank%03d", dirname, filename, lbm.rank);
+	sprintf(fname,"%s/%s_rank%03d", dirname, filename, nse.rank);
 
 	const std::string fmt = getSaveLoadFmt(args...);
 
@@ -1488,14 +975,14 @@ int State<LBM_TYPE>::saveLoadTextData(int direction, const char*dirname, const c
 	return 1;
 }
 
-template< typename LBM_TYPE >
+template< typename NSE >
 template< typename VARTYPE >
-int State<LBM_TYPE>::saveloadBinaryData(int direction, const char*dirname, const char*filename, VARTYPE*data, idx length)
+int State<NSE>::saveloadBinaryData(int direction, const char*dirname, const char*filename, VARTYPE*data, idx length)
 {
 	// check if main dir exists
 	mkdir_p(dirname, 0777);
 	char fname[FILENAME_CHARS];
-	sprintf(fname,"%s/%s_rank%03d", dirname, filename, lbm.rank);
+	sprintf(fname,"%s/%s_rank%03d", dirname, filename, nse.rank);
 
 	if (direction==MemoryToFile)
 	{
@@ -1524,8 +1011,8 @@ int State<LBM_TYPE>::saveloadBinaryData(int direction, const char*dirname, const
 	return 1;
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::saveAndLoadState(int direction, const char*subdirname)
+template< typename NSE >
+void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 {
 	char final_dirname[FILENAME_CHARS];
 	sprintf(final_dirname, "results_%s/%s", id, subdirname);
@@ -1551,8 +1038,12 @@ void State<LBM_TYPE>::saveAndLoadState(int direction, const char*subdirname)
 	char nid[200];
 
 //	saveLoadTextData(direction, tmp_dirname, "config", "%d\n%d\n%d\n%d\n%d\n%d\n%d\n%.20le\n",
-//			lbm.iterations, lbm.global_X, lbm.global_Y, lbm.global_Z, lbm.local_X, lbm.local_Y, lbm.local_Z, lbm.physFinalTime);
-	saveLoadTextData(direction, tmp_dirname, "config", lbm.iterations, lbm.global_X, lbm.global_Y, lbm.global_Z, lbm.local_X, lbm.local_Y, lbm.local_Z, lbm.physFinalTime);
+//			nse.iterations, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z(), nse.lat.local.x(), nse.lat.local.y(), nse.lat.local.z(), nse.physFinalTime);
+// FIXME: save and restore number of blocks
+//	saveLoadTextData(direction, tmp_dirname, "config", nse.iterations, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z(), nse.lat.local.x(), nse.lat.local.y(), nse.lat.local.z(), nse.physFinalTime);
+	saveLoadTextData(direction, tmp_dirname, "config", nse.iterations, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z(), nse.physFinalTime);
+//	for (auto& block : nse.blocks)
+//		saveLoadTextData(direction, tmp_dirname, "config", block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
 	// save all counter states
 	for (int c=0;c<MAX_COUNTER;c++)
@@ -1582,34 +1073,37 @@ void State<LBM_TYPE>::saveAndLoadState(int direction, const char*subdirname)
 		saveLoadTextData(direction, tmp_dirname, nid, probe2Dvec[i].cycle);
 	}
 
-	// save DFs
-	for (int dfty=0;dfty<DFMAX;dfty++)
+	for (auto& block : nse.blocks)
 	{
-		sprintf(nid,"df_%d",dfty);
-		#ifdef HAVE_MPI
-		saveloadBinaryData(direction, tmp_dirname, nid, lbm.hfs[dfty].getData(), lbm.hfs[dfty].getLocalStorageSize());
-		#else
-		saveloadBinaryData(direction, tmp_dirname, nid, lbm.hfs[dfty].getData(), lbm.hfs[dfty].getStorageSize());
-		#endif
-	}
+		// save DFs
+		for (int dfty=0;dfty<DFMAX;dfty++)
+		{
+			sprintf(nid,"df_%d",dfty);
+			#ifdef HAVE_MPI
+			saveloadBinaryData(direction, tmp_dirname, nid, block.hfs[dfty].getData(), block.hfs[dfty].getLocalStorageSize());
+			#else
+			saveloadBinaryData(direction, tmp_dirname, nid, block.hfs[dfty].getData(), block.hfs[dfty].getStorageSize());
+			#endif
+		}
 
-	// save map
-	sprintf(nid,"map");
-	#ifdef HAVE_MPI
-	saveloadBinaryData(direction, tmp_dirname, nid, lbm.hmap.getData(), lbm.hmap.getLocalStorageSize());
-	#else
-	saveloadBinaryData(direction, tmp_dirname, nid, lbm.hmap.getData(), lbm.hmap.getStorageSize());
-	#endif
-
-	// save macro
-	if (LBM_TYPE::MACRO::N>0)
-	{
-		sprintf(nid,"macro");
+		// save map
+		sprintf(nid,"map");
 		#ifdef HAVE_MPI
-		saveloadBinaryData(direction, tmp_dirname, nid, lbm.hmacro.getData(), lbm.hmacro.getLocalStorageSize());
+		saveloadBinaryData(direction, tmp_dirname, nid, block.hmap.getData(), block.hmap.getLocalStorageSize());
 		#else
-		saveloadBinaryData(direction, tmp_dirname, nid, lbm.hmacro.getData(), lbm.hmacro.getStorageSize());
+		saveloadBinaryData(direction, tmp_dirname, nid, block.hmap.getData(), block.hmap.getStorageSize());
 		#endif
+
+		// save macro
+		if (NSE::MACRO::N>0)
+		{
+			sprintf(nid,"macro");
+			#ifdef HAVE_MPI
+			saveloadBinaryData(direction, tmp_dirname, nid, block.hmacro.getData(), block.hmacro.getLocalStorageSize());
+			#else
+			saveloadBinaryData(direction, tmp_dirname, nid, block.hmacro.getData(), block.hmacro.getStorageSize());
+			#endif
+		}
 	}
 
 	if (local_scratch)
@@ -1640,64 +1134,64 @@ void State<LBM_TYPE>::saveAndLoadState(int direction, const char*subdirname)
 				sprintf(tmp_dirname, final_dirname);
 			}
 
-			sprintf(src, "config_rank%03d%s", lbm.rank, src_suffix);
-			sprintf(dst, "config_rank%03d%s", lbm.rank, dst_suffix);
+			sprintf(src, "config_rank%03d%s", nse.rank, src_suffix);
+			sprintf(dst, "config_rank%03d%s", nse.rank, dst_suffix);
 			move(tmp_dirname, final_dirname, src, dst);
 
 			// save all counter states
 			for (int c=0;c<MAX_COUNTER;c++)
 			{
-				sprintf(src, "cnt_%d_rank%03d%s", c, lbm.rank, src_suffix);
-				sprintf(dst, "cnt_%d_rank%03d%s", c, lbm.rank, dst_suffix);
+				sprintf(src, "cnt_%d_rank%03d%s", c, nse.rank, src_suffix);
+				sprintf(dst, "cnt_%d_rank%03d%s", c, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 
 			// save probes
 			for (int i=0;i<probe1Dvec.size();i++)
 			{
-				sprintf(src, "probe1D_%d_rank%03d%s", i, lbm.rank, src_suffix);
-				sprintf(dst, "probe1D_%d_rank%03d%s", i, lbm.rank, dst_suffix);
+				sprintf(src, "probe1D_%d_rank%03d%s", i, nse.rank, src_suffix);
+				sprintf(dst, "probe1D_%d_rank%03d%s", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 			for (int i=0;i<probe1Dlinevec.size();i++)
 			{
-				sprintf(src,"probe1Dline_%d_rank%03d%s", i, lbm.rank, src_suffix);
-				sprintf(dst,"probe1Dline_%d_rank%03d%s", i, lbm.rank, dst_suffix);
+				sprintf(src,"probe1Dline_%d_rank%03d%s", i, nse.rank, src_suffix);
+				sprintf(dst,"probe1Dline_%d_rank%03d%s", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 			for (int i=0;i<probe2Dvec.size();i++)
 			{
-				sprintf(src,"probe2D_%d_rank%03d%s", i, lbm.rank, src_suffix);
-				sprintf(dst,"probe2D_%d_rank%03d%s", i, lbm.rank, dst_suffix);
+				sprintf(src,"probe2D_%d_rank%03d%s", i, nse.rank, src_suffix);
+				sprintf(dst,"probe2D_%d_rank%03d%s", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 
 			// save DFs
 			for (int dfty=0;dfty<DFMAX;dfty++)
 			{
-				sprintf(src, "df_%d_rank%03d%s", dfty, lbm.rank, src_suffix);
-				sprintf(dst, "df_%d_rank%03d%s", dfty, lbm.rank, dst_suffix);
+				sprintf(src, "df_%d_rank%03d%s", dfty, nse.rank, src_suffix);
+				sprintf(dst, "df_%d_rank%03d%s", dfty, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 
 			// save map
-			sprintf(src, "map_rank%03d%s", lbm.rank, src_suffix);
-			sprintf(dst, "map_rank%03d%s", lbm.rank, dst_suffix);
+			sprintf(src, "map_rank%03d%s", nse.rank, src_suffix);
+			sprintf(dst, "map_rank%03d%s", nse.rank, dst_suffix);
 			move(tmp_dirname, final_dirname, src, dst);
 
 			// save macro
-			if (LBM_TYPE::MACRO::N>0)
+			if (NSE::MACRO::N>0)
 			{
-				sprintf(src, "macro_rank%03d%s", lbm.rank, src_suffix);
-				sprintf(dst, "macro_rank%03d%s", lbm.rank, dst_suffix);
+				sprintf(src, "macro_rank%03d%s", nse.rank, src_suffix);
+				sprintf(dst, "macro_rank%03d%s", nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 		}
 	}
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::saveState(bool forced)
+template< typename NSE >
+void State<NSE>::saveState(bool forced)
 {
 //	flagCreate("do_save_state");
 	if (flagExists("savestate") || !check_savestate_flag || forced)
@@ -1716,8 +1210,8 @@ void State<LBM_TYPE>::saveState(bool forced)
 //	saveAndLoadState(FileToMemory, "current_state");
 }
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::loadState(bool forced)
+template< typename NSE >
+void State<NSE>::loadState(bool forced)
 {
 //	flagCreate("do_save_state");
 	if (flagExists("loadstate") || forced)
@@ -1733,8 +1227,8 @@ void State<LBM_TYPE>::loadState(bool forced)
 //	saveAndLoadState(FileToMemory, "current_state");
 }
 
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::wallTimeReached()
+template< typename NSE >
+bool State<NSE>::wallTimeReached()
 {
 	bool local_result = false;
 	if (wallTime > 0)
@@ -1751,11 +1245,11 @@ bool State<LBM_TYPE>::wallTimeReached()
 	return TNL::MPI::reduce(local_result, MPI_LOR, MPI_COMM_WORLD);
 }
 
-template< typename LBM_TYPE >
-double State<LBM_TYPE>::getWallTime(bool collective)
+template< typename NSE >
+double State<NSE>::getWallTime(bool collective)
 {
 	double walltime = 0;
-	if (!collective || lbm.rank == 0)
+	if (!collective || nse.rank == 0)
 	{
 		timespec t_actual;
 		clock_gettime(CLOCK_REALTIME, &t_actual);
@@ -1779,36 +1273,19 @@ double State<LBM_TYPE>::getWallTime(bool collective)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::resetLattice(real rho, real vx, real vy, real vz)
+template< typename NSE >
+bool State<NSE>::estimateMemoryDemands()
 {
-	#pragma omp parallel for schedule(static) collapse(2)
-	for (idx x = lbm.offset_X; x < lbm.offset_X + lbm.local_X; x++)
-	for (idx z = lbm.offset_Z; z < lbm.offset_Z + lbm.local_Z; z++)
-	for (idx y = lbm.offset_Y; y < lbm.offset_Y + lbm.local_Y; y++)
-		lbm.setEqLat(x,y,z,rho,vx,vy,vz);
-}
+	long long memDFs = 0;
+	long long memMacro = 0;
+	long long memMap = 0;
+	for (const auto& block : nse.blocks) {
+		const long long XYZ = block.local.x() * block.local.y() * block.local.z();
+		memDFs += XYZ * sizeof(dreal) * NSE::Q;
+		memMacro += XYZ * sizeof(dreal) * NSE::MACRO::N;
+		memMap += XYZ * sizeof(map_t);
+	}
 
-// clear Lattice and boundary setup
-template< typename LBM_TYPE >
-void State<LBM_TYPE>::reset()
-{
-	lbm.resetMap(LBM_TYPE::BC::GEO_FLUID);
-	setupBoundaries();		// this can be virtualized
-	lbm.projectWall();
-	resetLattice(1.0, 0, 0, 0);
-//	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
-
-	//initial time of current simulation
-	clock_gettime(CLOCK_REALTIME, &t_init);
-}
-
-template< typename LBM_TYPE >
-bool State<LBM_TYPE>::estimateMemoryDemands()
-{
-	long long memDFs = lbm.local_X*lbm.local_Y*lbm.local_Z*27*sizeof(dreal);
-	long long memMacro = lbm.local_X*lbm.local_Y*lbm.local_Z*sizeof(dreal)*LBM_TYPE::MACRO::N;
-	long long memMap = lbm.local_X*lbm.local_Y*lbm.local_Z*sizeof(map_t);
 	long long CPUavail = sysconf(_SC_PHYS_PAGES)*sysconf(_SC_PAGE_SIZE);
 	long long GPUavail = 0;
 	long long GPUtotal = 0;
@@ -1833,7 +1310,7 @@ bool State<LBM_TYPE>::estimateMemoryDemands()
 		cudaGetDevice(&gpu_id);
 		cudaDeviceProp dprop;
 		cudaGetDeviceProperties(&dprop, gpu_id);
-		log("Rank %d uses GPU id %d: %s", lbm.rank, gpu_id, dprop.name);
+		log("Rank %d uses GPU id %d: %s", nse.rank, gpu_id, dprop.name);
 		// NOTE: cudaSetDevice breaks MPI !!!
 //		cudaSetDevice(i);
 		size_t free=0, total=0;
@@ -1846,7 +1323,7 @@ bool State<LBM_TYPE>::estimateMemoryDemands()
 //	CPUtotal += CPUDFs;
 	#endif
 
-	log("Local memory budget analysis / estimation for MPI rank %d", lbm.rank);
+	log("Local memory budget analysis / estimation for MPI rank %d", nse.rank);
 	log("CPU RAM for DFs:   %ld MiB", (long)(CPUDFs/1024/1024));
 //	log("CPU RAM for lat:   %ld MiB", (long)(memDFs/1024/1024));
 	log("CPU RAM for map:   %ld MiB", (long)(memMap/1024/1024));
@@ -1861,4 +1338,472 @@ bool State<LBM_TYPE>::estimateMemoryDemands()
 	#endif
 	if (CPUavail <= CPUtotal) return false;
 	return true;
+}
+
+// clear Lattice and boundary setup
+template< typename NSE >
+void State<NSE>::reset()
+{
+	nse.resetMap(NSE::BC::GEO_FLUID);
+	setupBoundaries();		// this can be virtualized
+	nse.projectWall();
+	resetLattice(1.0, 0, 0, 0);
+//	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
+
+	//initial time of current simulation
+	clock_gettime(CLOCK_REALTIME, &t_init);
+}
+
+template< typename NSE >
+void State<NSE>::resetLattice(real rho, real vx, real vy, real vz)
+{
+	// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
+	// (because GEO_INFLOW and GEO_OUTFLOW_EQ access the ghost layer in streaming)
+	nse.forAllLatticeSites( [&] (typename T_LBM_NSE::BLOCK& block, idx x, idx y, idx z) {
+		block.setEqLat(x,y,z,rho,vx,vy,vz);
+	} );
+}
+
+template< typename NSE >
+void State<NSE>::SimInit()
+{
+	timer_SimInit.reset();
+	timer_SimUpdate.reset();
+	timer_AfterSimUpdate.reset();
+	timer_compute.reset();
+	timer_compute_overlaps.reset();
+	timer_wait_communication.reset();
+	timer_wait_computation.reset();
+
+	timer_SimInit.start();
+
+	log("MPI info: rank=%d, nproc=%d, lat.global=[%d,%d,%d]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
+	for (auto& block : nse.blocks)
+		log("LBM block %d: local=[%d,%d,%d], offset=[%d,%d,%d]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
+
+	log("\nSTART: simulation NSE:%s lbmVisc %e physDl %e physDt %e", NSE::COLL::id, nse.lbmViscosity(), nse.lat.physDl, nse.physDt);
+
+	// reset counters
+	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
+	cnt[SAVESTATE].count = 1;  // skip initial save of state
+	nse.iterations = nse.prevIterations = 0;
+
+	// check for loadState
+//	if(flagExists("current_state/df_0"))
+	if(flagExists("loadstate"))
+	{
+		loadState(); // load saved state into CPU memory
+		nse.physStartTime = nse.physTime();
+	}
+	else
+	{
+		// setup map and DFs in CPU memory
+		reset();
+
+		for (auto& block : nse.blocks)
+		{
+			// create LBM_DATA with host pointers
+			typename NSE::DATA SD;
+			for (uint8_t dfty=0;dfty<DFMAX;dfty++)
+				SD.dfs[dfty] = block.hfs[dfty].getData();
+			#ifdef HAVE_MPI
+			SD.indexer = block.hmap.getLocalView().getIndexer();
+			#else
+			SD.indexer = block.hmap.getIndexer();
+			#endif
+			SD.XYZ = SD.indexer.getStorageSize();
+			SD.dmap = block.hmap.getData();
+			SD.dmacro = block.hmacro.getData();
+
+			// initialize macroscopic quantities on CPU
+			#pragma omp parallel for schedule(static) collapse(2)
+			for (idx x = 0; x < block.local.x(); x++)
+			for (idx z = 0; z < block.local.z(); z++)
+			for (idx y = 0; y < block.local.y(); y++)
+				LBMKernelInit<NSE>(SD, x, y, z);
+		}
+	}
+
+	nse.allocateDeviceData();
+	copyAllToDevice();
+
+#ifdef HAVE_MPI
+	// synchronize overlaps with MPI (initial synchronization can be synchronous)
+	nse.synchronizeMapDevice();
+	nse.synchronizeDFsDevice(df_cur);
+	if (NSE::MACRO::use_syncMacro)
+		nse.synchronizeMacroDevice();
+#endif
+
+	timer_SimInit.stop();
+}
+
+template< typename NSE >
+void State<NSE>::SimUpdate()
+{
+	timer_SimUpdate.start();
+
+	// debug
+	for (auto& block : nse.blocks)
+	if (block.data.lbmViscosity == 0) {
+		log("error: LBM viscosity is 0");
+		nse.terminate = true;
+		return;
+	}
+
+	// flags
+	bool doComputeVelocitiesStar=false;
+	bool doCopyQuantitiesStarToHost=false;
+	bool doZeroForceOnDevice=false;
+	bool doZeroForceOnHost=false;
+	bool doComputeLagrangePhysics=false;
+	bool doCopyForceToDevice=false;
+
+	// determine global flags
+	// NOTE: all Lagrangian points are assumed to be on the first GPU
+	// TODO
+//	if (nse.data.rank == 0 && FF.size() > 0)
+	if (FF.size() > 0)
+	{
+		doComputeLagrangePhysics=true;
+		for (std::size_t i=0;i<FF.size();i++)
+		if (FF[i].implicitWuShuForcing)
+		{
+			doComputeVelocitiesStar=true;
+			switch (FF[i].ws_compute)
+			{
+				case ws_computeCPU:
+				case ws_computeCPU_TNL:
+					doCopyQuantitiesStarToHost=true;
+					doZeroForceOnHost=true;
+					doCopyForceToDevice=true;
+					break;
+				case ws_computeGPU_TNL:
+				case ws_computeHybrid_TNL:
+				case ws_computeHybrid_TNL_zerocopy:
+				case ws_computeGPU_CUSPARSE:
+				case ws_computeHybrid_CUSPARSE:
+					doZeroForceOnDevice=true;
+					break;
+			}
+		}
+	}
+
+	#ifdef USE_CUDA
+	auto get_grid_size = [] (const auto& block) -> dim3
+	{
+		dim3 gridSize(block.local.x(), block.local.y()/block.block_size.y, block.local.z());
+
+		// check for PEBKAC problem existing between keyboard and chair
+		if (gridSize.y * block.block_size.y != block.local.y())
+			throw std::logic_error("error: block.local.y() (which is " + std::to_string(block.local.y()) + ") "
+								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.y) + ")");
+
+		return gridSize;
+	};
+	#endif
+
+	if (doComputeVelocitiesStar)
+	{
+		for (auto& block : nse.blocks)
+		{
+		#ifdef USE_CUDA
+			const dim3 gridSize = get_grid_size(block);
+			if (doZeroForceOnDevice)
+				cudaLBMComputeVelocitiesStarAndZeroForce< NSE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
+			else
+				cudaLBMComputeVelocitiesStar< NSE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
+			checkCudaDevice;
+		#else
+			#pragma omp parallel for schedule(static) collapse(2)
+			for (idx x = 0; x < block.local.x(); x++)
+			for (idx z = 0; z < block.local.z(); z++)
+			for (idx y = 0; y < block.local.y(); y++)
+			if (doZeroForceOnDevice)
+				LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.rank, nse.nproc, x, y, z);
+			else
+				LBMComputeVelocitiesStar< NSE >(block.data, nse.rank, nse.nproc, x, y, z);
+		#endif
+		}
+		if (doCopyQuantitiesStarToHost)
+		{
+			nse.copyMacroToHost();
+		}
+	}
+
+
+	// reset lattice force vectors dfx and dfy
+	if (doZeroForceOnHost)
+	{
+		nse.resetForces();
+	}
+
+	if (doComputeLagrangePhysics)
+	{
+		computeAllLagrangeForces();
+	}
+
+	if (doCopyForceToDevice)
+	{
+		nse.copyForcesToDevice();
+	}
+
+
+	// call hook method (used e.g. for extra kernels in the non-Newtonian model)
+	computeBeforeLBMKernel();
+
+
+#ifdef AA_PATTERN
+	uint8_t output_df = df_cur;
+#endif
+#ifdef AB_PATTERN
+	uint8_t output_df = df_out;
+#endif
+
+#ifdef USE_CUDA
+	#ifdef HAVE_MPI
+	if (nse.nproc == 1)
+	{
+	#endif
+		timer_compute.start();
+		for (auto& block : nse.blocks)
+		{
+			const dim3 blockSize = block.block_size;
+			const dim3 gridSize = get_grid_size(block);
+			cudaLBMKernel< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc, (idx) 0);
+		}
+		cudaDeviceSynchronize();
+		checkCudaDevice;
+		// copying of overlaps is not necessary for nproc == 1 (nproc is checked in streaming as well)
+		timer_compute.stop();
+	#ifdef HAVE_MPI
+	}
+	else
+	{
+		timer_compute.start();
+		timer_compute_overlaps.start();
+
+		for (auto& block : nse.blocks)
+		{
+			const dim3 blockSize = block.block_size;
+			const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y, block.local.z());
+			const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y, block.local.z());
+
+			// compute on boundaries (NOTE: 1D distribution is assumed)
+			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[0]>>>(block.data, block.id, nse.total_blocks, (idx) 0);
+			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[1]>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
+
+			// compute on internal lattice sites
+			cudaLBMKernel< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_streams[2]>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+		}
+
+		// wait for the computations on boundaries to finish
+		cudaStreamSynchronize(cuda_streams[0]);
+		cudaStreamSynchronize(cuda_streams[1]);
+		timer_compute_overlaps.stop();
+
+		// start communication of the latest DFs and dmacro on overlaps
+		timer_wait_communication.start();
+		nse.synchronizeDFsDevice_start(output_df);
+		if (NSE::MACRO::use_syncMacro)
+			nse.synchronizeMacroDevice_start();
+
+		// wait for the communication to finish
+		// (it is important to do this before waiting for the computation, otherwise MPI won't progress)
+		for (auto& block : nse.blocks)
+			block.waitAllCommunication();
+		timer_wait_communication.stop();
+
+		// wait for the computation on the interior to finish
+		timer_wait_computation.start();
+		cudaStreamSynchronize(cuda_streams[2]);
+
+		// synchronize the whole GPU and check errors
+		cudaDeviceSynchronize();
+		checkCudaDevice;
+		timer_wait_computation.stop();
+
+		timer_compute.stop();
+	}
+	#endif
+#else
+	timer_compute.start();
+	for (auto& block : nse.blocks)
+	{
+		#pragma omp parallel for schedule(static) collapse(2)
+		for (idx x=0; x<block.local.x(); x++)
+		for (idx z=0; z<block.local.z(); z++)
+		for (idx y=0; y<block.local.y(); y++)
+		{
+			LBMKernel< NSE >(block.data, x, y, z, nse.rank, nse.nproc);
+		}
+	}
+	timer_compute.stop();
+	#ifdef HAVE_MPI
+	// TODO: overlap computation with synchronization, just like above
+	timer_wait_communication.start();
+	nse.synchronizeDFsDevice(output_df);
+	timer_wait_communication.stop();
+	#endif
+#endif
+
+	nse.iterations++;
+
+	bool doit=false;
+	for (int c=0;c<MAX_COUNTER;c++) if (c!=PRINT && c!=SAVESTATE) if (cnt[c].action(nse.physTime())) doit = true;
+	if (doit)
+	{
+		// common copy
+		nse.copyMacroToHost();
+		// to be able to compute rho, vx, vy, vz etc... based on DFs on CPU to save GPU memory FIXME may not work with ESOTWIST
+		if (NSE::CPU_MACRO::N>0)
+			nse.copyDFsToHost(output_df);
+	}
+
+	timer_SimUpdate.stop();
+}
+
+template< typename NSE >
+void State<NSE>::AfterSimUpdate(timespec& t1, timespec& t2)
+{
+	timer_AfterSimUpdate.start();
+
+	// call hook method (used e.g. for the coupled LBM-MHFEM solver)
+	computeAfterLBMKernel();
+
+	bool write_info = false;
+
+	if (cnt[VTK1D].action(nse.physTime()) ||
+	    cnt[VTK2D].action(nse.physTime()) ||
+	    cnt[VTK3D].action(nse.physTime()) ||
+	    cnt[VTK3DCUT].action(nse.physTime()) ||
+	    cnt[PROBE1].action(nse.physTime()) ||
+	    cnt[PROBE2].action(nse.physTime()) ||
+	    cnt[PROBE3].action(nse.physTime())
+	    )
+	{
+		// cpu macro
+		nse.computeCPUMacroFromLat();
+		// probe1
+		if (cnt[PROBE1].action(nse.physTime()))
+		{
+			probe1();
+			cnt[PROBE1].count++;
+		}
+		// probe2
+		if (cnt[PROBE2].action(nse.physTime()))
+		{
+			probe2();
+			cnt[PROBE2].count++;
+		}
+		// probe3
+		if (cnt[PROBE3].action(nse.physTime()))
+		{
+			probe3();
+			cnt[PROBE3].count++;
+		}
+		// 3D VTK
+		if (cnt[VTK3D].action(nse.physTime()))
+		{
+			writeVTKs_3D();
+			cnt[VTK3D].count++;
+		}
+		// 3D VTK CUT
+		if (cnt[VTK3DCUT].action(nse.physTime()))
+		{
+			writeVTKs_3Dcut();
+			cnt[VTK3DCUT].count++;
+		}
+		// 2D VTK
+		if (cnt[VTK2D].action(nse.physTime()))
+		{
+			writeVTKs_2D();
+			cnt[VTK2D].count++;
+		}
+		// 1D VTK
+		if (cnt[VTK1D].action(nse.physTime()))
+		{
+			writeVTKs_1D();
+			cnt[VTK1D].count++;
+		}
+		write_info = true;
+	}
+
+	if (cnt[PRINT].action(nse.physTime()))
+	{
+		write_info = true;
+		cnt[PRINT].count++;
+	}
+
+	// statReset is called after all probes and VTK output
+	// copy macro from host to device after reset
+	if (cnt[STAT_RESET].action(nse.physTime()))
+	{
+		statReset();
+		nse.copyMacroToDevice();
+		cnt[STAT_RESET].count++;
+	}
+	if (cnt[STAT2_RESET].action(nse.physTime()))
+	{
+		stat2Reset();
+		nse.copyMacroToDevice();
+		cnt[STAT2_RESET].count++;
+	}
+
+	if (nse.rank == 0)	// only the first process writes MLUPS
+	if (nse.iterations > 1)
+	if (write_info)
+	{
+		clock_gettime(CLOCK_REALTIME, &t2);
+		long timediff = (t2.tv_sec - t1.tv_sec) * 1000000000 + (t2.tv_nsec - t1.tv_nsec);
+		// to avoid numerical errors - split LUPS computation in two parts
+		double LUPS = nse.iterations - nse.prevIterations;
+		LUPS *= nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * 1000000000.0 / timediff;
+		clock_gettime(CLOCK_REALTIME, &t1);
+		nse.prevIterations = nse.iterations;
+
+		// simple estimate of time of accomplishment
+		double ETA = getWallTime() * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
+
+		if (verbosity > 0)
+		{
+			log("MLUPS=%.1f iter=%d t=%1.3fs dt=%1.2e lbmVisc=%1.2e WT=%.0fs ETA=%.0fs",
+				LUPS * 1e-6,
+				nse.iterations,
+				nse.physTime(),
+				nse.physDt,
+				nse.lbmViscosity(),
+				getWallTime(),
+				ETA
+			);
+		}
+	}
+
+	timer_AfterSimUpdate.stop();
+}
+
+template< typename NSE >
+void State<NSE>::updateKernelData()
+{
+	nse.updateKernelData();
+
+	// this is not in nse.updateKernelData so that it can be overridden for ADE
+	for( auto& block : nse.blocks )
+		block.data.lbmViscosity = nse.lbmViscosity();
+}
+
+template< typename NSE >
+void State<NSE>::copyAllToDevice()
+{
+	nse.copyMapToDevice();
+	nse.copyDFsToDevice();
+	nse.copyMacroToDevice();  // important when a state has been loaded
+}
+
+template< typename NSE >
+void State<NSE>::copyAllToHost()
+{
+	nse.copyMapToHost();
+	nse.copyDFsToHost();
+	nse.copyMacroToHost();
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 template< typename T_LBM >
-struct D3Q27_BC_All
+struct D3Q7_BC_All
 {
 	using COLL = typename T_LBM::COLL;
 	using STREAMING = typename T_LBM::STREAMING;
@@ -15,7 +15,6 @@ struct D3Q27_BC_All
 		GEO_FLUID, 		// compulsory
 		GEO_WALL, 		// compulsory
 		GEO_INFLOW,
-		GEO_OUTFLOW_EQ,
 		GEO_OUTFLOW_RIGHT,
 		GEO_PERIODIC,
 		GEO_NOTHING
@@ -36,10 +35,7 @@ struct D3Q27_BC_All
 	{
 		if (mapgi == GEO_NOTHING) {
 			// nema zadny vliv na vypocet, jen pro output
-			KS.rho = 1;
-			KS.vx = 0;
-			KS.vy = 0;
-			KS.vz = 0;
+			KS.phi = 0;
 			return;
 		}
 
@@ -56,35 +52,20 @@ struct D3Q27_BC_All
 			SD.inflow(KS,x,y,z);
 			COLL::setEquilibrium(KS);
 			break;
-		case GEO_OUTFLOW_EQ:
-			COLL::computeDensityAndVelocity(KS);
-			KS.rho = 1;
-			COLL::setEquilibrium(KS);
-			break;
 		case GEO_OUTFLOW_RIGHT:
 			COLL::computeDensityAndVelocity(KS);
-			KS.rho = 1;
 			break;
 		case GEO_WALL:
 			// nema zadny vliv na vypocet, jen pro output
-			KS.rho = 1;
-			KS.vx = 0;
-			KS.vy = 0;
-			KS.vz = 0;
+			KS.phi = 0;
 			// collision step: bounce-back
-			TNL::swap( KS.f[mmm], KS.f[ppp] );
-			TNL::swap( KS.f[mmz], KS.f[ppz] );
-			TNL::swap( KS.f[mmp], KS.f[ppm] );
-			TNL::swap( KS.f[mzm], KS.f[pzp] );
 			TNL::swap( KS.f[mzz], KS.f[pzz] );
-			TNL::swap( KS.f[mzp], KS.f[pzm] );
-			TNL::swap( KS.f[mpm], KS.f[pmp] );
-			TNL::swap( KS.f[mpz], KS.f[pmz] );
-			TNL::swap( KS.f[mpp], KS.f[pmm] );
-			TNL::swap( KS.f[zmm], KS.f[zpp] );
-			TNL::swap( KS.f[zzm], KS.f[zzp] );
 			TNL::swap( KS.f[zmz], KS.f[zpz] );
-			TNL::swap( KS.f[zmp], KS.f[zpm] );
+			TNL::swap( KS.f[zzm], KS.f[zzp] );
+			// anti-bounce-back (recovers zero gradient across the wall boundary, see Kruger section 8.5.2.1)
+			for (int q = 0; q < 7; q++)
+				KS.f[q] = -KS.f[q];
+			// TODO: Kruger's eq (8.54) includes concentration imposed on the wall - does it diffusively propagate into the domain?
 			break;
 		default:
 			COLL::computeDensityAndVelocity(KS);

@@ -52,7 +52,7 @@ public:
     {
                 if (n<0)
                         return operator[](n+std::vector<T>::size());
-                if (n>=std::vector<T>::size())
+                if (std::size_t(n)>=std::vector<T>::size())
                         return operator[](n-std::vector<T>::size());
                 return std::vector<T>::operator[](n);
 //        int n=in;

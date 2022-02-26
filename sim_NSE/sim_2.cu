@@ -4,7 +4,7 @@
 // analytical solution for rectangular duct: forcing accelerated
 
 template < typename TRAITS >
-struct LBM_Data_XProfileInflow : LBM_Data < TRAITS >
+struct NSE_Data_XProfileInflow : NSE_Data < TRAITS >
 {
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
@@ -30,8 +30,9 @@ struct StateLocal : State<LBM_TYPE>
 	using TRAITS = typename LBM_TYPE::TRAITS;
 	using BC = typename LBM_TYPE::BC;
 	using MACRO = typename LBM_TYPE::MACRO;
+	using BLOCK = LBM_BLOCK< LBM_TYPE >;
 
-	using State<LBM_TYPE>::lbm;
+	using State<LBM_TYPE>::nse;
 	using State<LBM_TYPE>::vtk_helper;
 	using State<LBM_TYPE>::log;
 
@@ -39,6 +40,7 @@ struct StateLocal : State<LBM_TYPE>
 	using real = typename TRAITS::real;
 	using dreal = typename TRAITS::dreal;
 	using point_t = typename TRAITS::point_t;
+	using lat_t = Lattice<3, real, idx>;
 
 	real **an_cache=0;
 	int an_n=50;
@@ -49,13 +51,13 @@ struct StateLocal : State<LBM_TYPE>
 
 	real raw_analytical_ux(int n, int ilbm_y, int ilbm_z)
 	{
-		if (ilbm_y==0 || ilbm_y==lbm.global_Y-1 || ilbm_z==0 || ilbm_z==lbm.global_Z-1) return 0;
+		if (ilbm_y==0 || ilbm_y==nse.lat.global.y()-1 || ilbm_z==0 || ilbm_z==nse.lat.global.z()-1) return 0;
 		int lbm_y=ilbm_y;
 		int lbm_z=ilbm_z;
-		real a = lbm.global_Y/2.0 - 1.0;
-		real b = lbm.global_Z/2.0 - 1.0;
-		real y = ((real)lbm_y + 0.5 - lbm.global_Y/2.)/a;
-		real z = ((real)lbm_z + 0.5 - lbm.global_Z/2.)/a;
+		real a = nse.lat.global.y()/2.0 - 1.0;
+		real b = nse.lat.global.z()/2.0 - 1.0;
+		real y = ((real)lbm_y + 0.5 - nse.lat.global.y()/2.)/a;
+		real z = ((real)lbm_z + 0.5 - nse.lat.global.z()/2.)/a;
 		real b_ku_a = b/a;
 		real sum=0;
 		real minusonek=1.0;
@@ -68,9 +70,9 @@ struct StateLocal : State<LBM_TYPE>
 			minusonek *= -1.0;
 		}
 
-//		real coef = (lbm.data.fx != 0) ? lbm.data.fx : lbm.data.inflow_vx;
-		real coef = lbm.data.fx;
-		return coef * 16.0*a*a/PI/PI/PI*sum/lbm.lbmViscosity();
+//		real coef = (nse.blocks.front().data.fx != 0) ? nse.blocks.front().data.fx : nse.blocks.front().data.inflow_vx;
+		real coef = nse.blocks.front().data.fx;
+		return coef * 16.0*a*a/PI/PI/PI*sum/nse.lbmViscosity();
 	}
 
 	real analytical_ux(int lbm_y, int lbm_z)
@@ -81,68 +83,75 @@ struct StateLocal : State<LBM_TYPE>
 
 	void cache_analytical()
 	{
-		an_cache = new real*[lbm.local_Z];
-		for (int i=0;i<lbm.local_Z;i++) an_cache[i] = new real[lbm.local_Y];
+		an_cache = new real*[nse.blocks.front().local.z()];
+		for (int i=0;i<nse.blocks.front().local.z();i++) an_cache[i] = new real[nse.blocks.front().local.y()];
 		#pragma omp parallel for schedule(static) collapse(2)
-		for (int z=0;z<lbm.local_Z;z++)
-		for (int y=0;y<lbm.local_Y;y++)
-			an_cache[z][y] = raw_analytical_ux(an_n, lbm.offset_Y + y, lbm.offset_Z + z);
+		for (int z=0;z<nse.blocks.front().local.z();z++)
+		for (int y=0;y<nse.blocks.front().local.y();y++)
+			an_cache[z][y] = raw_analytical_ux(an_n, nse.blocks.front().offset.y() + y, nse.blocks.front().offset.z() + z);
 	}
 
 	virtual void setupBoundaries()
 	{
-//		if (lbm.data.inflow_vx != 0)
-		if (lbm.data.vx_profile)
+//		if (nse.blocks.front().data.inflow_vx != 0)
+		if (nse.blocks.front().data.vx_profile)
 		{
-//			lbm.setBoundaryX(0, BC::GEO_INFLOW); 		// left
-			lbm.setBoundaryX(0, BC::GEO_INFLOW_FREE_RHO); 		// left
-//			lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_EQ);		// right
-//			lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_RIGHT);		// right
-			lbm.setBoundaryX(lbm.global_X-1, BC::GEO_OUTFLOW_RIGHT_INTERP);		// right
+			nse.setBoundaryX(0, BC::GEO_INFLOW); 		// left
+//			nse.setBoundaryX(0, BC::GEO_INFLOW_FREE_RHO); 		// left
+			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);		// right
+//			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);		// right
+//			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT_INTERP);		// right
 		} else
 		{
-			lbm.setBoundaryX(0, BC::GEO_PERIODIC); 		// left
-			lbm.setBoundaryX(lbm.global_X-1, BC::GEO_PERIODIC);		// right
+			nse.setBoundaryX(0, BC::GEO_PERIODIC); 		// left
+			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_PERIODIC);		// right
 		}
-		lbm.setBoundaryZ(0, BC::GEO_WALL);		// top
-		lbm.setBoundaryZ(lbm.global_Z-1, BC::GEO_WALL);	// bottom
-		lbm.setBoundaryY(0, BC::GEO_WALL); 		// back
-		lbm.setBoundaryY(lbm.global_Y-1, BC::GEO_WALL);		// front
+
+		nse.setBoundaryZ(1, BC::GEO_WALL);		// top
+		nse.setBoundaryZ(nse.lat.global.z()-2, BC::GEO_WALL);	// bottom
+		nse.setBoundaryY(1, BC::GEO_WALL); 		// back
+		nse.setBoundaryY(nse.lat.global.y()-2, BC::GEO_WALL);		// front
+
+		// extra layer needed due to A-A pattern
+		nse.setBoundaryZ(0, BC::GEO_NOTHING);		// top
+		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_NOTHING);	// bottom
+		nse.setBoundaryY(0, BC::GEO_NOTHING); 		// back
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);		// front
 	}
 
-	virtual bool outputData(int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
+	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
 		int k=0;
-		if (index==k++) return vtk_helper("lbm_density", lbm.hmacro(MACRO::e_rho,x,y,z), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_delta_density", lbm.hmacro(MACRO::e_rho,x,y,z) - 1.0, 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_density", block.hmacro(MACRO::e_rho,x,y,z), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_delta_density", block.hmacro(MACRO::e_rho,x,y,z) - 1.0, 1, desc, value, dofs);
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("lbm_velocity", lbm.hmacro(MACRO::e_vx,x,y,z), 3, desc, value, dofs);
-				case 1: return vtk_helper("lbm_velocity", lbm.hmacro(MACRO::e_vy,x,y,z), 3, desc, value, dofs);
-				case 2: return vtk_helper("lbm_velocity", lbm.hmacro(MACRO::e_vz,x,y,z), 3, desc, value, dofs);
+				case 0: return vtk_helper("lbm_velocity", block.hmacro(MACRO::e_vx,x,y,z), 3, desc, value, dofs);
+				case 1: return vtk_helper("lbm_velocity", block.hmacro(MACRO::e_vy,x,y,z), 3, desc, value, dofs);
+				case 2: return vtk_helper("lbm_velocity", block.hmacro(MACRO::e_vz,x,y,z), 3, desc, value, dofs);
 			}
 		}
 		if (index==k++) return vtk_helper("lbm_analytical_ux", analytical_ux(y, z), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_ux", lbm.hmacro(MACRO::e_vx,x,y,z), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_uy", lbm.hmacro(MACRO::e_vy,x,y,z), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_uz", lbm.hmacro(MACRO::e_vz,x,y,z), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_error_ux", fabs(lbm.hmacro(MACRO::e_vx,x,y,z) - analytical_ux(y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_ux", block.hmacro(MACRO::e_vx,x,y,z), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_uy", block.hmacro(MACRO::e_vy,x,y,z), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_uz", block.hmacro(MACRO::e_vz,x,y,z), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_error_ux", fabs(block.hmacro(MACRO::e_vx,x,y,z) - analytical_ux(y,z)), 1, desc, value, dofs);
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("velocity", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
-		if (index==k++) return vtk_helper("lbm_analytical_ux", lbm.lbm2physVelocity(analytical_ux(y, z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_ux", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vx,x,y,z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_uy", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vy,x,y,z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_uz", lbm.lbm2physVelocity(lbm.hmacro(MACRO::e_vz,x,y,z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_error_ux", lbm.lbm2physVelocity(fabs(lbm.hmacro(MACRO::e_vx,x,y,z) - analytical_ux(y,z))), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_analytical_ux", nse.lbm2physVelocity(analytical_ux(y, z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_ux", nse.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_uy", nse.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_uz", nse.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_error_ux", nse.lbm2physVelocity(fabs(block.hmacro(MACRO::e_vx,x,y,z) - analytical_ux(y,z))), 1, desc, value, dofs);
 		return false;
 	}
 
@@ -150,15 +159,15 @@ struct StateLocal : State<LBM_TYPE>
 	// clear Lattice + boundary setup
 	virtual void resetLattice(real irho, real ivx, real ivy, real ivz)
 	{
-		for (int x = 0; x < lbm.X;x++)
-		for (int y = 0; y < lbm.Y;y++)
-		for (int z = 0; z < lbm.Z;z++)
+		for (int x = 0; x < nse.X;x++)
+		for (int y = 0; y < nse.Y;y++)
+		for (int z = 0; z < nse.Z;z++)
 		{
 			dreal rho= no1;
 			dreal vx= 0;//(lbmInputVelocityX!=0) ? (dreal)analytical_ux(y,z) : 0;
 			dreal vy= 0;
 			dreal vz= 0;
-			lbm.setEqLat(x,y,z,rho,vx,vy,vz);
+			nse.setEqLat(x,y,z,rho,vx,vy,vz);
 		}
 
 	}
@@ -177,12 +186,12 @@ struct StateLocal : State<LBM_TYPE>
 		real local_la2sum=0;
 		real diff;
 		real an;
-		for (int i = lbm.offset_X + 1; i < lbm.offset_X + lbm.local_X - 1; i++)
-		for (int j = lbm.offset_Y + 1; j < lbm.offset_Y + lbm.local_Y - 1; j++)
-		for (int k = lbm.offset_Z + 1; k < lbm.offset_Z + lbm.local_Z - 1; k++)
+		for (int i = nse.blocks.front().offset.x() + 1; i < nse.blocks.front().offset.x() + nse.blocks.front().local.x() - 1; i++)
+		for (int j = nse.blocks.front().offset.y() + 1; j < nse.blocks.front().offset.y() + nse.blocks.front().local.y() - 1; j++)
+		for (int k = nse.blocks.front().offset.z() + 1; k < nse.blocks.front().offset.z() + nse.blocks.front().local.z() - 1; k++)
 		{
 			an = analytical_ux(j,k);
-			diff = fabs(lbm.hmacro(MACRO::e_vx,i,j,k) - an);
+			diff = fabs(nse.blocks.front().hmacro(MACRO::e_vx,i,j,k) - an);
 			local_la1sum += an;
 			local_la2sum += SQ(an);
 			local_l1sum += diff;
@@ -200,11 +209,11 @@ struct StateLocal : State<LBM_TYPE>
 		real l2error_chinese = l2sum / la2sum;
 		l2error_chinese = sqrt(l2error_chinese);
 		// considering PHYS_DL, converting to physical units
-		real l1error_phys = l1sum*lbm.physDl*lbm.physDl*lbm.physDl;
-		real l2error_phys = l2sum*lbm.physDl*lbm.physDl*lbm.physDl;
+		real l1error_phys = l1sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
+		real l2error_phys = l2sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		l2error_phys = sqrt(l2error_phys);
-		l1error_phys = lbm.lbm2physVelocity(l1error_phys);
-		l2error_phys = lbm.lbm2physVelocity(l2error_phys);
+		l1error_phys = nse.lbm2physVelocity(l1error_phys);
+		l2error_phys = nse.lbm2physVelocity(l2error_phys);
 
 		// dynamic stopping criterion
 //		real threshold = 1e-6;
@@ -219,19 +228,19 @@ struct StateLocal : State<LBM_TYPE>
 		stddev /= (errors_count-1);
 		stddev = sqrt(stddev);
 		real stopping = abs(l1prev - l1error_phys) / l1error_phys;
-		if( stopping < threshold && stddev < threshold_stddev ) lbm.terminate = true;
+		if( stopping < threshold && stddev < threshold_stddev ) nse.terminate = true;
 
 		error_idx = (error_idx + 1) % errors_count;
 		l1errors[error_idx] = l1error_phys;
 
-		if (lbm.rank == 0)
+		if (nse.rank == 0)
 			log("at t=%1.2fs, iterations=%d l1error_chinese=%e l2error_chinese=%e l1error_phys=%e l2error_phys=%e\tstopping=%e",
-				lbm.physTime(), lbm.iterations, l1error_chinese, l2error_chinese, l1error_phys, l2error_phys, stopping);
+				nse.physTime(), nse.iterations, l1error_chinese, l2error_chinese, l1error_phys, l2error_phys, stopping);
 	}
 
 
-	StateLocal(int iX, int iY, int iZ, real iphysViscosity, real iphysDl, real iphysDt, point_t iphysOrigin, int RES)
-		: State<LBM_TYPE>(iX, iY, iZ, iphysViscosity, iphysDl, iphysDt, iphysOrigin)
+	StateLocal(lat_t ilat, real iphysViscosity, real iphysDt, int RES)
+		: State<LBM_TYPE>(ilat, iphysViscosity, iphysDt)
 	{
 		errors_count = 10 * RES;
 		l1errors = new real[errors_count];
@@ -242,7 +251,7 @@ struct StateLocal : State<LBM_TYPE>
 	{
 		if (an_cache)
 		{
-			for (int i=0;i<lbm.local_Z;i++) delete [] an_cache[i];
+			for (int i=0;i<nse.blocks.front().local.z();i++) delete [] an_cache[i];
 			delete [] an_cache;
 		}
 
@@ -253,9 +262,11 @@ struct StateLocal : State<LBM_TYPE>
 template < typename LBM_TYPE >
 int sim02(int RES=1, bool use_forcing=true)
 {
+	using idx = typename LBM_TYPE::TRAITS::idx;
 	using real = typename LBM_TYPE::TRAITS::real;
 	using dreal = typename LBM_TYPE::TRAITS::dreal;
 	using point_t = typename LBM_TYPE::TRAITS::point_t;
+	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
 	int LBM_X = block_size;
@@ -271,76 +282,85 @@ int sim02(int RES=1, bool use_forcing=true)
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
-	StateLocal<LBM_TYPE> state(LBM_X, LBM_Y, LBM_Z, PHYS_VISCOSITY, PHYS_DL, PHYS_DT, PHYS_ORIGIN, RES);
-	state.lbm.block_size=block_size;
-//	state.lbm.use_multiple_gpus = false;
-	state.lbm.physCharLength = 0.125; // [m]
+	// initialize the lattice
+	lat_t lat;
+	lat.global = typename lat_t::CoordinatesType( LBM_X, LBM_Y, LBM_Z );
+	lat.physOrigin = PHYS_ORIGIN;
+	lat.physDl = PHYS_DL;
 
-// NOTE: this is for LBM_Data_ConstInflow
+	StateLocal<LBM_TYPE> state(lat, PHYS_VISCOSITY, PHYS_DT, RES);
+#ifdef USE_CUDA
+	for (auto& block : state.nse.blocks)
+		block.block_size.y = block_size;
+#endif
+//	state.nse.use_multiple_gpus = false;
+	state.nse.physCharLength = 0.125; // [m]
+
+// NOTE: this is for NSE_Data_ConstInflow
 //	if (use_forcing)
 //	{
-//		state.lbm.data.fx = state.lbm.phys2lbmForce(1e-4);
-//		state.lbm.data.fy = 0;
-//		state.lbm.data.fz = 0;
-//		state.lbm.data.inflow_vx = 0;
-//		state.lbm.data.inflow_vy = 0;
-//		state.lbm.data.inflow_vz = 0;
+//		state.nse.blocks.front().data.fx = state.nse.phys2lbmForce(1e-4);
+//		state.nse.blocks.front().data.fy = 0;
+//		state.nse.blocks.front().data.fz = 0;
+//		state.nse.blocks.front().data.inflow_vx = 0;
+//		state.nse.blocks.front().data.inflow_vy = 0;
+//		state.nse.blocks.front().data.inflow_vz = 0;
 //	} else
 //	{
-//		state.lbm.data.fx = 0;
-//		state.lbm.data.fy = 0;
-//		state.lbm.data.fz = 0;
-//		state.lbm.data.inflow_vx = state.lbm.phys2lbmVelocity(2e-6);
-//		state.lbm.data.inflow_vy = 0;
-//		state.lbm.data.inflow_vz = 0;
+//		state.nse.blocks.front().data.fx = 0;
+//		state.nse.blocks.front().data.fy = 0;
+//		state.nse.blocks.front().data.fz = 0;
+//		state.nse.blocks.front().data.inflow_vx = state.nse.phys2lbmVelocity(2e-6);
+//		state.nse.blocks.front().data.inflow_vy = 0;
+//		state.nse.blocks.front().data.inflow_vz = 0;
 //	}
 
-// NOTE: this is for LBM_Data_XProfileInflow
+// NOTE: this is for NSE_Data_XProfileInflow
 	dreal force = 1e-4;
 	if (use_forcing)
 	{
-		state.lbm.data.fx = state.lbm.phys2lbmForce(force);
-		state.lbm.data.fy = 0;
-		state.lbm.data.fz = 0;
-		state.lbm.data.vx_profile = NULL;
+		state.nse.blocks.front().data.fx = state.nse.phys2lbmForce(force);
+		state.nse.blocks.front().data.fy = 0;
+		state.nse.blocks.front().data.fz = 0;
+		state.nse.blocks.front().data.vx_profile = NULL;
 	} else
 	{
 		// calculate analytical solution using forcing just like above
-		state.lbm.data.fx = state.lbm.phys2lbmForce(force);
-		state.lbm.data.fy = 0;
-		state.lbm.data.fz = 0;
+		state.nse.blocks.front().data.fx = state.nse.phys2lbmForce(force);
+		state.nse.blocks.front().data.fy = 0;
+		state.nse.blocks.front().data.fz = 0;
 		state.cache_analytical();
 		// reset the forcing for the LBM simulation
-		state.lbm.data.fx = 0;
+		state.nse.blocks.front().data.fx = 0;
 
 		// allocate array for the inflow profile
 		#ifdef USE_CUDA
-			cudaMalloc((void**)&state.lbm.data.vx_profile, state.lbm.local_Y*state.lbm.local_Z*sizeof(dreal));
+			cudaMalloc((void**)&state.nse.blocks.front().data.vx_profile, state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()*sizeof(dreal));
 		#else
-			state.lbm.data.vx_profile = new dreal[state.lbm.local_Y*state.lbm.local_Z];
+			state.nse.blocks.front().data.vx_profile = new dreal[state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()];
 		#endif
 
 		#ifdef USE_CUDA
 			// convert analytical solution from double to float
-			dreal analytical[state.lbm.local_Y*state.lbm.local_Z];
-			for (int j = 0; j < state.lbm.local_Y; j++)
-			for (int k = 0; k < state.lbm.local_Z; k++)
-				analytical[k*state.lbm.local_Y+j] = state.an_cache[k][j];
+			dreal analytical[state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()];
+			for (int j = 0; j < state.nse.blocks.front().local.y(); j++)
+			for (int k = 0; k < state.nse.blocks.front().local.z(); k++)
+				analytical[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
 			// copy the analytical profile to the GPU
-			cudaMemcpy(state.lbm.data.vx_profile, analytical, state.lbm.local_Y*state.lbm.local_Z*sizeof(dreal), cudaMemcpyHostToDevice);
+			cudaMemcpy(state.nse.blocks.front().data.vx_profile, analytical, state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
 		#else
-			for (int j = 0; j < state.lbm.local_Y; j++)
-			for (int k = 0; k < state.lbm.local_Z; k++)
-				state.lbm.data.vx_profile[k*state.lbm.local_Y+j] = state.an_cache[k][j];
+			for (int j = 0; j < state.nse.blocks.front().local.y(); j++)
+			for (int k = 0; k < state.nse.blocks.front().local.z(); k++)
+				state.nse.blocks.front().data.vx_profile[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
 		#endif
-		state.lbm.data.size_y = state.lbm.local_Y;
+		state.nse.blocks.front().data.size_y = state.nse.blocks.front().local.y();
 	}
 
 	state.cnt[PRINT].period = 10.0;
 	state.cnt[PROBE1].period = 10.0;// / RES;
-//	state.lbm.physFinalTime = PHYS_DT * 1e7;
-	state.lbm.physFinalTime = 5000;
-//	state.vtk.writePeriod = 1.0;
+//	state.nse.physFinalTime = PHYS_DT * 1e7;
+	state.nse.physFinalTime = 5000;
+//	state.cnt[VTK2D].period = 1.0;
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
 	state.setid("sim_2_%s_%s_%s_res_%d", LBM_TYPE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
@@ -349,7 +369,7 @@ int sim02(int RES=1, bool use_forcing=true)
 		return 0;
 
 	state.log("PHYS_DL = %e", PHYS_DL);
-//	state.log("in lbm units: forcing=%e velocity=%e", state.lbm.data.fx, state.lbm.data.inflow_vx);
+//	state.log("in lbm units: forcing=%e velocity=%e", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
 	state.log("in lbm units: forcing=%e", force);
 
 	// add cuts
@@ -361,12 +381,12 @@ int sim02(int RES=1, bool use_forcing=true)
 	execute(state);
 
 	// deallocate inflow data
-	if (state.lbm.data.vx_profile)
+	if (state.nse.blocks.front().data.vx_profile)
 	{
 		#ifdef USE_CUDA
-			cudaFree(state.lbm.data.vx_profile);
+			cudaFree(state.nse.blocks.front().data.vx_profile);
 		#else
-			delete[] state.lbm.data.vx_profile;
+			delete[] state.nse.blocks.front().data.vx_profile;
 		#endif
 	}
 
@@ -392,7 +412,7 @@ void run()
 
 	using NSE_TYPE = D3Q27<
 				COLL,
-				LBM_Data_XProfileInflow< TRAITS >,
+				NSE_Data_XProfileInflow< TRAITS >,
 				D3Q27_BC_All,
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
@@ -410,7 +430,7 @@ void run()
 	}
 }
 
-int Main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
 	run();

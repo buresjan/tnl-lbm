@@ -1,5 +1,9 @@
 #pragma once
 
+#if !defined(AB_PATTERN) && !defined(AA_PATTERN)
+	#define AA_PATTERN
+#endif
+
 #include <stdio.h>
 #include <cstdlib>
 #include <math.h>
@@ -29,20 +33,28 @@ using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 #ifdef USE_CUDA
 	#define checkCudaDevice TNL_CHECK_CUDA_DEVICE
 	#include <cuda_profiler_api.h>
-#endif // USE_CUDA
 
-#ifdef HAVE_MPI
-	// CUDA streams for overlapping computation and communication
-	cudaStream_t cuda_streams[3];
-#endif
+	#ifdef HAVE_MPI
+		// CUDA streams for overlapping computation and communication
+		cudaStream_t cuda_streams[3];
+	#endif
+#endif // USE_CUDA
 
 
 // number of dist. functions, default=2
 // quick fix, use templates to define DFMAX ... through TRAITS maybe ?
 #ifdef USE_DFMAX3
 enum : uint8_t { df_cur, df_out, df_prev, DFMAX }; // special 3 dfs
-#else
+#elif defined(AB_PATTERN)
 enum : uint8_t { df_cur, df_out, DFMAX }; // default 2 dfs
+#elif defined(AA_PATTERN)
+enum : uint8_t { df_cur, DFMAX }; // default 1 dfs
+#endif
+
+#ifdef USE_CUDA
+	using DeviceType = TNL::Devices::Cuda;
+#else
+	using DeviceType = TNL::Devices::Host;
 #endif
 
 template <
@@ -64,8 +76,8 @@ struct Traits
 	using d4_permutation = std::index_sequence< 0, 1, 3, 2 >;		// id, x, z, y
 
 #ifdef HAVE_MPI
-	using xyz_overlaps = std::index_sequence< 1, 0, 0 >;	// x, y, z
-	using d4_overlaps = std::index_sequence< 0, 1, 0, 0 >;	// id, x, y, z
+	using xyz_overlaps = std::index_sequence< 2, 0, 0 >;	// x, y, z
+	using d4_overlaps = std::index_sequence< 0, 2, 0, 0 >;	// id, x, y, z
 #else
 	using xyz_overlaps = std::index_sequence< 0, 0, 0 >;	// x, y, z
 	using d4_overlaps = std::index_sequence< 0, 0, 0, 0 >;	// id, x, y, z
@@ -88,11 +100,63 @@ struct Traits
 		idx,
 		d4_overlaps >;
 
-	using xyz_indexer_t = typename array3d<dreal, TNL::Devices::Cuda>::IndexerType;
+	using xyz_indexer_t = typename array3d<dreal, DeviceType>::IndexerType;
 };
 
 using TraitsSP = Traits<float>; //_dreal is float only
 using TraitsDP = Traits<double>;
+
+template< int _Q, typename MACRO, typename CPU_MACRO, typename TRAITS >
+struct D3Q_COMMON
+{
+	static constexpr int Q = _Q;
+
+	using __hmap_array_t = typename TRAITS::template array3d<typename TRAITS::map_t, TNL::Devices::Host>;
+	using __dmap_array_t = typename TRAITS::template array3d<typename TRAITS::map_t, DeviceType>;
+	using __bool_array_t = typename TRAITS::template array3d<bool, TNL::Devices::Host>;
+
+	using __hlat_array_t = typename TRAITS::template array4d<Q, typename TRAITS::dreal, TNL::Devices::Host>;
+	using __dlat_array_t = typename TRAITS::template array4d<Q, typename TRAITS::dreal, DeviceType>;
+
+	using __hmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
+	using __dmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, DeviceType>;
+	using __cpumacro_array_t = typename TRAITS::template array4d<CPU_MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
+
+#ifdef HAVE_MPI
+	using sync_array_t = TNL::Containers::DistributedNDArray< typename TRAITS::template array3d<typename TRAITS::dreal, DeviceType > >;
+
+	using hmap_array_t = TNL::Containers::DistributedNDArray< __hmap_array_t >;
+	using dmap_array_t = TNL::Containers::DistributedNDArray< __dmap_array_t >;
+	using bool_array_t = TNL::Containers::DistributedNDArray< __bool_array_t >;
+
+	using hlat_array_t = TNL::Containers::DistributedNDArray< __hlat_array_t >;
+	using dlat_array_t = TNL::Containers::DistributedNDArray< __dlat_array_t >;
+
+	using hmacro_array_t = TNL::Containers::DistributedNDArray< __hmacro_array_t >;
+	using dmacro_array_t = TNL::Containers::DistributedNDArray< __dmacro_array_t >;
+	using cpumacro_array_t = TNL::Containers::DistributedNDArray< __cpumacro_array_t >;
+#else
+	using sync_array_t = typename TRAITS::template array3d<typename TRAITS::dreal, DeviceType>;
+
+	using hmap_array_t = __hmap_array_t;
+	using dmap_array_t = __dmap_array_t;
+	using bool_array_t = __bool_array_t;
+
+	using hlat_array_t = __hlat_array_t;
+	using dlat_array_t = __dlat_array_t;
+
+	using hmacro_array_t = __hmacro_array_t;
+	using dmacro_array_t = __dmacro_array_t;
+	using cpumacro_array_t = __cpumacro_array_t;
+#endif
+
+	using hmap_view_t = typename hmap_array_t::ViewType;
+	using dmap_view_t = typename dmap_array_t::ViewType;
+	using bool_view_t = typename bool_array_t::ViewType;
+
+	using hlat_view_t = typename hlat_array_t::ViewType;
+	using dlat_view_t = typename dlat_array_t::ViewType;
+};
 
 template<
 	typename _COLL,
@@ -104,7 +168,40 @@ template<
 	typename _CPU_MACRO,
 	typename _TRAITS
 >
-struct D3Q27
+struct D3Q7 : D3Q_COMMON< 7, _MACRO, _CPU_MACRO, _TRAITS >
+{
+	using COLL=_COLL;
+	using DATA=_DATA;
+	using BC=_BC<D3Q7>;
+	using EQ=_EQ;
+	using STREAMING=_STREAMING;
+	using MACRO=_MACRO;
+	using CPU_MACRO=_CPU_MACRO;
+	using TRAITS=_TRAITS;
+
+	// KernelStruct
+	template < typename REAL >
+	struct KernelStruct
+	{
+		REAL f[7];
+		REAL vz=0, vx=0, vy=0;
+		REAL phi=1.0, lbmViscosity=1.0;
+		// FIXME
+//		REAL qcrit=0, phigradmag2=0;
+	};
+};
+
+template<
+	typename _COLL,
+	typename _DATA,
+	template<typename> class _BC,
+	typename _EQ,
+	typename _STREAMING,
+	typename _MACRO,
+	typename _CPU_MACRO,
+	typename _TRAITS
+>
+struct D3Q27 : D3Q_COMMON< 27, _MACRO, _CPU_MACRO, _TRAITS >
 {
 	using COLL=_COLL;
 	using DATA=_DATA;
@@ -137,52 +234,6 @@ struct D3Q27
 		REAL mu;
 	#endif
 	};
-
-	using __hmap_array_t = typename TRAITS::template array3d<typename TRAITS::map_t, TNL::Devices::Host>;
-	using __dmap_array_t = typename TRAITS::template array3d<typename TRAITS::map_t, TNL::Devices::Cuda>;
-	using __bool_array_t = typename TRAITS::template array3d<bool, TNL::Devices::Host>;
-
-	using __hlat_array_t = typename TRAITS::template array4d<27, typename TRAITS::dreal, TNL::Devices::Host>;
-	using __dlat_array_t = typename TRAITS::template array4d<27, typename TRAITS::dreal, TNL::Devices::Cuda>;
-
-	using __hmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
-	using __dmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, TNL::Devices::Cuda>;
-	using __cpumacro_array_t = typename TRAITS::template array4d<CPU_MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
-
-#ifdef HAVE_MPI
-	using sync_array_t = TNL::Containers::DistributedNDArray< typename TRAITS::template array3d<typename TRAITS::dreal, TNL::Devices::Cuda > >;
-
-	using hmap_array_t = TNL::Containers::DistributedNDArray< __hmap_array_t >;
-	using dmap_array_t = TNL::Containers::DistributedNDArray< __dmap_array_t >;
-	using bool_array_t = TNL::Containers::DistributedNDArray< __bool_array_t >;
-
-	using hlat_array_t = TNL::Containers::DistributedNDArray< __hlat_array_t >;
-	using dlat_array_t = TNL::Containers::DistributedNDArray< __dlat_array_t >;
-
-	using hmacro_array_t = TNL::Containers::DistributedNDArray< __hmacro_array_t >;
-	using dmacro_array_t = TNL::Containers::DistributedNDArray< __dmacro_array_t >;
-	using cpumacro_array_t = TNL::Containers::DistributedNDArray< __cpumacro_array_t >;
-#else
-	using sync_array_t = typename TRAITS::template array3d<typename TRAITS::dreal, TNL::Devices::Cuda>;
-
-	using hmap_array_t = __hmap_array_t;
-	using dmap_array_t = __dmap_array_t;
-	using bool_array_t = __bool_array_t;
-
-	using hlat_array_t = __hlat_array_t;
-	using dlat_array_t = __dlat_array_t;
-
-	using hmacro_array_t = __hmacro_array_t;
-	using dmacro_array_t = __dmacro_array_t;
-	using cpumacro_array_t = __cpumacro_array_t;
-#endif
-
-	using hmap_view_t = typename hmap_array_t::ViewType;
-	using dmap_view_t = typename dmap_array_t::ViewType;
-	using bool_view_t = typename bool_array_t::ViewType;
-
-	using hlat_view_t = typename hlat_array_t::ViewType;
-	using dlat_view_t = typename dlat_array_t::ViewType;
 };
 
 
@@ -191,6 +242,7 @@ struct D3Q27
 //#define USE_GEIER_CUM_2017 // use Geier 2017 Cummulant improvement A,B terms
 //#define USE_GEIER_CUM_ANTIALIAS // use antialiasing Dxu, Dyv, Dzw from Geier 2015/2017
 
+// TODO: replace these macros with functions TNL::min and TNL::max
 #define MAX( a , b) (((a)>(b))?(a):(b))
 #define MIN( a , b) (((a)<(b))?(a):(b))
 
@@ -201,151 +253,75 @@ struct D3Q27
 
 enum { SOLVER_UMFPACK, SOLVER_PETSC };
 
-/*
-// ordering suitable for esotwist - opposite directions have IDs different by 13
-// (first half)
+// NOTE: df_sync_directions must be kept consistent with this enum!
 enum
 {
-	pzz=0,
-	zpz=1,
-	zzp=2,
-	ppz=3,
-	pzp=4,
-	zpp=5,
-	ppp=6,
-	ppm=7,
-	pmp=8,
-	mpp=9,
-	zpm=10,
-	pzm=11,
-	pmz=12,
-	// (second half)
-	mzz=13,
-	zmz=14,
-	zzm=15,
-	mmz=16,
-	mzm=17,
-	zmm=18,
-	mmm=19,
-	mmp=20,
-	mpm=21,
-	pmm=22,
-	zmp=23,
-	mzp=24,
-	mpz=25,
-	// (central)
-	zzz=26
-};
-*/
-// ordering suitable for MPI and 1D distribution
-// (this ordering is not necessary for MPI anymore - but df_sync_directions must be kept consistent)
-enum
-{
-	// left third
-	mmm=0,
-	mmz=1,
-	mmp=2,
-	mzm=3,
-	mzz=4,
-	mzp=5,
-	mpm=6,
-	mpz=7,
-	mpp=8,
-	// central third
-	zmm=9,
-	zmz=10,
-	zmp=11,
-	zzm=12,
-	zzz=13,
-	zzp=14,
-	zpm=15,
-	zpz=16,
-	zpp=17,
-	// right third
-	pmm=18,
-	pmz=19,
-	pmp=20,
-	pzm=21,
-	pzz=22,
-	pzp=23,
-	ppm=24,
-	ppz=25,
-	ppp=26
+	// Q7
+	zzz=0,
+	pzz=1,
+	mzz=2,
+	zpz=3,
+	zmz=4,
+	zzp=5,
+	zzm=6,
+	// +Q19
+	ppz=7,
+	mmz=8,
+	pmz=9,
+	mpz=10,
+	pzp=11,
+	mzm=12,
+	pzm=13,
+	mzp=14,
+	zpp=15,
+	zmm=16,
+	zpm=17,
+	zmp=18,
+	// +Q27
+	ppp=19,
+	mmm=20,
+	ppm=21,
+	mmp=22,
+	pmp=23,
+	mpm=24,
+	pmm=25,
+	mpp=26,
 };
 
 // static array of sync directions for the MPI synchronizer
 // (indexing must correspond to the enum above)
 static TNL::Containers::SyncDirection df_sync_directions[27] = {
-	// left third
+	// Q7
+	TNL::Containers::SyncDirection::None,
+	TNL::Containers::SyncDirection::Right,
 	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Left,
-	// central third
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::None,
+	// +Q19
+	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
+	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
+	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
+	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
-	// right third
+	// +Q27
 	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
 	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
 	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
 	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Right,
+	TNL::Containers::SyncDirection::Left,
 };
-
-// vopicarna
-CUDA_HOSTDEV inline
-int directionIndex(int i, int j, int k)
-{
-	if (i==-1 && j==-1 && k==-1) return mmm;
-	if (i==-1 && j==-1 && k== 0) return mmz;
-	if (i==-1 && j==-1 && k== 1) return mmp;
-	if (i==-1 && j== 0 && k==-1) return mzm;
-	if (i==-1 && j== 0 && k== 0) return mzz;
-	if (i==-1 && j== 0 && k== 1) return mzp;
-	if (i==-1 && j== 1 && k==-1) return mpm;
-	if (i==-1 && j== 1 && k== 0) return mpz;
-	if (i==-1 && j== 1 && k== 1) return mpp;
-
-	if (i== 0 && j==-1 && k==-1) return zmm;
-	if (i== 0 && j==-1 && k== 0) return zmz;
-	if (i== 0 && j==-1 && k== 1) return zmp;
-	if (i== 0 && j== 0 && k==-1) return zzm;
-	if (i== 0 && j== 0 && k== 0) return zzz;
-	if (i== 0 && j== 0 && k== 1) return zzp;
-	if (i== 0 && j== 1 && k==-1) return zpm;
-	if (i== 0 && j== 1 && k== 0) return zpz;
-	if (i== 0 && j== 1 && k== 1) return zpp;
-
-	if (i== 1 && j==-1 && k==-1) return pmm;
-	if (i== 1 && j==-1 && k== 0) return pmz;
-	if (i== 1 && j==-1 && k== 1) return pmp;
-	if (i== 1 && j== 0 && k==-1) return pzm;
-	if (i== 1 && j== 0 && k== 0) return pzz;
-	if (i== 1 && j== 0 && k== 1) return pzp;
-	if (i== 1 && j== 1 && k==-1) return ppm;
-	if (i== 1 && j== 1 && k== 0) return ppz;
-	if (i== 1 && j== 1 && k== 1) return ppp;
-	return zzz;
-}
-
-
-#define Main main // TNL fix when LBM is included into TNL
 
 
 // default
@@ -358,7 +334,13 @@ int directionIndex(int i, int j, int k)
 #include "d3q27_eq_well.h"
 #include "d3q27_eq_entropic.h"
 
-#include "d3q27_streaming.h"
+// exactly one streaming header must be included
+#ifdef AA_PATTERN
+	#include "d3q27_streaming_AA.h"
+#endif
+#ifdef AB_PATTERN
+	#include "d3q27_streaming_AB.h"
+#endif
 
 #include "d3q27_col_cum.h"
 #include "d3q27_col_bgk.h"

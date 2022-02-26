@@ -1,10 +1,18 @@
 #pragma once
 
+// pull-scheme
 template < typename TRAITS >
 struct D3Q27_STREAMING
 {
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
+
+	template < typename LBM_DATA, typename LBM_KS >
+	CUDA_HOSTDEV static void postCollisionStreaming(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	{
+		// no streaming actually, write to the (x,y,z) site
+		for (int i=0;i<27;i++) SD.df(df_out,i,x,y,z) = KS.f[i];
+	}
 
 	template < typename LBM_DATA, typename LBM_KS >
 	CUDA_HOSTDEV static void streaming(uint8_t type, LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)

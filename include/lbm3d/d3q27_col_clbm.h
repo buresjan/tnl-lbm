@@ -129,18 +129,23 @@ struct D3Q27_CLBM : D3Q27_COMMON< TRAITS, LBM_EQ >
 		dreal omega9 = no1;
 		dreal omega10 = no1;
 
-		// derivatives of v: notation taken from Geier's paper 2015: Appendix D Eq D.1-3
-		const dreal Dxu = - omega1/no2/KS.rho*(no2*k_200-k_020-k_002) - omega2/no2/KS.rho*(k_200+k_020+k_002 - KS.rho);
-		const dreal Dyv = Dxu + n3o2*omega1/KS.rho *(k_200-k_020);
-		const dreal Dzw = Dxu + n3o2*omega1/KS.rho *(k_200-k_002);
-
 		// actual collision step: note: ks = Cs for these indexes
 //		const dreal Cs_110 = (no1 - omega1)*C_110;
 //		const dreal Cs_101 = (no1 - omega1)*C_101;
 //		const dreal Cs_011 = (no1 - omega1)*C_011;
-//		const dreal DxvDyu = -no3*omega1/KS.rho*C_110;
-//		const dreal DxwDzu = -no3*omega1/KS.rho*C_101;
-//		const dreal DywDzv = -no3*omega1/KS.rho*C_011;
+		#ifdef USE_GEIER_CUM_ANTIALIAS
+			// derivatives of v: notation taken from Geier's paper 2015: Appendix D Eq D.1-3
+			const dreal Dxu = - omega1/no2/KS.rho*(no2*k_200-k_020-k_002) - omega2/no2/KS.rho*(k_200+k_020+k_002 - KS.rho);
+			const dreal Dyv = Dxu + n3o2*omega1/KS.rho *(k_200-k_020);
+			const dreal Dzw = Dxu + n3o2*omega1/KS.rho *(k_200-k_002);
+			//const dreal DxvDyu = -no3*omega1/KS.rho*C_110;
+			//const dreal DxwDzu = -no3*omega1/KS.rho*C_101;
+			//const dreal DywDzv = -no3*omega1/KS.rho*C_011;
+		#else
+			const dreal Dxu = 0;
+			const dreal Dyv = 0;
+			const dreal Dzw = 0;
+		#endif
 		// Eqs D.4-6
 		const dreal EqD4RHS = (no1-omega1)*(k_200-k_020) - no3*KS.rho*(no1 - omega1*n1o2)*(KS.vx*KS.vx*Dxu - KS.vy*KS.vy*Dyv);
 		const dreal EqD5RHS = (no1-omega1)*(k_200-k_002) - no3*KS.rho*(no1 - omega1*n1o2)*(KS.vx*KS.vx*Dxu - KS.vz*KS.vz*Dzw);
@@ -351,30 +356,29 @@ struct D3Q27_CLBM : D3Q27_COMMON< TRAITS, LBM_EQ >
 		KS.f[zzz] +=  S_0; //0
 		KS.f[pzz] +=  S_1; //1
 		KS.f[mzz] +=  S_2; //2
-	        KS.f[zpz] +=  S_3; //3
-	        KS.f[zmz] +=  S_4 ; //4
-	        KS.f[zzp] +=  S_5; //5
-	        KS.f[zzm] +=  S_6; //6
-	        KS.f[ppz] +=  S_7; //7
-	        KS.f[mpz] +=  S_8; //8
-	        KS.f[pmz] +=  S_9; //9
-	        KS.f[mmz] +=  S_10; //10
-	        KS.f[pzp] +=  S_11; //11
-	        KS.f[mzp] +=  S_12; //12
-	        KS.f[pzm] +=  S_13; //13
-	        KS.f[mzm] +=  S_14; //14
-	        KS.f[zpp] +=  S_15; //15
-	        KS.f[zmp] +=  S_16; //16
-	        KS.f[zpm] +=  S_17; //17
-	        KS.f[zmm] +=  S_18; //18
-	        KS.f[ppp] +=  S_19; //19
-	        KS.f[mpp] +=  S_20; //20
-	        KS.f[pmp] +=  S_21; //21
-	        KS.f[mmp] +=  S_22; //22
-	        KS.f[ppm] +=  S_23; //23
-	        KS.f[mpm] +=  S_24; //24
-	        KS.f[pmm] +=  S_25; //25
-	        KS.f[mmm] +=  S_26; //26
+		KS.f[zpz] +=  S_3; //3
+		KS.f[zmz] +=  S_4; //4
+		KS.f[zzp] +=  S_5; //5
+		KS.f[zzm] +=  S_6; //6
+		KS.f[ppz] +=  S_7; //7
+		KS.f[mpz] +=  S_8; //8
+		KS.f[pmz] +=  S_9; //9
+		KS.f[mmz] +=  S_10; //10
+		KS.f[pzp] +=  S_11; //11
+		KS.f[mzp] +=  S_12; //12
+		KS.f[pzm] +=  S_13; //13
+		KS.f[mzm] +=  S_14; //14
+		KS.f[zpp] +=  S_15; //15
+		KS.f[zmp] +=  S_16; //16
+		KS.f[zpm] +=  S_17; //17
+		KS.f[zmm] +=  S_18; //18
+		KS.f[ppp] +=  S_19; //19
+		KS.f[mpp] +=  S_20; //20
+		KS.f[pmp] +=  S_21; //21
+		KS.f[mmp] +=  S_22; //22
+		KS.f[ppm] +=  S_23; //23
+		KS.f[mpm] +=  S_24; //24
+		KS.f[pmm] +=  S_25; //25
+		KS.f[mmm] +=  S_26; //26
 	}
 };
-
