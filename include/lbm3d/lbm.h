@@ -70,8 +70,8 @@ struct LBM
 
 #ifdef HAVE_MPI
 	// synchronizers for dfs, macro and map
-	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType, false, false > dreal_sync[27 + MACRO::N];
-	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t, false, false > map_sync;
+	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType, false > dreal_sync[27 + MACRO::N];
+	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t, false > map_sync;
 
 	// synchronization methods
 	template< typename Array >
