@@ -246,11 +246,13 @@ void LBM_BLOCK<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_
 	for (int i = 0; i < N; i++) {
 		// set neighbors (0 = x-direction)
 		dreal_sync[i + sync_offset].template setNeighbors< 0 >( neighbour_left, neighbour_right );
+		// TODO: make this a general parameter (for now we set an upper bound)
+		constexpr int blocks_per_rank = 32;
 		dreal_sync[i + sync_offset].setTags(
-				(2 * i + 1) * nproc + left_id,   // from left
-				(2 * i + 0) * nproc + id,        // to left
-				(2 * i + 0) * nproc + right_id,  // from right
-				(2 * i + 1) * nproc + id );      // to right
+				(2 * i + 1) * blocks_per_rank * nproc + left_id,   // from left
+				(2 * i + 0) * blocks_per_rank * nproc + id,        // to left
+				(2 * i + 0) * blocks_per_rank * nproc + right_id,  // from right
+				(2 * i + 1) * blocks_per_rank * nproc + id );      // to right
 		// rebind just the data pointer
 		view.bind(array.getData() + i * data.indexer.getStorageSize());
 		// determine sync direction
