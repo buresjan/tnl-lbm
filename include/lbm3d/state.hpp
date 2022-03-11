@@ -1394,9 +1394,13 @@ void State<NSE>::SimInit()
 	{
 		loadState(); // load saved state into CPU memory
 		nse.physStartTime = nse.physTime();
+		nse.allocateDeviceData();
 	}
 	else
 	{
+		// allocate before reset - it might initialize on the GPU...
+		nse.allocateDeviceData();
+
 		// setup map and DFs in CPU memory
 		reset();
 
@@ -1424,7 +1428,6 @@ void State<NSE>::SimInit()
 		}
 	}
 
-	nse.allocateDeviceData();
 	copyAllToDevice();
 
 #ifdef HAVE_MPI

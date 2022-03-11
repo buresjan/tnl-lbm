@@ -50,7 +50,7 @@ struct D3Q7_COMMON
 	}
 
 	template< typename LAT_DFS >
-	static void setEquilibriumLat(LAT_DFS& f, idx x, idx y, idx z, real phi, real vx, real vy, real vz)
+	CUDA_HOSTDEV static void setEquilibriumLat(LAT_DFS& f, idx x, idx y, idx z, real phi, real vx, real vy, real vz)
 	{
 		f(mzz,x,y,z) = EQ::eq_mzz(phi, vx, vy, vz);
 		f(zmz,x,y,z) = EQ::eq_zmz(phi, vx, vy, vz);
