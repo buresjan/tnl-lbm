@@ -324,6 +324,8 @@ void LBM_BLOCK<LBM_TYPE>::synchronizeMapDevice_start()
 	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
 	constexpr auto policy = std::decay_t<decltype(map_sync)>::AsyncPolicy::deferred;
 
+	// set neighbors (0 = x-direction)
+	map_sync.template setNeighbors< 0 >( neighbour_left, neighbour_right );
 	map_sync.setTags( nproc + left_id, id, right_id, nproc + id );
 	map_sync.synchronizeAsync(dmap, policy);
 }
