@@ -249,9 +249,13 @@ void LBM_BLOCK<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_
 		// TODO: make this a general parameter (for now we set an upper bound)
 		constexpr int blocks_per_rank = 32;
 		dreal_sync[i + sync_offset].setTags(
+			left_id < 0 ? -1 :
 				(2 * i + 1) * blocks_per_rank * nproc + left_id,   // from left
+			left_id < 0 ? -1 :
 				(2 * i + 0) * blocks_per_rank * nproc + id,        // to left
+			right_id < 0 ? -1 :
 				(2 * i + 0) * blocks_per_rank * nproc + right_id,  // from right
+			right_id < 0 ? -1 :
 				(2 * i + 1) * blocks_per_rank * nproc + id );      // to right
 		// rebind just the data pointer
 		view.bind(array.getData() + i * data.indexer.getStorageSize());
@@ -326,7 +330,11 @@ void LBM_BLOCK<LBM_TYPE>::synchronizeMapDevice_start()
 
 	// set neighbors (0 = x-direction)
 	map_sync.template setNeighbors< 0 >( neighbour_left, neighbour_right );
-	map_sync.setTags( nproc + left_id, id, right_id, nproc + id );
+	map_sync.setTags(
+			left_id < 0 ? -1 : nproc + left_id,  // from left
+			left_id < 0 ? -1 : id,               // to left
+			right_id < 0 ? -1 : right_id,        // from right
+			right_id < 0 ? -1 : nproc + id );    // to right
 	map_sync.synchronizeAsync(dmap, policy);
 }
 
