@@ -27,6 +27,7 @@ struct LBM
 	using lat_t = Lattice<3, real, idx>;
 
 	// MPI
+	TNL::MPI::Comm communicator = MPI_COMM_WORLD;
 	int rank = 0;
 	int nproc = 1;
 
@@ -64,8 +65,8 @@ struct LBM
 	LBM() = delete;
 	LBM(const LBM&) = delete;
 	LBM(LBM&&) = default;
-	LBM(lat_t ilat, real iphysViscosity, real iphysDt);
-	LBM(lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt);
+	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt);
+	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt);
 
 //	real Re(real physvel) { return fabs(physvel) * lat.physDl * (real)Y / physViscosity; } // TODO: change Y to charLength --- specify this explicitely
 	real Re(real physvel) { return fabs(physvel) * physCharLength / physViscosity; } // TODO: change Y to charLength --- specify this explicitely

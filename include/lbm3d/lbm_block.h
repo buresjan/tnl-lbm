@@ -54,6 +54,7 @@ struct LBM_BLOCK
 	dlat_array_t dfs[DFMAX];
 
 	// MPI
+	TNL::MPI::Comm communicator = MPI_COMM_WORLD;
 	int rank = 0;
 	int nproc = 1;
 	int neighbour_left = 0;
@@ -73,7 +74,7 @@ struct LBM_BLOCK
 	LBM_BLOCK() = delete;
 	LBM_BLOCK(const LBM_BLOCK&) = delete;
 	LBM_BLOCK(LBM_BLOCK&&) = default;
-	LBM_BLOCK(idx3d global, idx3d local, idx3d offset, int neighbour_left = -1, int neighbour_right = -1, int left_id = 0, int this_id = 0, int right_id = 0);
+	LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left = -1, int neighbour_right = -1, int left_id = 0, int this_id = 0, int right_id = 0);
 
 	int df_overlap_X() { return data.indexer.template getOverlap< 0 >(); }
 	int df_overlap_Y() { return data.indexer.template getOverlap< 1 >(); }

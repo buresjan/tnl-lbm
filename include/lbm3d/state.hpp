@@ -173,7 +173,7 @@ bool State<NSE>::isMark()
 			result = false;
 		}
 	}
-	TNL::MPI::Bcast(&result, 1, 0, MPI_COMM_WORLD);
+	TNL::MPI::Bcast(&result, 1, 0, nse.communicator);
 	return result;
 }
 
@@ -1112,7 +1112,7 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 		for (int i = 0; i < 2; i++)
 		{
 			// wait for all processes to create temporary files
-			TNL::MPI::Barrier();
+			TNL::MPI::Barrier(nse.communicator);
 
 			// first iteration: create temporary files in the destination directory
 			// second iteration: rename the temporary files to the target files
@@ -1242,7 +1242,7 @@ bool State<NSE>::wallTimeReached()
 			local_result = true;
 		}
 	}
-	return TNL::MPI::reduce(local_result, MPI_LOR, MPI_COMM_WORLD);
+	return TNL::MPI::reduce(local_result, MPI_LOR, nse.communicator);
 }
 
 template< typename NSE >
@@ -1258,7 +1258,7 @@ double State<NSE>::getWallTime(bool collective)
 	if (collective)
 	{
 		// collective operation - make sure that all MPI processes return the same walltime (taken from rank 0)
-		TNL::MPI::Bcast(&walltime, 1, 0, MPI_COMM_WORLD);
+		TNL::MPI::Bcast(&walltime, 1, 0, nse.communicator);
 	}
 	return walltime;
 }
@@ -1753,7 +1753,9 @@ void State<NSE>::AfterSimUpdate(timespec& t1, timespec& t2)
 		cnt[STAT2_RESET].count++;
 	}
 
-	if (nse.rank == 0)	// only the first process writes MLUPS
+	// only the first process writes MLUPS
+	// getting the rank from MPI_COMM_WORLD is intended here - other ranks may be redirected to a file when the ranks are reordered
+	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
 	if (nse.iterations > 1)
 	if (write_info)
 	{

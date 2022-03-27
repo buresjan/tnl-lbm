@@ -4,12 +4,12 @@
 #include "vtk_writer.h"
 
 template< typename LBM_TYPE >
-LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(idx3d global, idx3d local, idx3d offset, int neighbour_left, int neighbour_right, int left_id, int this_id, int right_id)
-: global(global), local(local), offset(offset), left_id(left_id), id(this_id), right_id(right_id)
+LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left, int neighbour_right, int left_id, int this_id, int right_id)
+: communicator(communicator), global(global), local(local), offset(offset), left_id(left_id), id(this_id), right_id(right_id)
 {
 	// initialize MPI info
-	rank = TNL::MPI::GetRank();
-	nproc = TNL::MPI::GetSize();
+	rank = communicator.rank();
+	nproc = communicator.size();
 
 	// initialize neighbours
 	if (neighbour_left < 0)
@@ -393,7 +393,7 @@ void LBM_BLOCK<LBM_TYPE>::allocateHostData()
 	{
 		hfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
-		hfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+		hfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 		hfs[dfty].allocate();
 		#endif
 	}
@@ -401,9 +401,9 @@ void LBM_BLOCK<LBM_TYPE>::allocateHostData()
 	hmap.setSizes(global.x(), global.y(), global.z());
 	wall.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
-	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	hmap.allocate();
-	wall.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+	wall.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	wall.allocate();
 #endif
 	wall.setValue(false);
@@ -411,9 +411,9 @@ void LBM_BLOCK<LBM_TYPE>::allocateHostData()
 	hmacro.setSizes(0, global.x(), global.y(), global.z());
 	cpumacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
-	hmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+	hmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	hmacro.allocate();
-	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	cpumacro.allocate();
 #endif
 	hmacro.setValue(0);
@@ -429,7 +429,7 @@ void LBM_BLOCK<LBM_TYPE>::allocateDeviceData()
 #if 1
 	dmap.setSizes(global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
-	dmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+	dmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	dmap.allocate();
 	#endif
 
@@ -437,14 +437,14 @@ void LBM_BLOCK<LBM_TYPE>::allocateDeviceData()
 	{
 		dfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
-		dfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+		dfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 		dfs[dfty].allocate();
 		#endif
 	}
 
 	dmacro.setSizes(0, global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
-	dmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), MPI_COMM_WORLD);
+	dmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	dmacro.allocate();
 	#endif
 #else

@@ -240,8 +240,8 @@ struct StateLocal : State<LBM_TYPE>
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(lat_t ilat, real iphysViscosity, real iphysDt)
-		: State<LBM_TYPE>(ilat, iphysViscosity, iphysDt)
+	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
+		: State<LBM_TYPE>(communicator, ilat, iphysViscosity, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -360,7 +360,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(lat, PHYS_VISCOSITY, PHYS_DT);
+	StateLocal<LBM_TYPE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
 	state.lbm_input_velocity = i_LBM_VELOCITY;
 #ifdef USE_CUDA
 	for (auto& block : state.nse.blocks)

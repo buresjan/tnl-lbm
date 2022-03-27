@@ -239,8 +239,8 @@ struct StateLocal : State<LBM_TYPE>
 	}
 
 
-	StateLocal(lat_t ilat, real iphysViscosity, real iphysDt, int RES)
-		: State<LBM_TYPE>(ilat, iphysViscosity, iphysDt)
+	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, int RES)
+		: State<LBM_TYPE>(communicator, ilat, iphysViscosity, iphysDt)
 	{
 		errors_count = 10 * RES;
 		l1errors = new real[errors_count];
@@ -288,7 +288,7 @@ int sim02(int RES=1, bool use_forcing=true)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(lat, PHYS_VISCOSITY, PHYS_DT, RES);
+	StateLocal<LBM_TYPE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
 #ifdef USE_CUDA
 	for (auto& block : state.nse.blocks)
 		block.block_size.y = block_size;

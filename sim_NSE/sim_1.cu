@@ -78,8 +78,8 @@ struct StateLocal : State<LBM_TYPE>
 			block.data.inflow_rho = lbmInflowDensity;
 	}
 
-	StateLocal(lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt)
-		: State<LBM_TYPE>(ilat, iphysViscosity, iphysDt)
+	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt)
+		: State<LBM_TYPE>(communicator, ilat, iphysViscosity, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -168,7 +168,7 @@ int sim01_test(int RESOLUTION = 2)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal< LBM_TYPE > state(lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
+	StateLocal< LBM_TYPE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
 	state.setid("sim_1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
 #ifdef USE_CUDA
 	for (auto& block : state.nse.blocks)

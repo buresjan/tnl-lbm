@@ -3,15 +3,15 @@
 #include "lbm.h"
 
 template< typename LBM_TYPE >
-LBM<LBM_TYPE>::LBM(lat_t ilat, real iphysViscosity, real iphysDt)
-: lat(ilat)
+LBM<LBM_TYPE>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
+: communicator(communicator), lat(ilat)
 {
 	// initialize MPI info
-	rank = TNL::MPI::GetRank();
-	nproc = TNL::MPI::GetSize();
+	rank = communicator.rank();
+	nproc = communicator.size();
 
 	// uniform decomposition by default
-	auto local_range = TNL::Containers::Partitioner<idx>::splitRange(lat.global.x(), MPI_COMM_WORLD);
+	auto local_range = TNL::Containers::Partitioner<idx>::splitRange(lat.global.x(), communicator);
 	idx3d local, offset;
 	local.x() = local_range.getEnd() - local_range.getBegin();
 	local.y() = lat.global.y();
@@ -20,7 +20,7 @@ LBM<LBM_TYPE>::LBM(lat_t ilat, real iphysViscosity, real iphysDt)
 	offset.y() = offset.z() = 0;
 	int neighbour_left = (rank - 1 + nproc) % nproc;
 	int neighbour_right = (rank + 1 + nproc) % nproc;
-	blocks.emplace_back(lat.global, local, offset, neighbour_left, neighbour_right, neighbour_left, rank, neighbour_right);
+	blocks.emplace_back(communicator, lat.global, local, offset, neighbour_left, neighbour_right, neighbour_left, rank, neighbour_right);
 	total_blocks = nproc;
 
 	physDt = iphysDt;
@@ -29,14 +29,14 @@ LBM<LBM_TYPE>::LBM(lat_t ilat, real iphysViscosity, real iphysDt)
 }
 
 template< typename LBM_TYPE >
-LBM<LBM_TYPE>::LBM(lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt)
-: lat(ilat), blocks(std::forward<std::vector<BLOCK>>(blocks))
+LBM<LBM_TYPE>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt)
+: communicator(communicator), lat(ilat), blocks(std::forward<std::vector<BLOCK>>(blocks))
 {
 	// initialize MPI info
-	rank = TNL::MPI::GetRank();
-	nproc = TNL::MPI::GetSize();
+	rank = communicator.rank();
+	nproc = communicator.size();
 
-	total_blocks = TNL::MPI::reduce(blocks.size(), MPI_SUM);
+	total_blocks = TNL::MPI::reduce(blocks.size(), MPI_SUM, communicator);
 
 	physDt = iphysDt;
 	physCharLength = lat.physDl * (real)lat.global.y();

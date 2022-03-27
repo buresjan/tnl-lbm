@@ -249,10 +249,11 @@ struct State
 
 	// constructors
 	template< typename... ARGS >
-	State(typename T_LBM_NSE::lat_t ilat, ARGS&&... args) : nse(ilat, std::forward<ARGS>(args)...)
+	State(const TNL::MPI::Comm& communicator, typename T_LBM_NSE::lat_t ilat, ARGS&&... args)
+	: nse(communicator, ilat, std::forward<ARGS>(args)...)
 	{
 		bool local_estimate = estimateMemoryDemands();
-		bool global_result = TNL::MPI::reduce(local_estimate, MPI_LAND, MPI_COMM_WORLD);
+		bool global_result = TNL::MPI::reduce(local_estimate, MPI_LAND, communicator);
 		if (!local_estimate)
 			log("Not enough memory available (CPU or GPU). [disable this check in lbm3d/state.h -> State constructor]");
 		if (!global_result)

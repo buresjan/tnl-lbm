@@ -407,9 +407,9 @@ struct StateLocal : State<NSE>
 	real lbmInflowDensity = no1;
 
 	// constructor
-	StateLocal(lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt, real iphysDiffusion)
-		: State<NSE>(ilat, iphysViscosity, iphysDt),
-		  ade(ilat, iphysDiffusion, iphysDt)
+	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt, real iphysDiffusion)
+		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt),
+		  ade(communicator, ilat, iphysDiffusion, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -1042,7 +1042,7 @@ int simT1_test(int RESOLUTION = 2)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal< NSE, ADE > state(lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
+	StateLocal< NSE, ADE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
 	state.setid("sim_T1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
 #ifdef USE_CUDA
 	for (auto& block : state.nse.blocks)
