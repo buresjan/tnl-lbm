@@ -1029,11 +1029,11 @@ int simT1_test(int RESOLUTION = 2)
 	int Z = Y;// height in pixels --- top and bottom walls 1px
 	real LBM_VISCOSITY = 0.001/3.0;//1.0/6.0; /// GIVEN: optimal is 1/6
 	real PHYS_HEIGHT = 0.41; // [m] domain height (physical)
-	real PHYS_VISCOSITY = 1.5e-5;// [m^2/s] fluid viscosity
+	real PHYS_VISCOSITY = 1.552e-5; // [m^2/s] fluid viscosity of air
 	real PHYS_VELOCITY = 1.0;
 	real PHYS_DL = PHYS_HEIGHT/((real)Y-2);
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;//PHYS_HEIGHT/(real)LBM_HEIGHT;
-	real PHYS_DIFFUSION = 1e-4; // diffusion coeff for the ADE --- TODO
+	real PHYS_DIFFUSION = 2.552e-05; // [m^2/s] diffusion coeff for the ADE
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	// initialize the lattice
