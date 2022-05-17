@@ -212,10 +212,7 @@ void LBMKernelInit(
 	typename LBM_TYPE::TRAITS::idx z
 )
 {
-	using map_t = typename LBM_TYPE::TRAITS::map_t;
 	using dreal = typename LBM_TYPE::TRAITS::dreal;
-
-	map_t gi_map = SD.map(x, y, z);
 
 	typename LBM_TYPE::template KernelStruct<dreal> KS;
 	for (int i = 0; i < LBM_TYPE::Q; i++)

@@ -176,7 +176,6 @@ int sim01_test(int RESOLUTION = 2)
 #endif
 	state.nse.physCharLength = 0.1; // [m]
 //	state.printIter = 100;
-//	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;
 	state.cnt[PRINT].period = 0.001;
 	state.cnt[PROBE1].period = 0.001;
