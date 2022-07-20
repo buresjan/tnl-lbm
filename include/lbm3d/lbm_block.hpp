@@ -485,10 +485,20 @@ template< typename LBM_TYPE >
 	template< typename F >
 void LBM_BLOCK<LBM_TYPE>::forAllLatticeSites(F f)
 {
+#ifdef HAVE_MPI
+	const int overlap_x = hmap.getLocalView().getIndexer().template getOverlap< 0 >();
+	const int overlap_y = hmap.getLocalView().getIndexer().template getOverlap< 1 >();
+	const int overlap_z = hmap.getLocalView().getIndexer().template getOverlap< 2 >();
+#else
+	const int overlap_x = hmap.getIndexer().template getOverlap< 0 >();
+	const int overlap_y = hmap.getIndexer().template getOverlap< 1 >();
+	const int overlap_z = hmap.getIndexer().template getOverlap< 2 >();
+#endif
+
 	#pragma omp parallel for schedule(static) collapse(2)
-	for (idx x = offset.x() - 1; x <= offset.x() + local.x(); x++)
-	for (idx z = offset.z() - 1; z <= offset.z() + local.z(); z++)
-	for (idx y = offset.y() - 1; y <= offset.y() + local.y(); y++)
+	for (idx x = offset.x() - overlap_x; x < offset.x() + local.x() + overlap_x; x++)
+	for (idx z = offset.z() - overlap_z; z < offset.z() + local.z() + overlap_z; z++)
+	for (idx y = offset.y() - overlap_y; y < offset.y() + local.y() + overlap_y; y++)
 		f(*this, x, y, z);
 }
 
