@@ -6,9 +6,6 @@
 template < typename STATE >
 void execute(STATE& state)
 {
-	struct timespec t1, t2;
-	clock_gettime(CLOCK_REALTIME, &t1);
-
 #if defined(HAVE_MPI) && defined(USE_CUDA)
 	// get the range of stream priorities for current GPU
 	int priority_high, priority_low;
@@ -24,7 +21,7 @@ void execute(STATE& state)
 	state.SimInit();
 
 	// make snapshot for the initial condition
-	state.AfterSimUpdate(t1, t2);
+	state.AfterSimUpdate();
 
 	bool quit = false;
 	while (!quit)
@@ -36,7 +33,7 @@ void execute(STATE& state)
 		state.SimUpdate();
 
 		// post-processing: snapshots etc.
-		state.AfterSimUpdate(t1, t2);
+		state.AfterSimUpdate();
 
 		// check wall time
 		// (Note that state.wallTimeReached() must be called exactly once per iteration!)
@@ -78,6 +75,8 @@ void execute(STATE& state)
 		// distribute quit among all MPI processes
 		quit = TNL::MPI::reduce(quit, MPI_LOR, MPI_COMM_WORLD);
 	}
+
+	state.AfterSimFinished();
 
 #if defined(HAVE_MPI) && defined(USE_CUDA)
 	for (int i = 0; i < 3; i++)

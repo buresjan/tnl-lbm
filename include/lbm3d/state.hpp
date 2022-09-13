@@ -1233,9 +1233,7 @@ bool State<NSE>::wallTimeReached()
 	bool local_result = false;
 	if (wallTime > 0)
 	{
-		timespec t_actual;
-		clock_gettime(CLOCK_REALTIME, &t_actual);
-		long actualtimediff = (t_actual.tv_sec - t_init.tv_sec);
+		long actualtimediff = timer_total.getRealTime();
 		if (actualtimediff >= wallTime)
 		{
 			log("wallTime reached: %ld / %ld [sec]", actualtimediff, wallTime);
@@ -1248,19 +1246,17 @@ bool State<NSE>::wallTimeReached()
 template< typename NSE >
 double State<NSE>::getWallTime(bool collective)
 {
-	double walltime = 0;
+	double result = 0;
 	if (!collective || nse.rank == 0)
 	{
-		timespec t_actual;
-		clock_gettime(CLOCK_REALTIME, &t_actual);
-		walltime = (t_actual.tv_sec - t_init.tv_sec) + 1e-9 * (t_actual.tv_nsec - t_init.tv_nsec);
+		result = timer_total.getRealTime();
 	}
 	if (collective)
 	{
 		// collective operation - make sure that all MPI processes return the same walltime (taken from rank 0)
-		TNL::MPI::Bcast(&walltime, 1, 0, nse.communicator);
+		TNL::MPI::Bcast(&result, 1, 0, nse.communicator);
 	}
-	return walltime;
+	return result;
 }
 
 
@@ -1349,9 +1345,6 @@ void State<NSE>::reset()
 	nse.projectWall();
 	resetLattice(1.0, 0, 0, 0);
 //	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
-
-	//initial time of current simulation
-	clock_gettime(CLOCK_REALTIME, &t_init);
 }
 
 template< typename NSE >
@@ -1367,6 +1360,8 @@ void State<NSE>::resetLattice(real rho, real vx, real vy, real vz)
 template< typename NSE >
 void State<NSE>::SimInit()
 {
+	glups_prev_time = glups_prev_iterations = 0;
+
 	timer_SimInit.reset();
 	timer_SimUpdate.reset();
 	timer_AfterSimUpdate.reset();
@@ -1386,7 +1381,7 @@ void State<NSE>::SimInit()
 	// reset counters
 	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
 	cnt[SAVESTATE].count = 1;  // skip initial save of state
-	nse.iterations = nse.prevIterations = 0;
+	nse.iterations = 0;
 
 	// check for loadState
 //	if(flagExists("current_state/df_0"))
@@ -1667,7 +1662,7 @@ void State<NSE>::SimUpdate()
 }
 
 template< typename NSE >
-void State<NSE>::AfterSimUpdate(timespec& t1, timespec& t2)
+void State<NSE>::AfterSimUpdate()
 {
 	timer_AfterSimUpdate.start();
 
@@ -1753,27 +1748,31 @@ void State<NSE>::AfterSimUpdate(timespec& t1, timespec& t2)
 		cnt[STAT2_RESET].count++;
 	}
 
-	// only the first process writes MLUPS
+	// only the first process writes GLUPS
 	// getting the rank from MPI_COMM_WORLD is intended here - other ranks may be redirected to a file when the ranks are reordered
 	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
 	if (nse.iterations > 1)
 	if (write_info)
 	{
-		clock_gettime(CLOCK_REALTIME, &t2);
-		long timediff = (t2.tv_sec - t1.tv_sec) * 1000000000 + (t2.tv_nsec - t1.tv_nsec);
+		// get time diff
+		const double now = timer_total.getRealTime();
+		const double timediff = TNL::max(1e-6, now - glups_prev_time);
+
 		// to avoid numerical errors - split LUPS computation in two parts
-		double LUPS = nse.iterations - nse.prevIterations;
-		LUPS *= nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * 1000000000.0 / timediff;
-		clock_gettime(CLOCK_REALTIME, &t1);
-		nse.prevIterations = nse.iterations;
+		double LUPS = (nse.iterations - glups_prev_iterations) / timediff;
+		LUPS *= nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z();
+
+		// save prev time and iterations
+		glups_prev_time = now;
+		glups_prev_iterations = nse.iterations;
 
 		// simple estimate of time of accomplishment
 		double ETA = getWallTime() * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
 
 		if (verbosity > 0)
 		{
-			log("MLUPS=%.1f iter=%d t=%1.3fs dt=%1.2e lbmVisc=%1.2e WT=%.0fs ETA=%.0fs",
-				LUPS * 1e-6,
+			log("GLUPS=%.3f iter=%d t=%1.3fs dt=%1.2e lbmVisc=%1.2e WT=%.0fs ETA=%.0fs",
+				LUPS * 1e-9,
 				nse.iterations,
 				nse.physTime(),
 				nse.physDt,
@@ -1785,6 +1784,35 @@ void State<NSE>::AfterSimUpdate(timespec& t1, timespec& t2)
 	}
 
 	timer_AfterSimUpdate.stop();
+}
+
+template< typename NSE >
+void State<NSE>::AfterSimFinished()
+{
+	// only the first process writes the info
+	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
+	if (nse.iterations > 1)
+	if (verbosity > 0)
+	{
+		log("total walltime: %.1f s, SimInit time: %.1f s, SimUpdate time: %.1f s, AfterSimUpdate time: %.1f s",
+			getWallTime(),
+			timer_SimInit.getRealTime(),
+			timer_SimUpdate.getRealTime(),
+			timer_AfterSimUpdate.getRealTime()
+		);
+		log("compute time: %.1f s, compute overlaps time: %.1f s, wait for communication time: %.1f s, wait for computation time: %.1f s",
+			timer_compute.getRealTime(),
+			timer_compute_overlaps.getRealTime(),
+			timer_wait_communication.getRealTime(),
+			timer_wait_computation.getRealTime()
+		);
+		const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
+		const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / timer_compute.getRealTime());
+		log("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): %.3f, based on compute time: %.3f",
+			avgLUPS * 1e-9,
+			computeLUPS * 1e-9
+		);
+	}
 }
 
 template< typename NSE >

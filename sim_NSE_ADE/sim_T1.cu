@@ -497,7 +497,7 @@ struct StateLocal : State<NSE>
 		// reset counters
 		for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
 		cnt[SAVESTATE].count = 1;  // skip initial save of state
-		nse.iterations = nse.prevIterations = 0;
+		nse.iterations = 0;
 
 		// setup map and DFs in CPU memory
 		reset();

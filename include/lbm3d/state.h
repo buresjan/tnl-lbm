@@ -177,7 +177,8 @@ struct State
 	virtual void updateKernelData(); // called from core.h -- calls updateKernelData on all LBM blocks
 	virtual void updateKernelVelocities() { } // called from core.h -- setup current velocity profile for the Kernel
 	virtual void SimUpdate(); // called from core.h -- from the time loop, once per time step
-	virtual void AfterSimUpdate(timespec& t1, timespec& t2); // called from core.h -- once before the time loop and then after each SimUpdate() call
+	virtual void AfterSimUpdate(); // called from core.h -- once before the time loop and then after each SimUpdate() call
+	virtual void AfterSimFinished(); // called from core.h -- at the end of the simulation (after the time loop)
 	virtual void computeBeforeLBMKernel() { } // called from core.h just before the main LBMKernel -- extra kernels e.g. for the non-Newtonian model
 	virtual void computeAfterLBMKernel() { } // called from core.h after the main LBMKernel -- extra kernels e.g. for the coupled LBM-MHFEM solver
 	virtual void copyAllToDevice(); // called from SimInit -- copy the initial state to the GPU
@@ -238,11 +239,15 @@ struct State
 	std::string getSaveLoadFmt(ARG0 arg0, ARGS... args) {	return getFmt(arg0) + "\n" + getSaveLoadFmt(args...); }
 	// JK magic ends here
 
-	// timer for walltime and ETA calculation
-	timespec t_init;
-	long wallTime=-1; //wallTime in seconds, use negative value to disable wall time check
+	// timers for walltime, GLUPS and ETA calculations
+	TNL::Timer timer_total;
+	long wallTime = -1;  // maximum allowed wallTime in seconds, use negative value to disable wall time check
 	bool wallTimeReached();
 	double getWallTime(bool collective=false);	// collective: must be true when called by all MPI ranks and false otherwise (e.g. when called only by rank 0)
+
+	// helpers for incremental GLUPS calculation
+	int glups_prev_iterations = 0;
+	double glups_prev_time = 0;
 
 	// timers for profiling
 	TNL::Timer timer_SimInit, timer_SimUpdate, timer_AfterSimUpdate, timer_compute, timer_compute_overlaps, timer_wait_communication, timer_wait_computation;
@@ -262,8 +267,8 @@ struct State
 		// allocate host data -- after the estimate
 		nse.allocateHostData();
 
-		//initial time of current simulation
-		clock_gettime(CLOCK_REALTIME, &t_init);
+		// initial time of current simulation
+		timer_total.start();
 	}
 };
 
