@@ -204,10 +204,6 @@ struct StateLocal : State<LBM_TYPE>
 		real la1sum=TNL::MPI::reduce(local_la1sum, MPI_SUM, MPI_COMM_WORLD);
 		real la2sum=TNL::MPI::reduce(local_la2sum, MPI_SUM, MPI_COMM_WORLD);
 
-		// Chinese version
-		real l1error_chinese = l1sum / la1sum;
-		real l2error_chinese = l2sum / la2sum;
-		l2error_chinese = sqrt(l2error_chinese);
 		// considering PHYS_DL, converting to physical units
 		real l1error_phys = l1sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		real l2error_phys = l2sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
@@ -216,8 +212,6 @@ struct StateLocal : State<LBM_TYPE>
 		l2error_phys = nse.lbm2physVelocity(l2error_phys);
 
 		// dynamic stopping criterion
-//		real threshold = 1e-6;
-//		real l1prev = l1errors[(error_idx - errors_count) % errors_count];
 		real threshold = 1e-4;
 		real threshold_stddev = 1e-3;
 		real l1prev = 0.0;
@@ -234,17 +228,17 @@ struct StateLocal : State<LBM_TYPE>
 		l1errors[error_idx] = l1error_phys;
 
 		if (nse.rank == 0)
-			log("at t=%1.2fs, iterations=%d l1error_chinese=%e l2error_chinese=%e l1error_phys=%e l2error_phys=%e\tstopping=%e",
-				nse.physTime(), nse.iterations, l1error_chinese, l2error_chinese, l1error_phys, l2error_phys, stopping);
+			log("at t=%1.2fs, iterations=%d l1error_phys=%e l2error_phys=%e stopping=%e",
+				nse.physTime(), nse.iterations, l1error_phys, l2error_phys, stopping);
 	}
 
 
 	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, int RES)
 		: State<LBM_TYPE>(communicator, ilat, iphysViscosity, iphysDt)
 	{
-		errors_count = 10 * RES;
+		errors_count = 10;
 		l1errors = new real[errors_count];
-		for (int i = 0; i < errors_count; i++) l1errors[i] = 1e18;
+		for (int i = 0; i < errors_count; i++) l1errors[i] = 1;
 	}
 
 	~StateLocal()
