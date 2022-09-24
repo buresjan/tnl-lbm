@@ -213,19 +213,7 @@ void LBMKernelCheckVelocity(
 
 
 template < typename NSE >
-#ifdef TODO
-CUDA_HOSTDEV
-void LBMKernelVelocity(
-	typename NSE::TRAITS::idx x,
-	typename NSE::TRAITS::idx y,
-	typename NSE::TRAITS::idx z,
-	typename NSE::DATA SD,
-	short int rank,
-	short int nproc
-)
-#else
 #ifdef USE_CUDA
-//__launch_bounds__(32, 16)
 __global__ void cudaLBMKernelVelocity(
 	typename NSE::DATA SD,
 	short int rank,
@@ -243,19 +231,16 @@ void LBMKernelVelocity(
 	short int nproc
 )
 #endif
-#endif
 {
 	using dreal = typename NSE::TRAITS::dreal;
 	using idx = typename NSE::TRAITS::idx;
 	using map_t = typename NSE::TRAITS::map_t;
 
-#ifndef TODO
 	#ifdef USE_CUDA
 	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
 	#endif
-#endif
 	map_t gi_map = SD.map(x, y, z);
 
 	typename NSE::KernelStruct<dreal> KS;
@@ -318,19 +303,7 @@ void LBMKernelVelocity(
 
 
 template < typename NSE >
-#ifdef TODO
-CUDA_HOSTDEV
-void LBMKernelStress(
-	typename NSE::TRAITS::idx x,
-	typename NSE::TRAITS::idx y,
-	typename NSE::TRAITS::idx z,
-	typename NSE::DATA SD,
-	short int rank,
-	short int nproc
-)
-#else
 #ifdef USE_CUDA
-//__launch_bounds__(32, 16)
 __global__ void cudaLBMKernelStress(
 	typename NSE::DATA SD,
 	short int rank,
@@ -348,19 +321,16 @@ void LBMKernelStress(
 	short int nproc
 )
 #endif
-#endif
 {
 	using dreal = typename NSE::TRAITS::dreal;
 	using idx = typename NSE::TRAITS::idx;
 	using map_t = typename NSE::TRAITS::map_t;
 
-#ifndef TODO
 	#ifdef USE_CUDA
 	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
 	#endif
-#endif
 	map_t gi_map = SD.map(x, y, z);
 
 	typename NSE::KernelStruct<dreal> KS;
@@ -499,38 +469,57 @@ void LBMKernelStress(
 }
 
 
-template <
-	typename STATE,
-	typename LBM
->
-void computeNonNewtonianKernels(STATE& state, LBM& lbm)
+template <typename STATE>
+void computeNonNewtonianKernels(STATE& state)
 {
-	using LBM_TYPE = typename STATE::LBM_TYPE;
-	using TRAITS = typename LBM_TYPE::TRAITS;
+	using NSE = typename STATE::NSE;
+	using LBM_NSE = typename STATE::T_LBM_NSE;
+	using TRAITS = typename LBM_NSE::TRAITS;
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 
-	dim3 blockSize(1, lbm.block_size, 1);
-	dim3 gridSizeForBoundary(lbm.df_overlap_X(), lbm.local_Y/lbm.block_size, lbm.local_Z);
-	dim3 gridSizeForInternal(lbm.local_X - 2*lbm.df_overlap_X(), lbm.local_Y/lbm.block_size, lbm.local_Z);
+	LBM_NSE& nse = state.nse;
 
-	// compute on boundaries (NOTE: 1D distribution is assumed)
-	cudaLBMKernelVelocity< LBM_TYPE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[0]>>>(lbm.data, lbm.rank, lbm.nproc, (idx) 0);
-	cudaLBMKernelVelocity< LBM_TYPE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[1]>>>(lbm.data, lbm.rank, lbm.nproc, lbm.local_X - lbm.df_overlap_X());
+	for (auto& block : nse.blocks)
+	{
+		const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
+		const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+		const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
 
-	// compute on internal lattice sites
-	cudaLBMKernelVelocity< LBM_TYPE ><<<gridSizeForInternal, blockSize, 0, cuda_streams[2]>>>(lbm.data, lbm.rank, lbm.nproc, lbm.df_overlap_X());
+		// get CUDA streams
+		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
+		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
+		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+
+		// compute on boundaries (NOTE: 1D distribution is assumed)
+		cudaLBMKernelVelocity< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block.data, block.id, nse.total_blocks, (idx) 0);
+		cudaLBMKernelVelocity< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
+
+		// compute on internal lattice sites
+		cudaLBMKernelVelocity< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+	}
 
 	// wait for the computations on boundaries to finish
-	cudaStreamSynchronize(cuda_streams[0]);
-	cudaStreamSynchronize(cuda_streams[1]);
+	for (auto& block : nse.blocks)
+	{
+		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
+		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
 
-	// communicate macroscopic quantities on overlaps
-	lbm.synchronizeMacroDevice();
+		cudaStreamSynchronize(cuda_stream_left);
+		cudaStreamSynchronize(cuda_stream_right);
+	}
+
+	// exchange macroscopic quantities on overlaps between blocks
+	// TODO: avoid communication of DFs here
+	nse.synchronizeDFsAndMacroDevice(df_out);
 
 	// wait for the computation on the interior to finish
-	cudaStreamSynchronize(cuda_streams[2]);
+	for (auto& block : nse.blocks)
+	{
+		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+		cudaStreamSynchronize(cuda_stream_main);
+	}
 
 	// synchronize the whole GPU and check errors
 	cudaDeviceSynchronize();
@@ -538,39 +527,62 @@ void computeNonNewtonianKernels(STATE& state, LBM& lbm)
 
 
 #if 0
-//	cudaLBMKernelCheckMap< LBM_TYPE, STREAMING, MACRO, LBM_DATA, LBM_BC><<<gridSizeForBoundary, blockSize, 0, cuda_streams[0]>>>(lbm.data, lbm.rank, lbm.nproc, lbm.local_X - lbm.df_overlap_X());
+//	cudaLBMKernelCheckMap< NSE, STREAMING, MACRO, LBM_DATA, LBM_BC><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(lbm.data, lbm.rank, lbm.nproc, lbm.local_X - lbm.df_overlap_X());
 
 	TNL::MPI::Barrier();
 	if(lbm.rank == 0)
 	{
-		cudaLBMKernelCheckVelocity< LBM_TYPE, STREAMING, MACRO, LBM_DATA, LBM_BC><<<gridSizeForBoundary, blockSize, 0, cuda_streams[0]>>>(lbm.data, lbm.rank, lbm.nproc, lbm.local_X - lbm.df_overlap_X(),lbm.iterations);
+		cudaLBMKernelCheckVelocity< NSE, STREAMING, MACRO, LBM_DATA, LBM_BC><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(lbm.data, lbm.rank, lbm.nproc, lbm.local_X - lbm.df_overlap_X(),lbm.iterations);
 	}
 	else if(lbm.rank == 1)
 	{
-		cudaLBMKernelCheckVelocity< LBM_TYPE, STREAMING, MACRO, LBM_DATA, LBM_BC><<<gridSizeForBoundary, blockSize, 0, cuda_streams[1]>>>(lbm.data, lbm.rank, lbm.nproc, (idx)0,lbm.iterations);
+		cudaLBMKernelCheckVelocity< NSE, STREAMING, MACRO, LBM_DATA, LBM_BC><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(lbm.data, lbm.rank, lbm.nproc, (idx)0,lbm.iterations);
 	}
-	cudaStreamSynchronize(cuda_streams[0]);
-	cudaStreamSynchronize(cuda_streams[1]);
+	cudaStreamSynchronize(cuda_stream_left);
+	cudaStreamSynchronize(cuda_stream_right);
 	TNL::MPI::Barrier();
 #endif
 
 
-	// compute on boundaries (NOTE: 1D distribution is assumed)
-	cudaLBMKernelStress< LBM_TYPE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[0]>>>(lbm.data, lbm.rank, lbm.nproc, (idx) 0);
-	cudaLBMKernelStress< LBM_TYPE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[1]>>>(lbm.data, lbm.rank, lbm.nproc, lbm.local_X - lbm.df_overlap_X());
+	for (auto& block : nse.blocks)
+	{
+		const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
+		const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+		const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
 
-	// compute on internal lattice sites
-	cudaLBMKernelStress< LBM_TYPE ><<<gridSizeForInternal, blockSize, 0, cuda_streams[2]>>>(lbm.data, lbm.rank, lbm.nproc, lbm.df_overlap_X());
+		// get CUDA streams
+		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
+		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
+		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+
+		// compute on boundaries (NOTE: 1D distribution is assumed)
+		cudaLBMKernelStress< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block.data, block.id, nse.total_blocks, (idx) 0);
+		cudaLBMKernelStress< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
+
+		// compute on internal lattice sites
+		cudaLBMKernelStress< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+	}
 
 	// wait for the computations on boundaries to finish
-	cudaStreamSynchronize(cuda_streams[0]);
-	cudaStreamSynchronize(cuda_streams[1]);
+	for (auto& block : nse.blocks)
+	{
+		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
+		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
 
-	// communicate macroscopic quantities on overlaps
-	lbm.synchronizeMacroDevice();
+		cudaStreamSynchronize(cuda_stream_left);
+		cudaStreamSynchronize(cuda_stream_right);
+	}
+
+	// exchange macroscopic quantities on overlaps between blocks
+	// TODO: avoid communication of DFs here
+	nse.synchronizeDFsAndMacroDevice(df_out);
 
 	// wait for the computation on the interior to finish
-	cudaStreamSynchronize(cuda_streams[2]);
+	for (auto& block : nse.blocks)
+	{
+		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+		cudaStreamSynchronize(cuda_stream_main);
+	}
 
 	// synchronize the whole GPU and check errors
 	cudaDeviceSynchronize();
@@ -590,7 +602,7 @@ void computeNonNewtonianKernels(STATE& state, LBM& lbm)
 #include "lbm_data.h"
 
 template < typename TRAITS >
-struct LBM_Data_NonNewtonian : LBM_Data<TRAITS>
+struct LBM_Data_NonNewtonian : NSE_Data<TRAITS>
 {
 	using dreal = typename TRAITS::dreal;
 

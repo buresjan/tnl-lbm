@@ -764,30 +764,33 @@ void State<NSE>::writeVTKs_2D()
 template< typename NSE >
 bool State<NSE>::projectPNG_X(const char * filename, idx x0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!nse.isLocalX(x0)) return true;
-
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
 	PNGTool P(filename);
 
-	// plane y-z
-	idx x = x0;
-	for (idx z = nse.lat.offset.z(); z < nse.lat.offset.z() + nse.lat.local.z(); z++)
+	for (auto& block : nse.blocks)
 	{
-		real a = (real)z/(real)(nse.lat.global.z() - 1); // a in [0,1]
-		a = amin + a * (amax - amin); // a in [amin, amax]
-		if (mirror) a = 1.0 - a;
-		for (idx y = nse.lat.offset.y(); y < nse.lat.offset.y() + nse.lat.local.y(); y++)
+		if (!block.isLocalX(x0)) continue;
+
+		// plane y-z
+		idx x = x0;
+		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++)
 		{
-			real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
-			b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
-			if (flip) b = 1.0 - b;
-			if (rotate)
+			real a = (real)z/(real)(nse.lat.global.z() - 1); // a in [0,1]
+			a = amin + a * (amax - amin); // a in [amin, amax]
+			if (mirror) a = 1.0 - a;
+			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++)
 			{
-				if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
-			}
-			else
-			{
-				if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
+				real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
+				b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
+				if (flip) b = 1.0 - b;
+				if (rotate)
+				{
+					if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
+				}
+				else
+				{
+					if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
+				}
 			}
 		}
 	}
@@ -834,30 +837,33 @@ bool State<NSE>::projectPNG_Y(const char * filename, idx y0, bool rotate, bool m
 template< typename NSE >
 bool State<NSE>::projectPNG_Z(const char * filename, idx z0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!nse.isLocalZ(z0)) return true;
-
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
 	PNGTool P(filename);
 
-	// plane x-y
-	idx z=z0;
-	for (idx x = nse.lat.offset.x(); x < nse.lat.offset.x() + nse.lat.local.x(); x++)
+	for (auto& block : nse.blocks)
 	{
-		real a = (real)x/(real)(nse.lat.global.x() - 1); // a in [0,1]
-		a = amin + a * (amax - amin); // a in [amin, amax]
-		if (mirror) a = 1.0 - a;
-		for (idx y = nse.lat.offset.y(); y < nse.lat.offset.y() + nse.lat.local.y(); y++)
+		if (!block.isLocalZ(z0)) continue;
+
+		// plane x-y
+		idx z=z0;
+		for (idx x = block.offset.x(); x < block.offset.x() + block.local.x(); x++)
 		{
-			real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
-			b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
-			if (flip) b = 1.0 - b;
-			if (rotate)
+			real a = (real)x/(real)(nse.lat.global.x() - 1); // a in [0,1]
+			a = amin + a * (amax - amin); // a in [amin, amax]
+			if (mirror) a = 1.0 - a;
+			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++)
 			{
-				if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
-			}
-			else
-			{
-				if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
+				real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
+				b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
+				if (flip) b = 1.0 - b;
+				if (rotate)
+				{
+					if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
+				}
+				else
+				{
+					if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
+				}
 			}
 		}
 	}
