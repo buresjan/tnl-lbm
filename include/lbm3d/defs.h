@@ -18,6 +18,7 @@
 #include <TNL/Containers/DistributedNDArraySynchronizer.h>
 #include <TNL/Containers/Partitioner.h>
 #include <TNL/MPI.h>
+#include <TNL/Cuda/Stream.h>
 
 using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 
@@ -33,11 +34,6 @@ using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 #ifdef USE_CUDA
 	#define checkCudaDevice TNL_CHECK_CUDA_DEVICE
 	#include <cuda_profiler_api.h>
-
-	#ifdef HAVE_MPI
-		// CUDA streams for overlapping computation and communication
-		cudaStream_t cuda_streams[3];
-	#endif
 #endif // USE_CUDA
 
 

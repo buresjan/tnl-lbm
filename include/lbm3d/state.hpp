@@ -1428,9 +1428,7 @@ void State<NSE>::SimInit()
 #ifdef HAVE_MPI
 	// synchronize overlaps with MPI (initial synchronization can be synchronous)
 	nse.synchronizeMapDevice();
-	nse.synchronizeDFsDevice(df_cur);
-	if (NSE::MACRO::use_syncMacro)
-		nse.synchronizeMacroDevice();
+	nse.synchronizeDFsAndMacroDevice(df_cur);
 #endif
 
 	timer_SimInit.stop();
@@ -1490,12 +1488,24 @@ void State<NSE>::SimUpdate()
 	#ifdef USE_CUDA
 	auto get_grid_size = [] (const auto& block) -> dim3
 	{
-		dim3 gridSize(block.local.x(), block.local.y()/block.block_size.y, block.local.z());
+		dim3 gridSize(block.local.x()/block.block_size.x(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
 
 		// check for PEBKAC problem existing between keyboard and chair
-		if (gridSize.y * block.block_size.y != block.local.y())
+		if (block.block_size.x() * block.block_size.y() * block.block_size.z() < 32)
+			throw std::logic_error("error: block.block_size contains less than 32 threads: [" + std::to_string(block.block_size.x()) + ","
+								   + std::to_string(block.block_size.x()) + "," + std::to_string(block.block_size.x()) + "]");
+		if (block.block_size.x() * block.block_size.y() * block.block_size.z() > 1024)
+			throw std::logic_error("error: block.block_size contains more than 1024 threads: [" + std::to_string(block.block_size.x()) + ","
+								   + std::to_string(block.block_size.x()) + "," + std::to_string(block.block_size.x()) + "]");
+		if (gridSize.x * block.block_size.x() != block.local.x())
+			throw std::logic_error("error: block.local.x() (which is " + std::to_string(block.local.x()) + ") "
+								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.x()) + ")");
+		if (gridSize.y * block.block_size.y() != block.local.y())
 			throw std::logic_error("error: block.local.y() (which is " + std::to_string(block.local.y()) + ") "
-								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.y) + ")");
+								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.y()) + ")");
+		if (gridSize.z * block.block_size.z() != block.local.z())
+			throw std::logic_error("error: block.local.z() (which is " + std::to_string(block.local.z()) + ") "
+								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.z()) + ")");
 
 		return gridSize;
 	};
@@ -1506,11 +1516,12 @@ void State<NSE>::SimUpdate()
 		for (auto& block : nse.blocks)
 		{
 		#ifdef USE_CUDA
+			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
 			const dim3 gridSize = get_grid_size(block);
 			if (doZeroForceOnDevice)
-				cudaLBMComputeVelocitiesStarAndZeroForce< NSE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
+				cudaLBMComputeVelocitiesStarAndZeroForce< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc);
 			else
-				cudaLBMComputeVelocitiesStar< NSE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
+				cudaLBMComputeVelocitiesStar< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc);
 			checkCudaDevice;
 		#else
 			#pragma omp parallel for schedule(static) collapse(2)
@@ -1566,7 +1577,7 @@ void State<NSE>::SimUpdate()
 		timer_compute.start();
 		for (auto& block : nse.blocks)
 		{
-			const dim3 blockSize = block.block_size;
+			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
 			const dim3 gridSize = get_grid_size(block);
 			cudaLBMKernel< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc, (idx) 0);
 		}
@@ -1583,38 +1594,48 @@ void State<NSE>::SimUpdate()
 
 		for (auto& block : nse.blocks)
 		{
-			const dim3 blockSize = block.block_size;
-			const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y, block.local.z());
-			const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y, block.local.z());
+			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
+			const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+			const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+
+			// get CUDA streams
+			const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
+			const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
+			const cudaStream_t cuda_stream_main = block.streams.at(block.id);
 
 			// compute on boundaries (NOTE: 1D distribution is assumed)
-			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[0]>>>(block.data, block.id, nse.total_blocks, (idx) 0);
-			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_streams[1]>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
+			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block.data, block.id, nse.total_blocks, (idx) 0);
+			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
 
 			// compute on internal lattice sites
-			cudaLBMKernel< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_streams[2]>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+			cudaLBMKernel< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
 		}
 
 		// wait for the computations on boundaries to finish
-		cudaStreamSynchronize(cuda_streams[0]);
-		cudaStreamSynchronize(cuda_streams[1]);
+		// TODO: pipeline the stream synchronization with the MPI synchronizer (wait using CUDA stream events in the DistributedNDArraySynchronizer)
+		for (auto& block : nse.blocks)
+		{
+			const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
+			const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
+
+			cudaStreamSynchronize(cuda_stream_left);
+			cudaStreamSynchronize(cuda_stream_right);
+		}
 		timer_compute_overlaps.stop();
 
-		// start communication of the latest DFs and dmacro on overlaps
+		// exchange the latest DFs and dmacro on overlaps between blocks
+		// (it is important to wait for the communication before waiting for the computation, otherwise MPI won't progress)
 		timer_wait_communication.start();
-		nse.synchronizeDFsDevice_start(output_df);
-		if (NSE::MACRO::use_syncMacro)
-			nse.synchronizeMacroDevice_start();
-
-		// wait for the communication to finish
-		// (it is important to do this before waiting for the computation, otherwise MPI won't progress)
-		for (auto& block : nse.blocks)
-			block.waitAllCommunication();
+		nse.synchronizeDFsAndMacroDevice(output_df);
 		timer_wait_communication.stop();
 
 		// wait for the computation on the interior to finish
 		timer_wait_computation.start();
-		cudaStreamSynchronize(cuda_streams[2]);
+		for (auto& block : nse.blocks)
+		{
+			const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+			cudaStreamSynchronize(cuda_stream_main);
+		}
 
 		// synchronize the whole GPU and check errors
 		cudaDeviceSynchronize();
@@ -1640,7 +1661,7 @@ void State<NSE>::SimUpdate()
 	#ifdef HAVE_MPI
 	// TODO: overlap computation with synchronization, just like above
 	timer_wait_communication.start();
-	nse.synchronizeDFsDevice(output_df);
+	nse.synchronizeDFsAndMacroDevice(output_df);
 	timer_wait_communication.stop();
 	#endif
 #endif

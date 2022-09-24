@@ -283,10 +283,6 @@ int sim02(int RES=1, bool use_forcing=true)
 	lat.physDl = PHYS_DL;
 
 	StateLocal<LBM_TYPE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
-#ifdef USE_CUDA
-	for (auto& block : state.nse.blocks)
-		block.block_size.y = block_size;
-#endif
 //	state.nse.use_multiple_gpus = false;
 	state.nse.physCharLength = 0.125; // [m]
 

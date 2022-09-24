@@ -170,10 +170,6 @@ int sim01_test(int RESOLUTION = 2)
 
 	StateLocal< LBM_TYPE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
 	state.setid("sim_1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
-#ifdef USE_CUDA
-	for (auto& block : state.nse.blocks)
-		block.block_size.y = block_size;
-#endif
 	state.nse.physCharLength = 0.1; // [m]
 //	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;

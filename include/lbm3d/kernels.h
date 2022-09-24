@@ -3,19 +3,7 @@
 #include "defs.h"
 
 template < typename NSE >
-#ifdef TODO
-CUDA_HOSTDEV
-void LBMKernel(
-	typename NSE::TRAITS::idx x,
-	typename NSE::TRAITS::idx y,
-	typename NSE::TRAITS::idx z,
-	typename NSE::DATA SD,
-	short int rank,
-	short int nproc
-)
-#else
 #ifdef USE_CUDA
-//__launch_bounds__(32, 16)
 __global__ void cudaLBMKernel(
 	typename NSE::DATA SD,
 	short int rank,
@@ -33,19 +21,16 @@ void LBMKernel(
 	short int nproc
 )
 #endif
-#endif
 {
 	using dreal = typename NSE::TRAITS::dreal;
 	using idx = typename NSE::TRAITS::idx;
 	using map_t = typename NSE::TRAITS::map_t;
 
-#ifndef TODO
 	#ifdef USE_CUDA
 	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
 	#endif
-#endif
 	map_t gi_map = SD.map(x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
@@ -89,20 +74,7 @@ void LBMKernel(
 
 
 template < typename NSE, typename ADE >
-#ifdef TODO
-CUDA_HOSTDEV
-void LBMKernel(
-	typename NSE::TRAITS::idx x,
-	typename NSE::TRAITS::idx y,
-	typename NSE::TRAITS::idx z,
-	typename NSE::DATA NSE_SD,
-	typename ADE::DATA ADE_SD,
-	short int rank,
-	short int nproc
-)
-#else
 #ifdef USE_CUDA
-//__launch_bounds__(32, 16)
 __global__ void cudaLBMKernel(
 	typename NSE::DATA NSE_SD,
 	typename ADE::DATA ADE_SD,
@@ -122,19 +94,16 @@ void LBMKernel(
 	short int nproc
 )
 #endif
-#endif
 {
 	using dreal = typename NSE::TRAITS::dreal;
 	using idx = typename NSE::TRAITS::idx;
 	using map_t = typename NSE::TRAITS::map_t;
 
-#ifndef TODO
 	#ifdef USE_CUDA
 	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
 	#endif
-#endif
 	const map_t NSE_mapgi = NSE_SD.map(x, y, z);
 	const map_t ADE_mapgi = ADE_SD.map(x, y, z);
 
@@ -230,7 +199,6 @@ void LBMKernelInit(
 }
 
 
-//template<typename L, typename M, typename LBM_DATA>
 template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMComputeVelocitiesStar(
@@ -298,7 +266,6 @@ void LBMComputeVelocitiesStar(
 	NSE::MACRO::outputMacro(SD, KS, x, y, z);
 }
 
-//template<typename L, typename M, typename LBM_DATA>
 template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMComputeVelocitiesStarAndZeroForce(

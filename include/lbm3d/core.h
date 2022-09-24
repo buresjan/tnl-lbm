@@ -6,17 +6,6 @@
 template < typename STATE >
 void execute(STATE& state)
 {
-#if defined(HAVE_MPI) && defined(USE_CUDA)
-	// get the range of stream priorities for current GPU
-	int priority_high, priority_low;
-	cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
-	// high-priority streams for boundaries
-	cudaStreamCreateWithPriority(&cuda_streams[0], cudaStreamNonBlocking, priority_high);
-	cudaStreamCreateWithPriority(&cuda_streams[1], cudaStreamNonBlocking, priority_high);
-	// low-priority stream for the interior
-	cudaStreamCreateWithPriority(&cuda_streams[2], cudaStreamNonBlocking, priority_low);
-#endif
-
 	// initialize the simulation -- load state or allocate, copy to device and synchronize overlaps with MPI
 	state.SimInit();
 
@@ -77,9 +66,4 @@ void execute(STATE& state)
 	}
 
 	state.AfterSimFinished();
-
-#if defined(HAVE_MPI) && defined(USE_CUDA)
-	for (int i = 0; i < 3; i++)
-		cudaStreamDestroy(cuda_streams[i]);
-#endif
 }

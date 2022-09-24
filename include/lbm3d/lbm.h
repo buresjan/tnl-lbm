@@ -40,10 +40,7 @@ struct LBM
 
 #ifdef HAVE_MPI
 	// synchronization methods
-	void synchronizeDFsDevice_start(uint8_t dftype);
-	void synchronizeDFsDevice(uint8_t dftype);
-	void synchronizeMacroDevice_start();
-	void synchronizeMacroDevice();
+	void synchronizeDFsAndMacroDevice(uint8_t dftype);
 	void synchronizeMapDevice();
 #endif
 

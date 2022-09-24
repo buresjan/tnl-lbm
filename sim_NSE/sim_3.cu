@@ -409,10 +409,6 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	StateLocal<LBM_TYPE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
-#ifdef USE_CUDA
-	for (auto& block : state.nse.blocks)
-		block.block_size.y = block_size;
-#endif
 	state.nse.physCharLength = cylinder_diameter; // [m]
 	state.cylinder_diameter = cylinder_diameter; // [m]
 	//state.nse.physFluidDensity = 1000.0; // [kg/m^3]

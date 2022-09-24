@@ -214,45 +214,43 @@ void LBM<LBM_TYPE>::copyDFsToDevice()
 }
 
 #ifdef HAVE_MPI
-
 template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::synchronizeDFsDevice_start(uint8_t dftype)
+void LBM<LBM_TYPE>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 {
-	for( auto& block : blocks )
+	// stage 0: set inputs, allocate buffers
+	// stage 1: fill send buffers
+	for( auto& block : blocks ) {
 		block.synchronizeDFsDevice_start(dftype);
-}
+		if (MACRO::use_syncMacro)
+			block.synchronizeMacroDevice_start();
+	}
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::synchronizeDFsDevice(uint8_t dftype)
-{
-	synchronizeDFsDevice_start(dftype);
-	for( auto& block : blocks )
+	// stage 2: issue all send and receive async operations
+	for( auto& block : blocks ) {
 		for (int i = 0; i < LBM_TYPE::Q; i++)
-			block.dreal_sync[i].wait();
-#ifdef USE_CUDA
-	cudaDeviceSynchronize();
-	checkCudaDevice;
-#endif
-}
+			block.dreal_sync[i].stage_2();
+		if (MACRO::use_syncMacro)
+			for (int i = 0; i < MACRO::N; i++)
+				block.dreal_sync[LBM_TYPE::Q + i].stage_2();
+	}
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::synchronizeMacroDevice_start()
-{
-	for( auto& block : blocks )
-		block.synchronizeMacroDevice_start();
-}
+	// stage 3: copy data from receive buffers
+	for( auto& block : blocks ) {
+		for (int i = 0; i < LBM_TYPE::Q; i++)
+			block.dreal_sync[i].stage_3();
+		if (MACRO::use_syncMacro)
+			for (int i = 0; i < MACRO::N; i++)
+				block.dreal_sync[LBM_TYPE::Q + i].stage_3();
+	}
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::synchronizeMacroDevice()
-{
-	synchronizeMacroDevice_start();
-	for( auto& block : blocks )
-		for (int i = 0; i < MACRO::N; i++)
-			block.dreal_sync[LBM_TYPE::Q + i].wait();
-#ifdef USE_CUDA
-	cudaDeviceSynchronize();
-	checkCudaDevice;
-#endif
+	// stage 4: ensure everything has finished
+	for( auto& block : blocks ) {
+		for (int i = 0; i < LBM_TYPE::Q; i++)
+			block.dreal_sync[i].stage_4();
+		if (MACRO::use_syncMacro)
+			for (int i = 0; i < MACRO::N; i++)
+				block.dreal_sync[LBM_TYPE::Q + i].stage_4();
+	}
 }
 
 template< typename LBM_TYPE >
@@ -262,10 +260,6 @@ void LBM<LBM_TYPE>::synchronizeMapDevice()
 		block.synchronizeMapDevice_start();
 	for( auto& block : blocks )
 		block.map_sync.wait();
-#ifdef USE_CUDA
-	cudaDeviceSynchronize();
-	checkCudaDevice;
-#endif
 }
 #endif  // HAVE_MPI
 

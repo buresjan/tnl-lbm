@@ -2,6 +2,7 @@
 
 #include "lbm_block.h"
 #include "vtk_writer.h"
+#include "block_size_optimizer.h"
 
 template< typename LBM_TYPE >
 LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left, int neighbour_right, int left_id, int this_id, int right_id)
@@ -20,6 +21,22 @@ LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global,
 		this->neighbour_right = (rank + 1) % nproc;
 	else
 		this->neighbour_right = neighbour_right;
+
+#ifdef USE_CUDA
+	// initialize optimal thread block size for the LBM kernel
+	block_size = get_optimal_block_size< typename TRAITS::xyz_permutation >(local);
+
+#ifdef HAVE_MPI
+	// get the range of stream priorities for current GPU
+	int priority_high, priority_low;
+	cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
+	// low-priority stream for the interior
+	streams.emplace( id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_low) );
+	// high-priority streams for boundaries
+	streams.emplace( left_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
+	streams.emplace( right_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
+#endif
+#endif
 }
 
 template< typename LBM_TYPE >
@@ -232,9 +249,6 @@ void LBM_BLOCK<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_
 	static_assert( N > 0, "the first dimension must be static" );
 	constexpr bool is_df = std::is_same< typename Array::ConstViewType, typename dlat_array_t::ConstViewType >::value;
 
-	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
-	constexpr auto policy = std::decay_t<decltype(dreal_sync[0])>::AsyncPolicy::deferred;
-
 	// empty view, but with correct sizes
 	#ifdef HAVE_MPI
 	typename sync_array_t::LocalViewType localView(nullptr, data.indexer);
@@ -279,8 +293,17 @@ void LBM_BLOCK<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_
 			}
 		}
 		#endif
+		#ifdef USE_CUDA
+		// set the CUDA stream
+		dreal_sync[i + sync_offset].setCudaStreams(streams.at(left_id), streams.at(right_id));
+		#endif
 		// start the synchronization
-		dreal_sync[i + sync_offset].synchronizeAsync(view, policy, sync_direction);
+		// NOTE: we don't use synchronizeAsync because we need pipelining
+		// NOTE: we could use only policy=deferred for synchronizeAsync, because  threadpool and async require MPI_THREAD_MULTIPLE which is slow
+		// stage 0: set inputs, allocate buffers
+		dreal_sync[i + sync_offset].stage_0(view, sync_direction);
+		// stage 1: fill send buffers
+		dreal_sync[i + sync_offset].stage_1();
 	}
 }
 
@@ -293,33 +316,9 @@ void LBM_BLOCK<LBM_TYPE>::synchronizeDFsDevice_start(uint8_t dftype)
 }
 
 template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::synchronizeDFsDevice(uint8_t dftype)
-{
-	synchronizeDFsDevice_start(dftype);
-	for (int i = 0; i < LBM_TYPE::Q; i++)
-		dreal_sync[i].wait();
-#ifdef USE_CUDA
-	cudaDeviceSynchronize();
-	checkCudaDevice;
-#endif
-}
-
-template< typename LBM_TYPE >
 void LBM_BLOCK<LBM_TYPE>::synchronizeMacroDevice_start()
 {
 	startDrealArraySynchronization(dmacro, LBM_TYPE::Q);
-}
-
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::synchronizeMacroDevice()
-{
-	synchronizeMacroDevice_start();
-	for (int i = 0; i < MACRO::N; i++)
-		dreal_sync[LBM_TYPE::Q + i].wait();
-#ifdef USE_CUDA
-	cudaDeviceSynchronize();
-	checkCudaDevice;
-#endif
 }
 
 template< typename LBM_TYPE >
@@ -336,16 +335,6 @@ void LBM_BLOCK<LBM_TYPE>::synchronizeMapDevice_start()
 			right_id < 0 ? -1 : right_id,        // from right
 			right_id < 0 ? -1 : nproc + id );    // to right
 	map_sync.synchronizeAsync(dmap, policy);
-}
-
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::waitAllCommunication()
-{
-	for (int i = 0; i < LBM_TYPE::Q; i++)
-		dreal_sync[i].wait();
-	if (LBM_TYPE::MACRO::use_syncMacro)
-		for (int i = 0; i < LBM_TYPE::MACRO::N; i++)
-			dreal_sync[LBM_TYPE::Q + i].wait();
 }
 #endif  // HAVE_MPI
 

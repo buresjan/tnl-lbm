@@ -32,8 +32,8 @@ struct LBM_BLOCK
 	// KernelData contains only the necessary data for the CUDA kernel. these are copied just before the kernel is called
 	typename LBM_TYPE::DATA data;
 #ifdef USE_CUDA
-	// block size for the LBM kernel (used in core.h)
-	dim3 block_size{1, 128, 1};
+	// CUDA thread block size for the LBM kernel
+	idx3d block_size{0, 0, 0};
 #endif
 
 	hmap_array_t hmap;
@@ -60,10 +60,10 @@ struct LBM_BLOCK
 	int neighbour_left = 0;
 	int neighbour_right = 0;
 
-	// index of the block on the rank (i.e. not global)
-	int left_id;
-	int id;
-	int right_id;
+	// block indices
+	int left_id;  // index of the left neighbor block
+	int id;       // index of this block
+	int right_id; // index of the right neighbor block
 
 	// lattice sizes and offsets
 	idx3d global;
@@ -82,18 +82,18 @@ struct LBM_BLOCK
 
 #ifdef HAVE_MPI
 	// synchronizers for dfs, macro and map
-	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType, false > dreal_sync[LBM_TYPE::Q + MACRO::N];
-	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t, false > map_sync;
+	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[LBM_TYPE::Q + MACRO::N];
+	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
+
+	// CUDA streams for the block itself and each neighbor
+	std::map< int, TNL::Cuda::Stream > streams;
 
 	// synchronization methods
 	template< typename Array >
 	void startDrealArraySynchronization(Array& array, int sync_offset);
 	void synchronizeDFsDevice_start(uint8_t dftype);
-	void synchronizeDFsDevice(uint8_t dftype);
 	void synchronizeMacroDevice_start();
-	void synchronizeMacroDevice();
 	void synchronizeMapDevice_start();
-	void waitAllCommunication();
 #endif
 
 	void resetForces() { resetForces(0,0,0);}
