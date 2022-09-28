@@ -24,7 +24,8 @@ LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global,
 
 #ifdef USE_CUDA
 	// initialize optimal thread block size for the LBM kernel
-	block_size = get_optimal_block_size< typename TRAITS::xyz_permutation >(local);
+	constexpr int max_threads = 256 / (sizeof(dreal) / sizeof(float));  // use 256 threads for SP and 128 threads for DP
+	block_size = get_optimal_block_size< typename TRAITS::xyz_permutation >(local, max_threads);
 
 #ifdef HAVE_MPI
 	// get the range of stream priorities for current GPU
