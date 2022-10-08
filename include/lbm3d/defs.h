@@ -57,7 +57,8 @@ template <
 	typename _dreal = float,	// real number representation on GPU
 	typename _real = double,	// real number representation on CPU
 	typename _idx = long int,	// array index on CPU and GPU (can be very large)
-	typename _map_t = short int
+	typename _map_t = short int,
+	unsigned _overlap_width = 1
 >
 struct Traits
 {
@@ -72,8 +73,8 @@ struct Traits
 	using d4_permutation = std::index_sequence< 0, 1, 3, 2 >;		// id, x, z, y
 
 #ifdef HAVE_MPI
-	using xyz_overlaps = std::index_sequence< 2, 0, 0 >;	// x, y, z
-	using d4_overlaps = std::index_sequence< 0, 2, 0, 0 >;	// id, x, y, z
+	using xyz_overlaps = std::index_sequence< _overlap_width, 0, 0 >;	// x, y, z
+	using d4_overlaps = std::index_sequence< 0, _overlap_width, 0, 0 >;	// id, x, y, z
 #else
 	using xyz_overlaps = std::index_sequence< 0, 0, 0 >;	// x, y, z
 	using d4_overlaps = std::index_sequence< 0, 0, 0, 0 >;	// id, x, y, z
