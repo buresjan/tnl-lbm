@@ -436,8 +436,6 @@ struct StateLocal : State<NSE>
 		nse.resetMap(NSE::BC::GEO_FLUID);
 		ade.resetMap(ADE::BC::GEO_FLUID);
 		setupBoundaries();
-		nse.projectWall();
-		ade.projectWall();
 
 		// reset lattice for NSE and ADE
 		// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
@@ -481,6 +479,64 @@ struct StateLocal : State<NSE>
 		ade.setBoundaryZ(ade.lat.global.z()-1, ADE::BC::GEO_NOTHING);	// bottom
 		ade.setBoundaryY(0, ADE::BC::GEO_NOTHING); 		// back
 		ade.setBoundaryY(ade.lat.global.y()-1, ADE::BC::GEO_NOTHING);		// front
+
+		// draw a sphere
+		if (1)
+		{
+			int cy=floor(0.2/nse.lat.physDl);
+			int cz=floor(0.2/nse.lat.physDl);
+			int cx=floor(0.45/nse.lat.physDl);
+			real radius=0.05; // 10 cm diameter
+			int range=ceil(radius/nse.lat.physDl)+1;
+			for (int py=cy-range;py<=cy+range;py++)
+			for (int pz=cz-range;pz<=cz+range;pz++)
+			for (int px=cx-range;px<=cx+range;px++)
+				//if (NORM( (real)(px-cx)*nse.lat.physDl, (real)(py-cy)*nse.lat.physDl, (real)(pz-cz)*nse.lat.physDl) < radius )
+				if ((real)(px-cx)*nse.lat.physDl < radius && (real)(py-cy)*nse.lat.physDl < radius && (real)(pz-cz)*nse.lat.physDl < radius )
+				{
+					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
+					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
+				}
+		}
+
+		// draw a cylinder
+		if (0)
+		{
+			int cy=floor(0.2/nse.lat.physDl);
+			int cz=floor(0.2/nse.lat.physDl);
+			int cx=floor(0.45/nse.lat.physDl);
+			real radius=0.05; // 10 cm diameter
+			int range=ceil(radius/nse.lat.physDl)+1;
+			//for (int py=cy-range;py<=cy+range;py++)
+			for (int pz=cz-range;pz<=cz+range;pz++)
+			for (int px=cx-range;px<=cx+range;px++)
+			for (int py=0;py<=nse.lat.global.y()-1;py++)
+				if (NORM( (real)(px-cx)*nse.lat.physDl,0, (real)(pz-cz)*nse.lat.physDl) < radius )
+				{
+					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
+					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
+				}
+		}
+
+		// draw a block
+		if (0)
+		{
+			//		int cy=floor(0.2/nse.lat.physDl);
+			int cz=floor(0.20/nse.lat.physDl);
+			int cx=floor(0.20/nse.lat.physDl);
+			//int range=nse.lat.global.z()/4;
+			int width=nse.lat.global.z()/10;
+			//for (int py=cy-range;py<=cy+range;py++)
+			//for (int pz=0;pz<=cz;pz++)
+			for (int px=cx;px<=cx+width;px++)
+			for (int pz=1;pz<=nse.lat.global.z()-2;pz++)
+			for (int py=1;py<=nse.lat.global.y()-2;py++)
+				if (!((pz>=nse.lat.global.z()*4/10 &&  pz<=nse.lat.global.z()*6/10) && (py>=nse.lat.global.y()*4/10 && py<=nse.lat.global.y()*6/10)))
+				{
+					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
+					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
+				}
+		}
 	}
 
 	void SimInit() override
@@ -1084,64 +1140,6 @@ int simT1_test(int RESOLUTION = 2)
 //	state.cnt[VTK3D].period = 0.001;
 //	state.cnt[VTK3DCUT].period = 0.001;
 //	state.add3Dcut(X/4,Y/4,Z/4, X/2,Y/2,Z/2, 2, "box");
-
-	// draw a sphere
-	if (1)
-	{
-		int cy=floor(0.2/PHYS_DL);
-		int cz=floor(0.2/PHYS_DL);
-		int cx=floor(0.45/PHYS_DL);
-		real radius=0.05; // 10 cm diameter
-		int range=ceil(radius/PHYS_DL)+1;
-		for (int py=cy-range;py<=cy+range;py++)
-		for (int pz=cz-range;pz<=cz+range;pz++)
-		for (int px=cx-range;px<=cx+range;px++)
-//			if (NORM( (real)(px-cx)*PHYS_DL, (real)(py-cy)*PHYS_DL, (real)(pz-cz)*PHYS_DL) < radius )
-			if ((real)(px-cx)*PHYS_DL < radius && (real)(py-cy)*PHYS_DL < radius && (real)(pz-cz)*PHYS_DL < radius )
-			{
-				state.nse.defineWall(px,py,pz,true);
-				state.ade.defineWall(px,py,pz,true);
-			}
-	}
-
-	// draw a cylinder
-	if (0)
-	{
-		int cy=floor(0.2/PHYS_DL);
-		int cz=floor(0.2/PHYS_DL);
-		int cx=floor(0.45/PHYS_DL);
-		real radius=0.05; // 10 cm diameter
-		int range=ceil(radius/PHYS_DL)+1;
-		//		for (int py=cy-range;py<=cy+range;py++)
-		for (int pz=cz-range;pz<=cz+range;pz++)
-		for (int px=cx-range;px<=cx+range;px++)
-		for (int py=0;py<=Y-1;py++)
-			if (NORM( (real)(px-cx)*PHYS_DL,0, (real)(pz-cz)*PHYS_DL) < radius )
-			{
-				state.nse.defineWall(px,py,pz,true);
-				state.ade.defineWall(px,py,pz,true);
-			}
-	}
-
-	// draw a block
-	if (0)
-	{
-		//		int cy=floor(0.2/PHYS_DL);
-		int cz=floor(0.20/PHYS_DL);
-		int cx=floor(0.20/PHYS_DL);
-		//		int range=Z/4;
-		int width=Z/10;
-		//		for (int py=cy-range;py<=cy+range;py++)
-		//		for (int pz=0;pz<=cz;pz++)
-		for (int px=cx;px<=cx+width;px++)
-		for (int pz=1;pz<=Z-2;pz++)
-		for (int py=1;py<=Y-2;py++)
-			if (!((pz>=Z*4/10 &&  pz<=Z*6/10) && (py>=Y*4/10 && py<=Y*6/10)))
-			{
-				state.nse.defineWall(px,py,pz,true);
-				state.ade.defineWall(px,py,pz,true);
-			}
-	}
 
 	execute(state);
 

@@ -102,11 +102,9 @@ bool LBM_BLOCK<LBM_TYPE>::isLocalZ(idx z) const
 }
 
 template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::defineWall(idx x, idx y, idx z, bool value)
+void LBM_BLOCK<LBM_TYPE>::setMap(idx x, idx y, idx z, map_t value)
 {
-//	if (x>0 && x<X-1 && y > 0 && y<Y-1 && z > 0 && z<Z-1) wall(x,y,z) = value;
-//	if (x>=0 && x<=X-1 && y >= 0 && y<=Y-1 && z>=0 && z<=Z-1) wall(x,y,z) = value;
-	if (isLocalIndex(x, y, z)) wall(x, y, z) = value;
+	if (isLocalIndex(x, y, z)) map(x, y, z) = value;
 }
 
 template< typename LBM_TYPE >
@@ -115,12 +113,7 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryX(idx x, map_t value)
 	if (isLocalX(x))
 		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
 		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-		{
 			map(x, y, z) = value;
-			// undef wall (bool array), otherwise projectWall() would reset it back to GEO_WALL
-			if (value != LBM_TYPE::BC::GEO_WALL)
-				wall(x, y, z) = false;
-		}
 }
 
 template< typename LBM_TYPE >
@@ -129,12 +122,7 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryY(idx y, map_t value)
 	if (isLocalY(y))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
 		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-		{
 			map(x, y, z) = value;
-			// undef wall (bool array), otherwise projectWall() would reset it back to GEO_WALL
-			if (value != LBM_TYPE::BC::GEO_WALL)
-				wall(x, y, z) = false;
-		}
 }
 
 template< typename LBM_TYPE >
@@ -143,19 +131,7 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryZ(idx z, map_t value)
 	if (isLocalZ(z))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
 		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-		{
 			map(x, y, z) = value;
-			// undef wall (bool array), otherwise projectWall() would reset it back to GEO_WALL
-			if (value != LBM_TYPE::BC::GEO_WALL)
-				wall(x, y, z) = false;
-		}
-}
-
-template< typename LBM_TYPE >
-bool LBM_BLOCK<LBM_TYPE>::getWall(idx x, idx y, idx z) const
-{
-	if (!isLocalIndex(x, y, z)) return false;
-	return wall(x,y,z);
 }
 
 template< typename LBM_TYPE >
@@ -163,19 +139,6 @@ bool LBM_BLOCK<LBM_TYPE>::isFluid(idx x, idx y, idx z) const
 {
 	if (!isLocalIndex(x, y, z)) return false;
 	return LBM_TYPE::BC::isFluid(map(x,y,z));
-}
-
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::projectWall()
-{
-	#pragma omp parallel for schedule(static) collapse(2)
-	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-	for (idx z = offset.y(); z < offset.y() + local.z(); z++)
-	for (idx y = offset.z(); y < offset.z() + local.y(); y++)
-	{
-		if (wall(x, y, z))
-			map(x, y, z) = LBM_TYPE::BC::GEO_WALL;
-	}
 }
 
 template< typename LBM_TYPE >
@@ -389,14 +352,10 @@ void LBM_BLOCK<LBM_TYPE>::allocateHostData()
 	}
 
 	hmap.setSizes(global.x(), global.y(), global.z());
-	wall.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	hmap.allocate();
-	wall.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
-	wall.allocate();
 #endif
-	wall.setValue(false);
 
 	hmacro.setSizes(0, global.x(), global.y(), global.z());
 	cpumacro.setSizes(0, global.x(), global.y(), global.z());

@@ -98,14 +98,12 @@ struct LBM
 	bool isAnyLocalZ(idx z);
 
 	// Global methods - use GLOBAL indices !!!
-	void defineWall(idx x, idx y, idx z, bool value);
+	void setMap(idx x, idx y, idx z, map_t value);
 	void setBoundaryX(idx x, map_t value);
 	void setBoundaryY(idx y, map_t value);
 	void setBoundaryZ(idx z, map_t value);
-	bool getWall(idx x, idx y, idx z);
 	bool isFluid(idx x, idx y, idx z);
 
-	void projectWall();
 	void resetMap(map_t geo_type);
 
 	bool quit() { return terminate; }

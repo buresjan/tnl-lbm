@@ -38,7 +38,6 @@ struct LBM_BLOCK
 
 	hmap_array_t hmap;
 	dmap_array_t dmap;
-	bool_array_t wall; // indicates whether there is a wall (custom define outside the class State)
 
 	// TODO: use hmap directly instead of this method
 	map_t& map(idx x, idx y, idx z) { return hmap(x,y,z); }
@@ -135,14 +134,12 @@ struct LBM_BLOCK
 	bool isLocalZ(idx z) const;
 
 	// Global methods - use GLOBAL indices !!!
-	void defineWall(idx x, idx y, idx z, bool value);
+	void setMap(idx x, idx y, idx z, map_t value);
 	void setBoundaryX(idx x, map_t value);
 	void setBoundaryY(idx y, map_t value);
 	void setBoundaryZ(idx z, map_t value);
-	bool getWall(idx x, idx y, idx z) const;
 	bool isFluid(idx x, idx y, idx z) const;
 
-	void projectWall();
 	void resetMap(map_t geo_type);
 	void setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz); // prescribe rho,vx,vy,vz at a given point into "hfs" array
 

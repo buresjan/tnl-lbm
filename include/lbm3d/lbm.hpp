@@ -96,10 +96,10 @@ bool LBM<LBM_TYPE>::isAnyLocalZ(idx z)
 
 
 template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::defineWall(idx x, idx y, idx z, bool value)
+void LBM<LBM_TYPE>::setMap(idx x, idx y, idx z, map_t value)
 {
 	for( auto& block : blocks )
-		block.defineWall(x, y, z, value);
+		block.setMap(x, y, z, value);
 }
 
 template< typename LBM_TYPE >
@@ -124,15 +124,6 @@ void LBM<LBM_TYPE>::setBoundaryZ(idx z, map_t value)
 }
 
 template< typename LBM_TYPE >
-bool LBM<LBM_TYPE>::getWall(idx x, idx y, idx z)
-{
-	for( auto& block : blocks )
-		if (block.getWall(x, y, z))
-			return true;
-	return false;
-}
-
-template< typename LBM_TYPE >
 bool LBM<LBM_TYPE>::isFluid(idx x, idx y, idx z)
 {
 	for( auto& block : blocks )
@@ -141,13 +132,6 @@ bool LBM<LBM_TYPE>::isFluid(idx x, idx y, idx z)
 	return false;
 }
 
-
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::projectWall()
-{
-	for( auto& block : blocks )
-		block.projectWall();
-}
 
 template< typename LBM_TYPE >
 void LBM<LBM_TYPE>::resetMap(map_t geo_type)

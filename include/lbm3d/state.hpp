@@ -785,11 +785,11 @@ bool State<NSE>::projectPNG_X(const char * filename, idx x0, bool rotate, bool m
 				if (flip) b = 1.0 - b;
 				if (rotate)
 				{
-					if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
+					if (P.intensity(b,a) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 				else
 				{
-					if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
+					if (P.intensity(a,b) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 			}
 		}
@@ -821,11 +821,11 @@ bool State<NSE>::projectPNG_Y(const char * filename, idx y0, bool rotate, bool m
 				if (flip) b = 1.0 - b;
 				if (rotate)
 				{
-					if (P.intensity(b,a) > 0) block.defineWall(x, y, z, true);
+					if (P.intensity(b,a) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 				else
 				{
-					if (P.intensity(a,b) > 0) block.defineWall(x, y, z, true);
+					if (P.intensity(a,b) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 			}
 		}
@@ -858,11 +858,11 @@ bool State<NSE>::projectPNG_Z(const char * filename, idx z0, bool rotate, bool m
 				if (flip) b = 1.0 - b;
 				if (rotate)
 				{
-					if (P.intensity(b,a) > 0) nse.defineWall(x, y, z, true);
+					if (P.intensity(b,a) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 				else
 				{
-					if (P.intensity(a,b) > 0) nse.defineWall(x, y, z, true);
+					if (P.intensity(a,b) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 			}
 		}
@@ -1348,7 +1348,6 @@ void State<NSE>::reset()
 {
 	nse.resetMap(NSE::BC::GEO_FLUID);
 	setupBoundaries();		// this can be virtualized
-	nse.projectWall();
 	resetLattice(1.0, 0, 0, 0);
 //	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
 }
