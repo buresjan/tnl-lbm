@@ -20,7 +20,6 @@ struct LBM_BLOCK
 
 	using hmap_array_t = typename LBM_TYPE::hmap_array_t;
 	using dmap_array_t = typename LBM_TYPE::dmap_array_t;
-	using bool_array_t = typename LBM_TYPE::bool_array_t;
 	using hlat_array_t = typename LBM_TYPE::hlat_array_t;
 	using dlat_array_t = typename LBM_TYPE::dlat_array_t;
 	using dlat_view_t = typename LBM_TYPE::dlat_view_t;
