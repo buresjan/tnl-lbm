@@ -104,7 +104,7 @@ bool LBM_BLOCK<LBM_TYPE>::isLocalZ(idx z) const
 template< typename LBM_TYPE >
 void LBM_BLOCK<LBM_TYPE>::setMap(idx x, idx y, idx z, map_t value)
 {
-	if (isLocalIndex(x, y, z)) map(x, y, z) = value;
+	if (isLocalIndex(x, y, z)) hmap(x, y, z) = value;
 }
 
 template< typename LBM_TYPE >
@@ -113,7 +113,7 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryX(idx x, map_t value)
 	if (isLocalX(x))
 		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
 		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			map(x, y, z) = value;
+			hmap(x, y, z) = value;
 }
 
 template< typename LBM_TYPE >
@@ -122,7 +122,7 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryY(idx y, map_t value)
 	if (isLocalY(y))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
 		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			map(x, y, z) = value;
+			hmap(x, y, z) = value;
 }
 
 template< typename LBM_TYPE >
@@ -131,14 +131,14 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryZ(idx z, map_t value)
 	if (isLocalZ(z))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
 		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-			map(x, y, z) = value;
+			hmap(x, y, z) = value;
 }
 
 template< typename LBM_TYPE >
 bool LBM_BLOCK<LBM_TYPE>::isFluid(idx x, idx y, idx z) const
 {
 	if (!isLocalIndex(x, y, z)) return false;
-	return LBM_TYPE::BC::isFluid(map(x,y,z));
+	return LBM_TYPE::BC::isFluid(hmap(x,y,z));
 }
 
 template< typename LBM_TYPE >
@@ -492,7 +492,7 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_3D(lat_t lat, Output&& outputData, const char
 	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
 	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		vtk.writeInt(fp, map(x,y,z));
+		vtk.writeInt(fp, hmap(x,y,z));
 
 	char idd[500];
 	real value;
@@ -582,7 +582,7 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const c
 	for (idx z = oz; z < oz + lz; z += step)
 	for (idx y = oy; y < oy + ly; y += step)
 	for (idx x = ox; x < ox + lx; x += step)
-		vtk.writeInt(fp, map(x,y,z));
+		vtk.writeInt(fp, hmap(x,y,z));
 
 	char idd[500];
 	real value;
@@ -660,7 +660,7 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const 
 	idx x=XPOS;
 	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
 	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-		vtk.writeInt(fp, map(x,y,z));
+		vtk.writeInt(fp, hmap(x,y,z));
 
 	int count=0, index=0;
 	char idd[500];
@@ -736,7 +736,7 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const 
 	idx y=YPOS;
 	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		vtk.writeInt(fp, map(x,y,z));
+		vtk.writeInt(fp, hmap(x,y,z));
 
 	int count=0, index=0;
 	char idd[500];
@@ -811,7 +811,7 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const 
 	idx z=ZPOS;
 	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		vtk.writeInt(fp, map(x,y,z));
+		vtk.writeInt(fp, hmap(x,y,z));
 
 	int count=0, index=0;
 	char idd[500];

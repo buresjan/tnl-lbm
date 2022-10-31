@@ -39,10 +39,6 @@ struct LBM_BLOCK
 	hmap_array_t hmap;
 	dmap_array_t dmap;
 
-	// TODO: use hmap directly instead of this method
-	map_t& map(idx x, idx y, idx z) { return hmap(x,y,z); }
-	const map_t& map(idx x, idx y, idx z) const { return hmap(x,y,z); }
-
 	// macroscopic quantities
 	hmacro_array_t hmacro;
 	dmacro_array_t dmacro;
