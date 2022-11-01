@@ -103,10 +103,67 @@ struct Traits
 using TraitsSP = Traits<float>; //_dreal is float only
 using TraitsDP = Traits<double>;
 
-template< int _Q, typename MACRO, typename CPU_MACRO, typename TRAITS >
-struct D3Q_COMMON
+// KernelStruct - D3Q7
+template < typename REAL >
+struct D3Q7_KernelStruct
 {
-	static constexpr int Q = _Q;
+	static constexpr int Q = 7;
+	REAL f[Q];
+	REAL vz=0, vx=0, vy=0;
+	REAL phi=1.0, lbmViscosity=1.0;
+	// FIXME
+//	REAL qcrit=0, phigradmag2=0;
+};
+
+// KernelStruct - D3Q27
+template < typename REAL >
+struct D3Q27_KernelStruct
+{
+	static constexpr int Q = 27;
+	REAL f[Q];
+	REAL fz=0, fx=0, fy=0;
+	REAL vz=0, vx=0, vy=0;
+	REAL rho=1.0, lbmViscosity=1.0;
+
+#if defined(USE_CYMODEL) || defined(USE_CASSON)
+	REAL S11=0.,S12=0.,S22=0.,S32=0.,S13=0.,S33=0.;
+
+	//Non-Newtonian parameters
+	#if defined(USE_CYMODEL)
+	REAL lbm_nu0=0, lbm_lambda=0, lbm_a=0, lbm_n=0;
+	#elif defined(USE_CASSON)
+	REAL lbm_k0=0, lbm_k1=0;
+	#endif
+
+	REAL mu;
+#endif
+};
+
+template<
+	typename _TRAITS,
+	template<typename> class _KERNEL_STRUCT,
+	typename _DATA,
+	typename _COLL,
+	typename _EQ,
+	typename _STREAMING,
+	template<typename> class _BC,
+	typename _MACRO,
+	typename _CPU_MACRO
+>
+struct LBM_CONFIG
+{
+	using TRAITS = _TRAITS;
+	template< typename REAL >
+	using KernelStruct = _KERNEL_STRUCT<REAL>;
+	using DATA = _DATA;
+	using COLL = _COLL;
+	using EQ = _EQ;
+	using STREAMING = _STREAMING;
+	using BC = _BC<LBM_CONFIG>;
+	using MACRO = _MACRO;
+	using CPU_MACRO = _CPU_MACRO;
+
+	static constexpr int Q = KernelStruct<typename TRAITS::dreal>::Q;
 
 	using __hmap_array_t = typename TRAITS::template array3d<typename TRAITS::map_t, TNL::Devices::Host>;
 	using __dmap_array_t = typename TRAITS::template array3d<typename TRAITS::map_t, DeviceType>;
@@ -153,84 +210,6 @@ struct D3Q_COMMON
 
 	using hlat_view_t = typename hlat_array_t::ViewType;
 	using dlat_view_t = typename dlat_array_t::ViewType;
-};
-
-template<
-	typename _COLL,
-	typename _DATA,
-	template<typename> class _BC,
-	typename _EQ,
-	typename _STREAMING,
-	typename _MACRO,
-	typename _CPU_MACRO,
-	typename _TRAITS
->
-struct D3Q7 : D3Q_COMMON< 7, _MACRO, _CPU_MACRO, _TRAITS >
-{
-	using COLL=_COLL;
-	using DATA=_DATA;
-	using BC=_BC<D3Q7>;
-	using EQ=_EQ;
-	using STREAMING=_STREAMING;
-	using MACRO=_MACRO;
-	using CPU_MACRO=_CPU_MACRO;
-	using TRAITS=_TRAITS;
-
-	// KernelStruct
-	template < typename REAL >
-	struct KernelStruct
-	{
-		REAL f[7];
-		REAL vz=0, vx=0, vy=0;
-		REAL phi=1.0, lbmViscosity=1.0;
-		// FIXME
-//		REAL qcrit=0, phigradmag2=0;
-	};
-};
-
-template<
-	typename _COLL,
-	typename _DATA,
-	template<typename> class _BC,
-	typename _EQ,
-	typename _STREAMING,
-	typename _MACRO,
-	typename _CPU_MACRO,
-	typename _TRAITS
->
-struct D3Q27 : D3Q_COMMON< 27, _MACRO, _CPU_MACRO, _TRAITS >
-{
-	using COLL=_COLL;
-	using DATA=_DATA;
-	using BC=_BC<D3Q27>;
-	using EQ=_EQ;
-	using STREAMING=_STREAMING;
-	using MACRO=_MACRO;
-	using CPU_MACRO=_CPU_MACRO;
-	using TRAITS=_TRAITS;
-
-	// KernelStruct
-	template < typename REAL >
-	struct KernelStruct
-	{
-		REAL f[27];
-		REAL fz=0, fx=0, fy=0;
-		REAL vz=0, vx=0, vy=0;
-		REAL rho=1.0, lbmViscosity=1.0;
-
-	#if defined(USE_CYMODEL) || defined(USE_CASSON)
-		REAL S11=0.,S12=0.,S22=0.,S32=0.,S13=0.,S33=0.;
-
-		//Non-Newtonian parameters
-		#if defined(USE_CYMODEL)
-		REAL lbm_nu0=0, lbm_lambda=0, lbm_a=0, lbm_n=0;
-		#elif defined(USE_CASSON)
-		REAL lbm_k0=0, lbm_k1=0;
-		#endif
-
-		REAL mu;
-	#endif
-	};
 };
 
 

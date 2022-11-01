@@ -400,15 +400,16 @@ void run()
 //	using COLL = D3Q27_CUM_FIX<TRAITS>;
 //	using COLL = D3Q27_CUM_WELL<TRAITS>;
 
-	using NSE_TYPE = D3Q27<
-				COLL,
+	using NSE_CONFIG = LBM_CONFIG<
+				TRAITS,
+				D3Q27_KernelStruct,
 				NSE_Data_XProfileInflow< TRAITS >,
-				D3Q27_BC_All,
+				COLL,
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
+				D3Q27_BC_All,
 				D3Q27_MACRO_Default< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >,
-				TRAITS
+				D3Q27_MACRO_Void< TRAITS >
 			>;
 
 	bool use_forcing = false;
@@ -416,7 +417,7 @@ void run()
 	{
 //		int res=4;
 		int res = pow(2, i);
-		sim02<NSE_TYPE>(res, use_forcing);
+		sim02<NSE_CONFIG>(res, use_forcing);
 	}
 }
 

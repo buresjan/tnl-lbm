@@ -257,18 +257,19 @@ void run(int RES)
 //	using COLL = D3Q27_CUM< TRAITS >;
 	using COLL = D3Q27_CUM< TRAITS, D3Q27_EQ_INV_CUM<TRAITS> >;
 
-	using NSE_TYPE = D3Q27<
-				COLL,
+	using NSE_CONFIG = LBM_CONFIG<
+				TRAITS,
+				D3Q27_KernelStruct,
 				NSE_Data_ConstInflow< TRAITS >,
-				D3Q27_BC_All,
+				COLL,
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
+				D3Q27_BC_All,
 				D3Q27_MACRO_Default< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >,
-				TRAITS
+				D3Q27_MACRO_Void< TRAITS >
 			>;
 
-	sim01_test<NSE_TYPE>(RES);
+	sim01_test<NSE_CONFIG>(RES);
 }
 
 int main(int argc, char **argv)

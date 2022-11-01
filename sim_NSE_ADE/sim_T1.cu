@@ -576,35 +576,37 @@ template < typename TRAITS=TraitsDP >
 void run(int RES)
 {
 	using NSE_COLL = D3Q27_CUM< TRAITS, D3Q27_EQ_INV_CUM<TRAITS> >;
-	using NSE_TYPE = D3Q27<
-				NSE_COLL,
+	using NSE_CONFIG = LBM_CONFIG<
+				TRAITS,
+				D3Q27_KernelStruct,
 //				NSE_Data_ConstInflow< TRAITS >,
 				// FIXME: FreeRho inflow condition leads to lower velocity in the domain (approx 70%)
 				NSE_Data_FreeRhoConstInflow< TRAITS >,
-				D3Q27_BC_All,
+				NSE_COLL,
 				typename NSE_COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
+				D3Q27_BC_All,
 				D3Q27_MACRO_Default< TRAITS >,
 //				D3Q27_MACRO_QCriterion< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >,
-				TRAITS
+				D3Q27_MACRO_Void< TRAITS >
 			>;
 
 //	using ADE_COLL = D3Q7_SRT< TRAITS >;
 //	using ADE_COLL = D3Q7_MRT< TRAITS >;
 	using ADE_COLL = D3Q7_CLBM< TRAITS >;
-	using ADE_TYPE = D3Q7<
-				ADE_COLL,
+	using ADE_CONFIG = LBM_CONFIG<
+				TRAITS,
+				D3Q7_KernelStruct,
 				ADE_Data_ConstInflow< TRAITS >,
-				D3Q7_BC_All,
+				ADE_COLL,
 				typename ADE_COLL::EQ,
 				D3Q7_STREAMING< TRAITS >,
+				D3Q7_BC_All,
 				D3Q7_MACRO_Default< TRAITS >,
-				D3Q7_MACRO_Void< TRAITS >,
-				TRAITS
+				D3Q7_MACRO_Void< TRAITS >
 			>;
 
-	simT1_test< NSE_TYPE, ADE_TYPE >(RES);
+	simT1_test< NSE_CONFIG, ADE_CONFIG >(RES);
 }
 
 int main(int argc, char **argv)

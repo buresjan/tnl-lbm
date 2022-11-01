@@ -418,18 +418,19 @@ template < typename TRAITS=TraitsSP >
 void run(int res, double Re, double h, int dirac, int method, int compute)
 {
 	using COLL = D3Q27_CUM<TRAITS>;
-	using NSE_TYPE = D3Q27<
-				COLL,
+	using NSE_CONFIG = LBM_CONFIG<
+				TRAITS,
+				D3Q27_KernelStruct,
 				NSE_Data_ConstInflow< TRAITS >,
-				D3Q27_BC_All,
+				COLL,
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
+				D3Q27_BC_All,
 				MacroLocal< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >,
-				TRAITS
+				D3Q27_MACRO_Void< TRAITS >
 			>;
 
-	sim<NSE_TYPE>(res, Re, h, dirac, method, compute);
+	sim<NSE_CONFIG>(res, Re, h, dirac, method, compute);
 }
 
 int main(int argc, char **argv)
