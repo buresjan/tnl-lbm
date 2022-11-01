@@ -581,7 +581,7 @@ void State<NSE>::writeVTKs_3D()
 
 		sprintf(basename,"block%03d_%d.vtk", block.id, cnt[VTK3D].count);
 		sprintf(filename,"%s/%s", tmp_dirname, basename);
-		auto outputData = [this] (const typename T_LBM_NSE::BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+		auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 		{
 			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 		};
@@ -637,7 +637,7 @@ void State<NSE>::writeVTKs_3Dcut()
 			sprintf(fname,"results_%s/vtk3Dcut/%s_block%03d_%d.vtk", id, probevec.name, block.id, probevec.cycle);
 			// create parent directories
 			create_file(fname);
-			auto outputData = [this] (const typename T_LBM_NSE::BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
@@ -732,7 +732,7 @@ void State<NSE>::writeVTKs_2D()
 			sprintf(fname,"results_%s/vtk2D/%s_block%03d_%d.vtk", id, probevec.name, block.id, probevec.cycle);
 			// create parent directories
 			create_file(fname);
-			auto outputData = [this] (const typename T_LBM_NSE::BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
@@ -1357,7 +1357,7 @@ void State<NSE>::resetLattice(real rho, real vx, real vy, real vz)
 {
 	// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
 	// (because GEO_INFLOW and GEO_OUTFLOW_EQ access the ghost layer in streaming)
-	nse.forAllLatticeSites( [&] (typename T_LBM_NSE::BLOCK& block, idx x, idx y, idx z) {
+	nse.forAllLatticeSites( [&] (BLOCK_NSE& block, idx x, idx y, idx z) {
 		block.setEqLat(x,y,z,rho,vx,vy,vz);
 	} );
 }

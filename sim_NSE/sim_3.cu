@@ -73,19 +73,19 @@ struct NSE_Data_SpecialInflow : NSE_Data< TRAITS >
 	}
 };
 
-template < typename LBM_TYPE >
-struct StateLocal : State<LBM_TYPE>
+template < typename NSE >
+struct StateLocal : State<NSE>
 {
-	using TRAITS = typename LBM_TYPE::TRAITS;
-	using BC = typename LBM_TYPE::BC;
-	using MACRO = typename LBM_TYPE::MACRO;
-	using BLOCK = LBM_BLOCK< LBM_TYPE >;
+	using TRAITS = typename NSE::TRAITS;
+	using BC = typename NSE::BC;
+	using MACRO = typename NSE::MACRO;
+	using BLOCK = LBM_BLOCK< NSE >;
 
-	using State<LBM_TYPE>::nse;
-	using State<LBM_TYPE>::log;
-	using State<LBM_TYPE>::vtk_helper;
-	using State<LBM_TYPE>::id;
-	using State<LBM_TYPE>::FF;
+	using State<NSE>::nse;
+	using State<NSE>::log;
+	using State<NSE>::vtk_helper;
+	using State<NSE>::id;
+	using State<NSE>::FF;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -294,7 +294,7 @@ struct StateLocal : State<LBM_TYPE>
 	}
 
 	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
-		: State<LBM_TYPE>(communicator, ilat, iphysViscosity, iphysDt)
+		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -372,12 +372,12 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 }
 
 
-template < typename LBM_TYPE >
+template < typename NSE >
 int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int method=0, int compute=5)
 {
-	using idx = typename LBM_TYPE::TRAITS::idx;
-	using real = typename LBM_TYPE::TRAITS::real;
-	using point_t = typename LBM_TYPE::TRAITS::point_t;
+	using idx = typename NSE::TRAITS::idx;
+	using real = typename NSE::TRAITS::real;
+	using point_t = typename NSE::TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
@@ -406,7 +406,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
+	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
 	state.nse.physCharLength = cylinder_diameter; // [m]
@@ -422,7 +422,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.cnt[VTK2D].period = 1.0;
 	state.cnt[VTK1D].period = 1.0;
 
-	state.setid("sim_3_%s_%s_dirac_%d_res_%d_Re_%d_nas_%05.4f_compute_%d", LBM_TYPE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, (int)Re, nasobek, compute);
+	state.setid("sim_3_%s_%s_dirac_%d_res_%d_Re_%d_nas_%05.4f_compute_%d", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, (int)Re, nasobek, compute);
 	if (state.isMark()) return 0;
 
 	// select compute method

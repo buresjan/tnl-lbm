@@ -1,15 +1,15 @@
 #pragma once
 
-template< typename T_LBM >
+template< typename CONFIG >
 struct D3Q27_BC_All
 {
-	using COLL = typename T_LBM::COLL;
-	using STREAMING = typename T_LBM::STREAMING;
-	using DATA = typename T_LBM::DATA;
+	using COLL = typename CONFIG::COLL;
+	using STREAMING = typename CONFIG::STREAMING;
+	using DATA = typename CONFIG::DATA;
 
-	using map_t = typename T_LBM::TRAITS::map_t;
-	using idx = typename T_LBM::TRAITS::idx;
-	using dreal = typename T_LBM::TRAITS::dreal;
+	using map_t = typename CONFIG::TRAITS::map_t;
+	using idx = typename CONFIG::TRAITS::idx;
+	using dreal = typename CONFIG::TRAITS::dreal;
 
 	enum GEO : map_t {
 		GEO_FLUID, 		// compulsory

@@ -3,13 +3,12 @@
 #include "defs.h"
 #include "lattice.h"
 
-template< typename T_LBM_TYPE >
+template< typename CONFIG >
 struct LBM_BLOCK
 {
-	using LBM_TYPE = T_LBM_TYPE;
-	using MACRO = typename LBM_TYPE::MACRO;
-	using CPU_MACRO = typename LBM_TYPE::CPU_MACRO;
-	using TRAITS = typename LBM_TYPE::TRAITS;
+	using MACRO = typename CONFIG::MACRO;
+	using CPU_MACRO = typename CONFIG::CPU_MACRO;
+	using TRAITS = typename CONFIG::TRAITS;
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
@@ -18,18 +17,18 @@ struct LBM_BLOCK
 	using idx3d = typename TRAITS::idx3d;
 	using lat_t = Lattice<3, real, idx>;
 
-	using hmap_array_t = typename LBM_TYPE::hmap_array_t;
-	using dmap_array_t = typename LBM_TYPE::dmap_array_t;
-	using hlat_array_t = typename LBM_TYPE::hlat_array_t;
-	using dlat_array_t = typename LBM_TYPE::dlat_array_t;
-	using dlat_view_t = typename LBM_TYPE::dlat_view_t;
-	using hmacro_array_t = typename LBM_TYPE::hmacro_array_t;
-	using dmacro_array_t = typename LBM_TYPE::dmacro_array_t;
-	using cpumacro_array_t = typename LBM_TYPE::cpumacro_array_t;
-	using sync_array_t = typename LBM_TYPE::sync_array_t;
+	using hmap_array_t = typename CONFIG::hmap_array_t;
+	using dmap_array_t = typename CONFIG::dmap_array_t;
+	using hlat_array_t = typename CONFIG::hlat_array_t;
+	using dlat_array_t = typename CONFIG::dlat_array_t;
+	using dlat_view_t = typename CONFIG::dlat_view_t;
+	using hmacro_array_t = typename CONFIG::hmacro_array_t;
+	using dmacro_array_t = typename CONFIG::dmacro_array_t;
+	using cpumacro_array_t = typename CONFIG::cpumacro_array_t;
+	using sync_array_t = typename CONFIG::sync_array_t;
 
 	// KernelData contains only the necessary data for the CUDA kernel. these are copied just before the kernel is called
-	typename LBM_TYPE::DATA data;
+	typename CONFIG::DATA data;
 #ifdef USE_CUDA
 	// CUDA thread block size for the LBM kernel
 	idx3d block_size{0, 0, 0};
@@ -76,7 +75,7 @@ struct LBM_BLOCK
 
 #ifdef HAVE_MPI
 	// synchronizers for dfs, macro and map
-	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[LBM_TYPE::Q + MACRO::N];
+	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[CONFIG::Q + MACRO::N];
 	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
 
 	// CUDA streams for the block itself and each neighbor

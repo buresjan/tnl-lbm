@@ -24,17 +24,17 @@ struct NSE_Data_XProfileInflow : NSE_Data < TRAITS >
 };
 
 // uloha: periodic, forcing accelerated
-template < typename LBM_TYPE >
-struct StateLocal : State<LBM_TYPE>
+template < typename NSE >
+struct StateLocal : State<NSE>
 {
-	using TRAITS = typename LBM_TYPE::TRAITS;
-	using BC = typename LBM_TYPE::BC;
-	using MACRO = typename LBM_TYPE::MACRO;
-	using BLOCK = LBM_BLOCK< LBM_TYPE >;
+	using TRAITS = typename NSE::TRAITS;
+	using BC = typename NSE::BC;
+	using MACRO = typename NSE::MACRO;
+	using BLOCK = LBM_BLOCK< NSE >;
 
-	using State<LBM_TYPE>::nse;
-	using State<LBM_TYPE>::vtk_helper;
-	using State<LBM_TYPE>::log;
+	using State<NSE>::nse;
+	using State<NSE>::vtk_helper;
+	using State<NSE>::log;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -234,7 +234,7 @@ struct StateLocal : State<LBM_TYPE>
 
 
 	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, int RES)
-		: State<LBM_TYPE>(communicator, ilat, iphysViscosity, iphysDt)
+		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
 	{
 		errors_count = 10;
 		l1errors = new real[errors_count];
@@ -253,13 +253,13 @@ struct StateLocal : State<LBM_TYPE>
 	}
 };
 
-template < typename LBM_TYPE >
+template < typename NSE >
 int sim02(int RES=1, bool use_forcing=true)
 {
-	using idx = typename LBM_TYPE::TRAITS::idx;
-	using real = typename LBM_TYPE::TRAITS::real;
-	using dreal = typename LBM_TYPE::TRAITS::dreal;
-	using point_t = typename LBM_TYPE::TRAITS::point_t;
+	using idx = typename NSE::TRAITS::idx;
+	using real = typename NSE::TRAITS::real;
+	using dreal = typename NSE::TRAITS::dreal;
+	using point_t = typename NSE::TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
@@ -282,7 +282,7 @@ int sim02(int RES=1, bool use_forcing=true)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<LBM_TYPE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
+	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
 //	state.nse.use_multiple_gpus = false;
 	state.nse.physCharLength = 0.125; // [m]
 
@@ -353,7 +353,7 @@ int sim02(int RES=1, bool use_forcing=true)
 //	state.cnt[VTK2D].period = 1.0;
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
-	state.setid("sim_2_%s_%s_%s_res_%d", LBM_TYPE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
+	state.setid("sim_2_%s_%s_%s_res_%d", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
 
 	if (state.isMark())
 		return 0;

@@ -4,8 +4,8 @@
 #include "vtk_writer.h"
 #include "block_size_optimizer.h"
 
-template< typename LBM_TYPE >
-LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left, int neighbour_right, int left_id, int this_id, int right_id)
+template< typename CONFIG >
+LBM_BLOCK<CONFIG>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left, int neighbour_right, int left_id, int this_id, int right_id)
 : communicator(communicator), global(global), local(local), offset(offset), left_id(left_id), id(this_id), right_id(right_id)
 {
 	// initialize MPI info
@@ -40,15 +40,15 @@ LBM_BLOCK<LBM_TYPE>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global,
 #endif
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz)
 {
 	for (uint8_t dfty=0; dfty<DFMAX; dfty++)
-		LBM_TYPE::COLL::setEquilibriumLat(hfs[dfty], x, y, z, rho, vx, vy, vz);
+		CONFIG::COLL::setEquilibriumLat(hfs[dfty], x, y, z, rho, vx, vy, vz);
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::resetForces(real ifx, real ify, real ifz)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::resetForces(real ifx, real ify, real ifz)
 {
 	/// Reset forces - This is necessary since '+=' is used afterwards.
 	#pragma omp parallel for schedule(static) collapse(2)
@@ -62,8 +62,8 @@ void LBM_BLOCK<LBM_TYPE>::resetForces(real ifx, real ify, real ifz)
 	}
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyForcesToDevice()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyForcesToDevice()
 {
 	// FIXME: overlaps
 	#ifdef USE_CUDA
@@ -75,40 +75,40 @@ void LBM_BLOCK<LBM_TYPE>::copyForcesToDevice()
 }
 
 
-template< typename LBM_TYPE >
-bool LBM_BLOCK<LBM_TYPE>::isLocalIndex(idx x, idx y, idx z) const
+template< typename CONFIG >
+bool LBM_BLOCK<CONFIG>::isLocalIndex(idx x, idx y, idx z) const
 {
 	return x >= offset.x() && x < offset.x() + local.x() &&
 		y >= offset.y() && y < offset.y() + local.y() &&
 		z >= offset.z() && z < offset.z() + local.z();
 }
 
-template< typename LBM_TYPE >
-bool LBM_BLOCK<LBM_TYPE>::isLocalX(idx x) const
+template< typename CONFIG >
+bool LBM_BLOCK<CONFIG>::isLocalX(idx x) const
 {
 	return x >= offset.x() && x < offset.x() + local.x();
 }
 
-template< typename LBM_TYPE >
-bool LBM_BLOCK<LBM_TYPE>::isLocalY(idx y) const
+template< typename CONFIG >
+bool LBM_BLOCK<CONFIG>::isLocalY(idx y) const
 {
 	return y >= offset.y() && y < offset.y() + local.y();
 }
 
-template< typename LBM_TYPE >
-bool LBM_BLOCK<LBM_TYPE>::isLocalZ(idx z) const
+template< typename CONFIG >
+bool LBM_BLOCK<CONFIG>::isLocalZ(idx z) const
 {
 	return z >= offset.z() && z < offset.z() + local.z();
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::setMap(idx x, idx y, idx z, map_t value)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::setMap(idx x, idx y, idx z, map_t value)
 {
 	if (isLocalIndex(x, y, z)) hmap(x, y, z) = value;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::setBoundaryX(idx x, map_t value)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::setBoundaryX(idx x, map_t value)
 {
 	if (isLocalX(x))
 		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
@@ -116,8 +116,8 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryX(idx x, map_t value)
 			hmap(x, y, z) = value;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::setBoundaryY(idx y, map_t value)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::setBoundaryY(idx y, map_t value)
 {
 	if (isLocalY(y))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
@@ -125,8 +125,8 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryY(idx y, map_t value)
 			hmap(x, y, z) = value;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::setBoundaryZ(idx z, map_t value)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::setBoundaryZ(idx z, map_t value)
 {
 	if (isLocalZ(z))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
@@ -134,69 +134,69 @@ void LBM_BLOCK<LBM_TYPE>::setBoundaryZ(idx z, map_t value)
 			hmap(x, y, z) = value;
 }
 
-template< typename LBM_TYPE >
-bool LBM_BLOCK<LBM_TYPE>::isFluid(idx x, idx y, idx z) const
+template< typename CONFIG >
+bool LBM_BLOCK<CONFIG>::isFluid(idx x, idx y, idx z) const
 {
 	if (!isLocalIndex(x, y, z)) return false;
-	return LBM_TYPE::BC::isFluid(hmap(x,y,z));
+	return CONFIG::BC::isFluid(hmap(x,y,z));
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::resetMap(map_t geo_type)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::resetMap(map_t geo_type)
 {
 	hmap.setValue(geo_type);
 }
 
 
-template< typename LBM_TYPE >
-void  LBM_BLOCK<LBM_TYPE>::copyMapToHost()
+template< typename CONFIG >
+void  LBM_BLOCK<CONFIG>::copyMapToHost()
 {
 	hmap = dmap;
 }
 
-template< typename LBM_TYPE >
-void  LBM_BLOCK<LBM_TYPE>::copyMapToDevice()
+template< typename CONFIG >
+void  LBM_BLOCK<CONFIG>::copyMapToDevice()
 {
 	dmap = hmap;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyMacroToHost()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyMacroToHost()
 {
 	hmacro = dmacro;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyMacroToDevice()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyMacroToDevice()
 {
 	dmacro = hmacro;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyDFsToHost(uint8_t dfty)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyDFsToHost(uint8_t dfty)
 {
 	dlat_view_t df = dfs[0].getView();
 	df.bind(data.dfs[dfty]);
 	hfs[dfty] = df;
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyDFsToDevice(uint8_t dfty)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyDFsToDevice(uint8_t dfty)
 {
 	dlat_view_t df = dfs[0].getView();
 	df.bind(data.dfs[dfty]);
 	df = hfs[dfty];
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyDFsToHost()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyDFsToHost()
 {
 	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
 		hfs[dfty] = dfs[dfty];
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::copyDFsToDevice()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::copyDFsToDevice()
 {
 	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
 		dfs[dfty] = hfs[dfty];
@@ -204,9 +204,9 @@ void LBM_BLOCK<LBM_TYPE>::copyDFsToDevice()
 
 #ifdef HAVE_MPI
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename Array >
-void LBM_BLOCK<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_offset)
+void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_offset)
 {
 	static_assert( Array::getDimension() == 4, "4D array expected" );
 	constexpr int N = Array::SizesHolderType::template getStaticSize<0>();
@@ -271,22 +271,22 @@ void LBM_BLOCK<LBM_TYPE>::startDrealArraySynchronization(Array& array, int sync_
 	}
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::synchronizeDFsDevice_start(uint8_t dftype)
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::synchronizeDFsDevice_start(uint8_t dftype)
 {
 	auto df = dfs[0].getView();
 	df.bind(data.dfs[dftype]);
 	startDrealArraySynchronization(df, 0);
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::synchronizeMacroDevice_start()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::synchronizeMacroDevice_start()
 {
-	startDrealArraySynchronization(dmacro, LBM_TYPE::Q);
+	startDrealArraySynchronization(dmacro, CONFIG::Q);
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::synchronizeMapDevice_start()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::synchronizeMapDevice_start()
 {
 	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
 	constexpr auto policy = std::decay_t<decltype(map_sync)>::AsyncPolicy::deferred;
@@ -302,13 +302,13 @@ void LBM_BLOCK<LBM_TYPE>::synchronizeMapDevice_start()
 }
 #endif  // HAVE_MPI
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::computeCPUMacroFromLat()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::computeCPUMacroFromLat()
 {
 	// take Lat, compute KS and then CPU_MACRO
 	if (CPU_MACRO::N > 0)
 	{
-		typename LBM_TYPE::DATA SD;
+		typename CONFIG::DATA SD;
 		for (uint8_t dfty=0;dfty<DFMAX;dfty++)
 			SD.dfs[dfty] = hfs[dfty].getData();
 		#ifdef HAVE_MPI
@@ -325,12 +325,12 @@ void LBM_BLOCK<LBM_TYPE>::computeCPUMacroFromLat()
 		for (idx z=0; z<local.z(); z++)
 		for (idx y=0; y<local.y(); y++)
 		{
-			typename LBM_TYPE::template KernelStruct<dreal> KS;
+			typename CONFIG::template KernelStruct<dreal> KS;
 			KS.fx=0;
 			KS.fy=0;
 			KS.fz=0;
-			LBM_TYPE::COLL::copyDFcur2KS(SD, KS, x, y, z);
-			LBM_TYPE::COLL::computeDensityAndVelocity(KS);
+			CONFIG::COLL::copyDFcur2KS(SD, KS, x, y, z);
+			CONFIG::COLL::computeDensityAndVelocity(KS);
 			CPU_MACRO::outputMacro(SD, KS, x, y, z);
 //			if (x==128 && y==23 && z==103)
 //			printf("KS: %e %e %e %e vs. cpumacro %e %e %e %e [at %d %d %d]\n", KS.vx, KS.vy, KS.vz, KS.rho, cpumacro[mpos(CPU_MACRO::e_vx,x,y,z)], cpumacro[mpos(CPU_MACRO::e_vy,x,y,z)], cpumacro[mpos(CPU_MACRO::e_vz,x,y,z)],cpumacro[mpos(CPU_MACRO::e_rho,x,y,z)],x,y,z);
@@ -339,8 +339,8 @@ void LBM_BLOCK<LBM_TYPE>::computeCPUMacroFromLat()
 	}
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::allocateHostData()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::allocateHostData()
 {
 	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
 	{
@@ -371,8 +371,8 @@ void LBM_BLOCK<LBM_TYPE>::allocateHostData()
 		cpumacro.setValue(0);
 }
 
-template< typename LBM_TYPE >
-void LBM_BLOCK<LBM_TYPE>::allocateDeviceData()
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::allocateDeviceData()
 {
 //#ifdef USE_CUDA
 #if 1
@@ -419,9 +419,9 @@ void LBM_BLOCK<LBM_TYPE>::allocateDeviceData()
 	data.dmacro = dmacro.getData();
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename F >
-void LBM_BLOCK<LBM_TYPE>::forLocalLatticeSites(F f)
+void LBM_BLOCK<CONFIG>::forLocalLatticeSites(F f)
 {
 	#pragma omp parallel for schedule(static) collapse(2)
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
@@ -430,9 +430,9 @@ void LBM_BLOCK<LBM_TYPE>::forLocalLatticeSites(F f)
 		f(*this, x, y, z);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename F >
-void LBM_BLOCK<LBM_TYPE>::forAllLatticeSites(F f)
+void LBM_BLOCK<CONFIG>::forAllLatticeSites(F f)
 {
 #ifdef HAVE_MPI
 	const int overlap_x = hmap.getLocalView().getIndexer().template getOverlap< 0 >();
@@ -451,9 +451,9 @@ void LBM_BLOCK<LBM_TYPE>::forAllLatticeSites(F f)
 		f(*this, x, y, z);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<LBM_TYPE>::writeVTK_3D(lat_t lat, Output&& outputData, const char* filename, real time, int cycle) const
+void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const char* filename, real time, int cycle) const
 {
 	VTKWriter vtk;
 
@@ -526,9 +526,9 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_3D(lat_t lat, Output&& outputData, const char
 	fclose(fp);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<LBM_TYPE>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const char* filename, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step) const
+void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const char* filename, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step) const
 {
 	if (!isLocalIndex(ox, oy, oz)) return;
 
@@ -616,9 +616,9 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const c
 	fclose(fp);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx XPOS) const
+void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx XPOS) const
 {
 	if (!isLocalX(XPOS)) return;
 
@@ -693,9 +693,9 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const 
 	fclose(fp);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx YPOS) const
+void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx YPOS) const
 {
 	if (!isLocalY(YPOS)) return;
 
@@ -769,9 +769,9 @@ void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const 
 	fclose(fp);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<LBM_TYPE>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx ZPOS) const
+void LBM_BLOCK<CONFIG>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx ZPOS) const
 {
 	if (!isLocalZ(ZPOS)) return;
 

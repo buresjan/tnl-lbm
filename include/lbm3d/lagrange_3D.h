@@ -78,13 +78,12 @@ template< typename LBM >
 struct Lagrange3D
 {
 	using TRAITS = typename LBM::TRAITS;
-	using T_LBM = LBM;
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 	using real = typename TRAITS::real;
 
-	T_LBM &lbm;
+	LBM &lbm;
 
 #ifdef USE_TNL
 //	using hVector = TNL::Containers::Vector< real, TNL::Devices::Host, idx, TNL::Allocators::CudaHost<real> >;
@@ -198,11 +197,11 @@ struct Lagrange3D
 	void log(const char* fmt, ARGS... args);
 
 	// constructors
-	Lagrange3D(T_LBM &inputLBM, const char* resultsDir);
+	Lagrange3D(LBM &inputLBM, const char* resultsDir);
 	~Lagrange3D();
 
 	// disable copy-constructor and copy-assignment, leave only move-constructor and move-assignment
-	// (because this class has a "T_LBM &lbm;" member)
+	// (because this class has a "LBM &lbm;" member)
 	Lagrange3D(const Lagrange3D&) = delete;
 	Lagrange3D(Lagrange3D&&) = default;
 	Lagrange3D& operator=(const Lagrange3D&) = delete;

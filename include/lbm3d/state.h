@@ -71,19 +71,19 @@ enum { STAT_RESET, STAT2_RESET, PRINT, VTK1D, VTK2D, VTK3D, PROBE1, PROBE2, PROB
 enum { MemoryToFile, FileToMemory };
 
 
-template< typename T_NSE >
+template< typename NSE >
 struct State
 {
-	using NSE = T_NSE;
-	using T_LBM_NSE = LBM<NSE>;
 	using TRAITS = typename NSE::TRAITS;
-	using Lagrange3D = ::Lagrange3D< T_LBM_NSE >;
+	using BLOCK_NSE = LBM_BLOCK< NSE >;
+	using Lagrange3D = ::Lagrange3D< LBM<NSE> >;
 
 	using map_t = typename TRAITS::map_t;
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 	using real = typename TRAITS::real;
 	using point_t = typename TRAITS::point_t;
+	using lat_t = typename LBM< NSE >::lat_t;
 
 	using T_PROBE3DCUT = probe3Dcut<idx>;
 	using T_PROBE2DCUT = probe2Dcut<idx>;
@@ -91,7 +91,7 @@ struct State
 	using T_PROBE1DLINECUT = probe1Dlinecut<real>;
 	using T_COUNTER = counter<real>;
 
-	T_LBM_NSE nse;
+	LBM<NSE> nse;
 
 	std::vector< T_PROBE3DCUT > probe3Dvec;
 	std::vector< T_PROBE2DCUT > probe2Dvec;
@@ -157,7 +157,7 @@ struct State
 	int verbosity=1;
 	char id[FILENAME_CHARS] = "default";
 
-	virtual bool outputData(const typename T_LBM_NSE::BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) { return false; }
+	virtual bool outputData(const BLOCK_NSE& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) { return false; }
 
 	bool getPNGdimensions(const char * filename, int &w, int &h);
 
@@ -254,7 +254,7 @@ struct State
 
 	// constructors
 	template< typename... ARGS >
-	State(const TNL::MPI::Comm& communicator, typename T_LBM_NSE::lat_t ilat, ARGS&&... args)
+	State(const TNL::MPI::Comm& communicator, lat_t ilat, ARGS&&... args)
 	: nse(communicator, ilat, std::forward<ARGS>(args)...)
 	{
 		bool local_estimate = estimateMemoryDemands();

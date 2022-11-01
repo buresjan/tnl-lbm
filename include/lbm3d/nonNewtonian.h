@@ -473,13 +473,12 @@ template <typename STATE>
 void computeNonNewtonianKernels(STATE& state)
 {
 	using NSE = typename STATE::NSE;
-	using LBM_NSE = typename STATE::T_LBM_NSE;
 	using TRAITS = typename LBM_NSE::TRAITS;
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 
-	LBM_NSE& nse = state.nse;
+	auto& nse = state.nse;
 
 	for (auto& block : nse.blocks)
 	{

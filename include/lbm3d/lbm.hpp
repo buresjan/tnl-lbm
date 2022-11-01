@@ -2,8 +2,8 @@
 
 #include "lbm.h"
 
-template< typename LBM_TYPE >
-LBM<LBM_TYPE>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
+template< typename CONFIG >
+LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
 : communicator(communicator), lat(ilat)
 {
 	// initialize MPI info
@@ -28,8 +28,8 @@ LBM<LBM_TYPE>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysVis
 	physViscosity = iphysViscosity;
 }
 
-template< typename LBM_TYPE >
-LBM<LBM_TYPE>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt)
+template< typename CONFIG >
+LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt)
 : communicator(communicator), lat(ilat), blocks(std::forward<std::vector<BLOCK>>(blocks))
 {
 	// initialize MPI info
@@ -43,23 +43,23 @@ LBM<LBM_TYPE>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<B
 	physViscosity = iphysViscosity;
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::resetForces(real ifx, real ify, real ifz)
+template< typename CONFIG >
+void LBM<CONFIG>::resetForces(real ifx, real ify, real ifz)
 {
 	for( auto& block : blocks )
 		block.resetForces(ifx, ify, ifz);
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyForcesToDevice()
+template< typename CONFIG >
+void LBM<CONFIG>::copyForcesToDevice()
 {
 	for( auto& block : blocks )
 		block.copyForcesToDevice();
 }
 
 
-template< typename LBM_TYPE >
-bool LBM<LBM_TYPE>::isAnyLocalIndex(idx x, idx y, idx z)
+template< typename CONFIG >
+bool LBM<CONFIG>::isAnyLocalIndex(idx x, idx y, idx z)
 {
 	for( auto& block : blocks )
 		if( block.isLocalIndex(x, y, z) )
@@ -67,8 +67,8 @@ bool LBM<LBM_TYPE>::isAnyLocalIndex(idx x, idx y, idx z)
 	return false;
 }
 
-template< typename LBM_TYPE >
-bool LBM<LBM_TYPE>::isAnyLocalX(idx x)
+template< typename CONFIG >
+bool LBM<CONFIG>::isAnyLocalX(idx x)
 {
 	for( auto& block : blocks )
 		if( block.isLocalX(x) )
@@ -76,8 +76,8 @@ bool LBM<LBM_TYPE>::isAnyLocalX(idx x)
 	return false;
 }
 
-template< typename LBM_TYPE >
-bool LBM<LBM_TYPE>::isAnyLocalY(idx y)
+template< typename CONFIG >
+bool LBM<CONFIG>::isAnyLocalY(idx y)
 {
 	for( auto& block : blocks )
 		if( block.isLocalY(y) )
@@ -85,8 +85,8 @@ bool LBM<LBM_TYPE>::isAnyLocalY(idx y)
 	return false;
 }
 
-template< typename LBM_TYPE >
-bool LBM<LBM_TYPE>::isAnyLocalZ(idx z)
+template< typename CONFIG >
+bool LBM<CONFIG>::isAnyLocalZ(idx z)
 {
 	for( auto& block : blocks )
 		if( block.isLocalZ(z) )
@@ -95,36 +95,36 @@ bool LBM<LBM_TYPE>::isAnyLocalZ(idx z)
 }
 
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::setMap(idx x, idx y, idx z, map_t value)
+template< typename CONFIG >
+void LBM<CONFIG>::setMap(idx x, idx y, idx z, map_t value)
 {
 	for( auto& block : blocks )
 		block.setMap(x, y, z, value);
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::setBoundaryX(idx x, map_t value)
+template< typename CONFIG >
+void LBM<CONFIG>::setBoundaryX(idx x, map_t value)
 {
 	for( auto& block : blocks )
 		block.setBoundaryX(x, value);
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::setBoundaryY(idx y, map_t value)
+template< typename CONFIG >
+void LBM<CONFIG>::setBoundaryY(idx y, map_t value)
 {
 	for( auto& block : blocks )
 		block.setBoundaryY(y, value);
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::setBoundaryZ(idx z, map_t value)
+template< typename CONFIG >
+void LBM<CONFIG>::setBoundaryZ(idx z, map_t value)
 {
 	for( auto& block : blocks )
 		block.setBoundaryZ(z, value);
 }
 
-template< typename LBM_TYPE >
-bool LBM<LBM_TYPE>::isFluid(idx x, idx y, idx z)
+template< typename CONFIG >
+bool LBM<CONFIG>::isFluid(idx x, idx y, idx z)
 {
 	for( auto& block : blocks )
 		if (block.isFluid(x, y, z))
@@ -133,73 +133,73 @@ bool LBM<LBM_TYPE>::isFluid(idx x, idx y, idx z)
 }
 
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::resetMap(map_t geo_type)
+template< typename CONFIG >
+void LBM<CONFIG>::resetMap(map_t geo_type)
 {
 	for( auto& block : blocks )
 		block.resetMap(geo_type);
 }
 
 
-template< typename LBM_TYPE >
-void  LBM<LBM_TYPE>::copyMapToHost()
+template< typename CONFIG >
+void  LBM<CONFIG>::copyMapToHost()
 {
 	for( auto& block : blocks )
 		block.copyMapToHost();
 }
 
-template< typename LBM_TYPE >
-void  LBM<LBM_TYPE>::copyMapToDevice()
+template< typename CONFIG >
+void  LBM<CONFIG>::copyMapToDevice()
 {
 	for( auto& block : blocks )
 		block.copyMapToDevice();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyMacroToHost()
+template< typename CONFIG >
+void LBM<CONFIG>::copyMacroToHost()
 {
 	for( auto& block : blocks )
 		block.copyMacroToHost();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyMacroToDevice()
+template< typename CONFIG >
+void LBM<CONFIG>::copyMacroToDevice()
 {
 	for( auto& block : blocks )
 		block.copyMacroToDevice();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyDFsToHost(uint8_t dfty)
+template< typename CONFIG >
+void LBM<CONFIG>::copyDFsToHost(uint8_t dfty)
 {
 	for( auto& block : blocks )
 		block.copyDFsToHost(dfty);
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyDFsToDevice(uint8_t dfty)
+template< typename CONFIG >
+void LBM<CONFIG>::copyDFsToDevice(uint8_t dfty)
 {
 	for( auto& block : blocks )
 		block.copyDFsToDevice(dfty);
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyDFsToHost()
+template< typename CONFIG >
+void LBM<CONFIG>::copyDFsToHost()
 {
 	for( auto& block : blocks )
 		block.copyDFsToHost();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::copyDFsToDevice()
+template< typename CONFIG >
+void LBM<CONFIG>::copyDFsToDevice()
 {
 	for( auto& block : blocks )
 		block.copyDFsToDevice();
 }
 
 #ifdef HAVE_MPI
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::synchronizeDFsAndMacroDevice(uint8_t dftype)
+template< typename CONFIG >
+void LBM<CONFIG>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 {
 	// stage 0: set inputs, allocate buffers
 	// stage 1: fill send buffers
@@ -211,34 +211,34 @@ void LBM<LBM_TYPE>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 
 	// stage 2: issue all send and receive async operations
 	for( auto& block : blocks ) {
-		for (int i = 0; i < LBM_TYPE::Q; i++)
+		for (int i = 0; i < CONFIG::Q; i++)
 			block.dreal_sync[i].stage_2();
 		if (MACRO::use_syncMacro)
 			for (int i = 0; i < MACRO::N; i++)
-				block.dreal_sync[LBM_TYPE::Q + i].stage_2();
+				block.dreal_sync[CONFIG::Q + i].stage_2();
 	}
 
 	// stage 3: copy data from receive buffers
 	for( auto& block : blocks ) {
-		for (int i = 0; i < LBM_TYPE::Q; i++)
+		for (int i = 0; i < CONFIG::Q; i++)
 			block.dreal_sync[i].stage_3();
 		if (MACRO::use_syncMacro)
 			for (int i = 0; i < MACRO::N; i++)
-				block.dreal_sync[LBM_TYPE::Q + i].stage_3();
+				block.dreal_sync[CONFIG::Q + i].stage_3();
 	}
 
 	// stage 4: ensure everything has finished
 	for( auto& block : blocks ) {
-		for (int i = 0; i < LBM_TYPE::Q; i++)
+		for (int i = 0; i < CONFIG::Q; i++)
 			block.dreal_sync[i].stage_4();
 		if (MACRO::use_syncMacro)
 			for (int i = 0; i < MACRO::N; i++)
-				block.dreal_sync[LBM_TYPE::Q + i].stage_4();
+				block.dreal_sync[CONFIG::Q + i].stage_4();
 	}
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::synchronizeMapDevice()
+template< typename CONFIG >
+void LBM<CONFIG>::synchronizeMapDevice()
 {
 	for( auto& block : blocks )
 		block.synchronizeMapDevice_start();
@@ -247,29 +247,29 @@ void LBM<LBM_TYPE>::synchronizeMapDevice()
 }
 #endif  // HAVE_MPI
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::computeCPUMacroFromLat()
+template< typename CONFIG >
+void LBM<CONFIG>::computeCPUMacroFromLat()
 {
 	for( auto& block : blocks )
 		block.computeCPUMacroFromLat();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::allocateHostData()
+template< typename CONFIG >
+void LBM<CONFIG>::allocateHostData()
 {
 	for( auto& block : blocks )
 		block.allocateHostData();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::allocateDeviceData()
+template< typename CONFIG >
+void LBM<CONFIG>::allocateDeviceData()
 {
 	for( auto& block : blocks )
 		block.allocateDeviceData();
 }
 
-template< typename LBM_TYPE >
-void LBM<LBM_TYPE>::updateKernelData()
+template< typename CONFIG >
+void LBM<CONFIG>::updateKernelData()
 {
 	for( auto& block : blocks )
 	{
@@ -289,17 +289,17 @@ void LBM<LBM_TYPE>::updateKernelData()
 	}
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename F >
-void LBM<LBM_TYPE>::forLocalLatticeSites(F f)
+void LBM<CONFIG>::forLocalLatticeSites(F f)
 {
 	for( auto& block : blocks )
 		block.forLocalLatticeSites(f);
 }
 
-template< typename LBM_TYPE >
+template< typename CONFIG >
 	template< typename F >
-void LBM<LBM_TYPE>::forAllLatticeSites(F f)
+void LBM<CONFIG>::forAllLatticeSites(F f)
 {
 	for( auto& block : blocks )
 		block.forAllLatticeSites(f);

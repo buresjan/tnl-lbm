@@ -5,17 +5,13 @@
 #include "lbm_block.h"
 #include <type_traits>
 
-template<
-	typename T_LBM_TYPE
-	// TODO: const int Q
->
+template< typename CONFIG >
 struct LBM
 {
-	using LBM_TYPE = T_LBM_TYPE;
-	using MACRO = typename LBM_TYPE::MACRO;
-	using CPU_MACRO = typename LBM_TYPE::CPU_MACRO;
-	using TRAITS = typename LBM_TYPE::TRAITS;
-	using BLOCK = LBM_BLOCK< LBM_TYPE >;
+	using MACRO = typename CONFIG::MACRO;
+	using CPU_MACRO = typename CONFIG::CPU_MACRO;
+	using TRAITS = typename CONFIG::TRAITS;
+	using BLOCK = LBM_BLOCK< CONFIG >;
 	static_assert( std::is_move_constructible<BLOCK>::value, "LBM_BLOCK must be move-constructible" );
 
 	using idx = typename TRAITS::idx;
