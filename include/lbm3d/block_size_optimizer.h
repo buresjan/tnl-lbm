@@ -34,7 +34,7 @@ idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_
 	if( multiple * warp_size != domain_size[i] )
 		return best;
 
-	for( idx bs_j = 1; bs_j < std::sqrt(domain_size[j]); bs_j++ ) {
+	for( idx bs_j = 1; bs_j <= domain_size[j]; bs_j++ ) {
 		if( domain_size[j] % bs_j != 0 )
 			continue;
 
