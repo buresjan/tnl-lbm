@@ -44,6 +44,7 @@ template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz)
 {
 	for (uint8_t dfty=0; dfty<DFMAX; dfty++) {
+		#ifdef HAVE_MPI
 		// shift global indices to local
 		const auto local_begins = hfs[dfty].getLocalBegins();
 		const idx lx = x - local_begins.template getSize< 0 >();
@@ -52,6 +53,11 @@ void LBM_BLOCK<CONFIG>::setEqLat(idx x, idx y, idx z, real rho, real vx, real vy
 		// call setEquilibriumLat on the local array view
 		auto local_view = hfs[dfty].getLocalView();
 		CONFIG::COLL::setEquilibriumLat(local_view, lx, ly, lz, rho, vx, vy, vz);
+		#else
+		// without MPI, global array = local array
+		auto local_view = hfs[dfty].getView();
+		CONFIG::COLL::setEquilibriumLat(local_view, x, y, z, rho, vx, vy, vz);
+		#endif
 	}
 }
 
