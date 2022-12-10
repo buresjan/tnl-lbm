@@ -3,6 +3,13 @@
 // 3D test problem: forcing/input velocity
 // analytical solution for rectangular duct: forcing accelerated
 
+enum Scaling
+{
+	STRONG_SCALING,
+	WEAK_SCALING_1D,
+	WEAK_SCALING_3D,
+};
+
 template < typename TRAITS >
 struct NSE_Data_XProfileInflow : NSE_Data < TRAITS >
 {
@@ -254,7 +261,7 @@ struct StateLocal : State<NSE>
 };
 
 template < typename NSE >
-int sim02(int RES=1, bool use_forcing=true)
+int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -267,13 +274,22 @@ int sim02(int RES=1, bool use_forcing=true)
 	if (!use_forcing) LBM_X *= RES;
 	int LBM_Y = RES*block_size;
 	int LBM_Z = RES*block_size;
+	if (scaling == WEAK_SCALING_1D)
+		LBM_X *= TNL::MPI::GetSize(MPI_COMM_WORLD);
+	else if (scaling == WEAK_SCALING_3D) {
+		// NOTE: scale volume by nproc, preserve the proportions of the domain, LBM_Y must be a multiple of 32
+		const real factor = std::cbrt(TNL::MPI::GetSize(MPI_COMM_WORLD));
+		LBM_X = std::round(LBM_X * factor / 32) * 32;
+		LBM_Y = std::round(LBM_Y * factor / 32) * 32;
+		LBM_Z = std::round(LBM_Z * factor / 32) * 32;
+	}
 	// NOTE: LBM_VISCOSITY must be less than 1/6
 //	real LBM_VISCOSITY = 0.01*RES;
 	real LBM_VISCOSITY = std::min(0.1, 0.01*RES);
-	real PHYS_HEIGHT = 0.25;
 	real PHYS_VISCOSITY = 1.5e-5;// [m^2/s] fluid viscosity air: 1.81e-5
-	real PHYS_DL = PHYS_HEIGHT/((real)LBM_Y-2);
-	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
+	real PHYS_HEIGHT = 0.25;
+	real PHYS_DL = PHYS_HEIGHT / real(LBM_Z - 2);
+	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY * PHYS_DL * PHYS_DL;
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	// initialize the lattice
@@ -371,6 +387,14 @@ int sim02(int RES=1, bool use_forcing=true)
 	state.nse.physFinalTime = 5000;
 //	state.cnt[VTK2D].period = 1.0;
 
+	if (scaling == WEAK_SCALING_3D) {
+		// TRICK to keep the benchmark fast: decrease the periods and physFinalTime to keep the compute time (more or less) constant
+		const real factor = (LBM_Y - 2) / real(block_size * RES - 2) * RES / 2;
+		state.cnt[PRINT].period /= factor;
+		state.cnt[PROBE1].period /= factor;
+		state.nse.physFinalTime /= factor;
+	}
+
 	state.log("PHYS_DL = %e", PHYS_DL);
 //	state.log("in lbm units: forcing=%e velocity=%e", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
 	state.log("in lbm units: forcing=%e", force);
@@ -426,11 +450,14 @@ void run()
 			>;
 
 	bool use_forcing = false;
+	Scaling scaling = STRONG_SCALING;
+//	Scaling scaling = WEAK_SCALING;
+//	Scaling scaling = WEAK_SCALING_3D;
 	for (int i = 2; i <= 4; i++)
 	{
 //		int res=4;
 		int res = pow(2, i);
-		sim02<NSE_CONFIG>(res, use_forcing);
+		sim02<NSE_CONFIG>(res, use_forcing, scaling);
 	}
 }
 
