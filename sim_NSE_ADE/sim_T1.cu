@@ -536,7 +536,6 @@ int simT1_test(int RESOLUTION = 2)
 
 	StateLocal< NSE, ADE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
 	state.setid("sim_T1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
-	state.nse.physCharLength = 0.1; // [m]
 //	state.printIter = 100;
 //	state.printIter = 100;
 	state.nse.physFinalTime = 10.0;

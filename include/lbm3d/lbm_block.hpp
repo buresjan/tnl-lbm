@@ -26,17 +26,6 @@ LBM_BLOCK<CONFIG>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, i
 	// initialize optimal thread block size for the LBM kernel
 	constexpr int max_threads = 256 / (sizeof(dreal) / sizeof(float));  // use 256 threads for SP and 128 threads for DP
 	block_size = get_optimal_block_size< typename TRAITS::xyz_permutation >(local, max_threads);
-
-#ifdef HAVE_MPI
-	// get the range of stream priorities for current GPU
-	int priority_high, priority_low;
-	cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
-	// low-priority stream for the interior
-	streams.emplace( id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_low) );
-	// high-priority streams for boundaries
-	streams.emplace( left_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
-	streams.emplace( right_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
-#endif
 #endif
 }
 
@@ -272,6 +261,17 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 		}
 		#endif
 		#ifdef USE_CUDA
+		// lazy creation of CUDA streams
+		if (streams.empty()) {
+			// get the range of stream priorities for current GPU
+			int priority_high, priority_low;
+			cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
+			// low-priority stream for the interior
+			streams.emplace( id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_low) );
+			// high-priority streams for boundaries
+			streams.emplace( left_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
+			streams.emplace( right_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
+		}
 		// set the CUDA stream
 		dreal_sync[i + sync_offset].setCudaStreams(streams.at(left_id), streams.at(right_id));
 		#endif

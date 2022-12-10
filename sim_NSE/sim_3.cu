@@ -407,6 +407,19 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.physDl = PHYS_DL;
 
 	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
+	state.setid("sim_3_%s_%s_dirac_%d_res_%d_Re_%d_nas_%05.4f_compute_%d", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, (int)Re, nasobek, compute);
+	if (state.isMark()) return 0;
+
+	#ifdef HAVE_MPI
+	// disable MPI communication over the periodic boundary
+	for (auto& block : state.nse.blocks) {
+		if (block.id == 0)
+			block.left_id = -1;
+		if (block.id == block.nproc - 1)
+			block.right_id = -1;
+	}
+	#endif
+
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
 	state.nse.physCharLength = cylinder_diameter; // [m]
@@ -421,9 +434,6 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 //	state.cnt[VTK3D].period = 1.0;
 	state.cnt[VTK2D].period = 1.0;
 	state.cnt[VTK1D].period = 1.0;
-
-	state.setid("sim_3_%s_%s_dirac_%d_res_%d_Re_%d_nas_%05.4f_compute_%d", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, (int)Re, nasobek, compute);
-	if (state.isMark()) return 0;
 
 	// select compute method
 	int ws_compute;

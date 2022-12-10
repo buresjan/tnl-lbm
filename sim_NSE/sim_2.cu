@@ -283,8 +283,17 @@ int sim02(int RES=1, bool use_forcing=true)
 	lat.physDl = PHYS_DL;
 
 	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
-//	state.nse.use_multiple_gpus = false;
-	state.nse.physCharLength = 0.125; // [m]
+
+	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
+	state.setid("sim_2_%s_%s_%s_res_%d", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
+
+	if (state.isMark())
+		return 0;
+
+	if (state.nse.blocks.front().local.x() <= 2) {
+		std::cout << "Local block size " << state.nse.blocks.front().local.x() << " is too small, skipping this resolution." << std::endl;
+		return 0;
+	}
 
 // NOTE: this is for NSE_Data_ConstInflow
 //	if (use_forcing)
@@ -344,6 +353,16 @@ int sim02(int RES=1, bool use_forcing=true)
 				state.nse.blocks.front().data.vx_profile[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
 		#endif
 		state.nse.blocks.front().data.size_y = state.nse.blocks.front().local.y();
+
+		#ifdef HAVE_MPI
+		// disable MPI communication over the periodic boundary
+		for (auto& block : state.nse.blocks) {
+			if (block.id == 0)
+				block.left_id = -1;
+			if (block.id == block.nproc - 1)
+				block.right_id = -1;
+		}
+		#endif
 	}
 
 	state.cnt[PRINT].period = 10.0;
@@ -351,12 +370,6 @@ int sim02(int RES=1, bool use_forcing=true)
 //	state.nse.physFinalTime = PHYS_DT * 1e7;
 	state.nse.physFinalTime = 5000;
 //	state.cnt[VTK2D].period = 1.0;
-
-	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
-	state.setid("sim_2_%s_%s_%s_res_%d", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
-
-	if (state.isMark())
-		return 0;
 
 	state.log("PHYS_DL = %e", PHYS_DL);
 //	state.log("in lbm units: forcing=%e velocity=%e", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
