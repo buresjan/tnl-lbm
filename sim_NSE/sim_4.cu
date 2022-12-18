@@ -333,7 +333,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	idx LBM_Y = RES*block_size; // for 4 cm
 	idx LBM_Z = LBM_Y;
 	real PHYS_DL = real_domain_height/((real)LBM_Y);
-	idx LBM_X = LBM_Y;//(int)(real_domain_length/PHYS_DL)+2;//block_size;//16*RESOLUTION;// width in pixels --- product of 128.
+	idx LBM_X = LBM_Y;//(int)(real_domain_length/PHYS_DL)+2;//block_size;//16*RESOLUTION;
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	// zvolit Re + LBM VELOCITY + PHYS_VISCOSITY

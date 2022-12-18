@@ -414,14 +414,21 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 	void computeBeforeLBMKernel() override
 	{
 		#ifdef USE_CUDA
-		auto get_grid_size = [] (const auto& block) -> dim3
+		auto get_grid_size = [] (const auto& block, idx x = 0, idx y = 0, idx z = 0) -> dim3
 		{
-			dim3 gridSize(block.local.x(), block.local.y()/block.block_size.y, block.local.z());
-
-			// check for PEBKAC problem existing between keyboard and chair
-			if (gridSize.y * block.block_size.y != block.local.y())
-				throw std::logic_error("error: block.local.y() (which is " + std::to_string(block.local.y()) + ") "
-									   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.y) + ")");
+			dim3 gridSize;
+			if (x > 0)
+				gridSize.x = x;
+			else
+				gridSize.x = TNL::roundUpDivision(block.local.x(), block.block_size.x());
+			if (y > 0)
+				gridSize.y = y;
+			else
+				gridSize.y = TNL::roundUpDivision(block.local.y(), block.block_size.y());
+			if (z > 0)
+				gridSize.z = z;
+			else
+				gridSize.z = TNL::roundUpDivision(block.local.z(), block.block_size.z());
 
 			return gridSize;
 		};
@@ -514,7 +521,7 @@ int simT1_test(int RESOLUTION = 2)
 	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
-	int X = 128*RESOLUTION;// width in pixels --- product of 128.
+	int X = 128*RESOLUTION;// width in pixels
 	//	int Y = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
 	//	int Z = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
 	int Y = block_size*RESOLUTION;// height in pixels --- top and bottom walls 1px

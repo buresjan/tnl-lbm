@@ -1491,26 +1491,21 @@ void State<NSE>::SimUpdate()
 	}
 
 	#ifdef USE_CUDA
-	auto get_grid_size = [] (const auto& block) -> dim3
+	auto get_grid_size = [] (const auto& block, idx x = 0, idx y = 0, idx z = 0) -> dim3
 	{
-		dim3 gridSize(block.local.x()/block.block_size.x(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
-
-		// check for PEBKAC problem existing between keyboard and chair
-		if (block.block_size.x() * block.block_size.y() * block.block_size.z() < 32)
-			throw std::logic_error("error: block.block_size contains less than 32 threads: [" + std::to_string(block.block_size.x()) + ","
-								   + std::to_string(block.block_size.x()) + "," + std::to_string(block.block_size.x()) + "]");
-		if (block.block_size.x() * block.block_size.y() * block.block_size.z() > 1024)
-			throw std::logic_error("error: block.block_size contains more than 1024 threads: [" + std::to_string(block.block_size.x()) + ","
-								   + std::to_string(block.block_size.x()) + "," + std::to_string(block.block_size.x()) + "]");
-		if (gridSize.x * block.block_size.x() != block.local.x())
-			throw std::logic_error("error: block.local.x() (which is " + std::to_string(block.local.x()) + ") "
-								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.x()) + ")");
-		if (gridSize.y * block.block_size.y() != block.local.y())
-			throw std::logic_error("error: block.local.y() (which is " + std::to_string(block.local.y()) + ") "
-								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.y()) + ")");
-		if (gridSize.z * block.block_size.z() != block.local.z())
-			throw std::logic_error("error: block.local.z() (which is " + std::to_string(block.local.z()) + ") "
-								   "is not aligned to a multiple of the block size (which is " + std::to_string(block.block_size.z()) + ")");
+		dim3 gridSize;
+		if (x > 0)
+			gridSize.x = x;
+		else
+			gridSize.x = TNL::roundUpDivision(block.local.x(), block.block_size.x());
+		if (y > 0)
+			gridSize.y = y;
+		else
+			gridSize.y = TNL::roundUpDivision(block.local.y(), block.block_size.y());
+		if (z > 0)
+			gridSize.z = z;
+		else
+			gridSize.z = TNL::roundUpDivision(block.local.z(), block.block_size.z());
 
 		return gridSize;
 	};
@@ -1600,8 +1595,8 @@ void State<NSE>::SimUpdate()
 		for (auto& block : nse.blocks)
 		{
 			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
-			const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
-			const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+			const dim3 gridSizeForBoundary = get_grid_size(block, block.df_overlap_X());
+			const dim3 gridSizeForInternal = get_grid_size(block, block.local.x() - 2*block.df_overlap_X());
 
 			// get CUDA streams
 			const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);

@@ -30,7 +30,11 @@ void LBMKernel(
 	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+
+	if (x >= SD.X() || y >= SD.Y() || z >= SD.Z())
+		return;
 	#endif
+
 	map_t gi_map = SD.map(x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
@@ -103,7 +107,11 @@ void LBMKernel(
 	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+
+	if (x >= NSE_SD.X() || y >= NSE_SD.Y() || z >= NSE_SD.Z())
+		return;
 	#endif
+
 	const map_t NSE_mapgi = NSE_SD.map(x, y, z);
 	const map_t ADE_mapgi = ADE_SD.map(x, y, z);
 
@@ -225,7 +233,11 @@ void LBMComputeVelocitiesStar(
 	idx x = threadIdx.x + blockIdx.x * blockDim.x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+
+	if (x >= SD.X() || y >= SD.Y() || z >= SD.Z())
+		return;
 	#endif
+
 	map_t gi_map = SD.map(x, y, z);
 
 	typename NSE::template KernelStruct<dreal> KS;
@@ -292,7 +304,11 @@ void LBMComputeVelocitiesStarAndZeroForce(
 	idx x = threadIdx.x + blockIdx.x * blockDim.x;
 	idx y = threadIdx.y + blockIdx.y * blockDim.y;
 	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+
+	if (x >= SD.X() || y >= SD.Y() || z >= SD.Z())
+		return;
 	#endif
+
 	map_t gi_map = SD.map(x, y, z);
 
 	typename NSE::template KernelStruct<dreal> KS;

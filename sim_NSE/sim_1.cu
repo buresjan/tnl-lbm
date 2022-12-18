@@ -196,7 +196,7 @@ int sim01_test(int RESOLUTION = 2)
 	using lat_t = Lattice<3, real, idx>;
 
 	int block_size=32;
-	int X = 128*RESOLUTION;// width in pixels --- product of 128.
+	int X = 128*RESOLUTION;// width in pixels
 	//	int Y = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
 	//	int Z = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
 	int Y = block_size*RESOLUTION;// height in pixels --- top and bottom walls 1px

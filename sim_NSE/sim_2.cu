@@ -277,11 +277,11 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	if (scaling == WEAK_SCALING_1D)
 		LBM_X *= TNL::MPI::GetSize(MPI_COMM_WORLD);
 	else if (scaling == WEAK_SCALING_3D) {
-		// NOTE: scale volume by nproc, preserve the proportions of the domain, LBM_Y must be a multiple of 32
+		// NOTE: scale volume by nproc, preserve the proportions of the domain
 		const real factor = std::cbrt(TNL::MPI::GetSize(MPI_COMM_WORLD));
-		LBM_X = std::round(LBM_X * factor / 32) * 32;
-		LBM_Y = std::round(LBM_Y * factor / 32) * 32;
-		LBM_Z = std::round(LBM_Z * factor / 32) * 32;
+		LBM_X = std::round(LBM_X * factor);
+		LBM_Y = std::round(LBM_Y * factor);
+		LBM_Z = std::round(LBM_Z * factor);
 	}
 	// NOTE: LBM_VISCOSITY must be less than 1/6
 //	real LBM_VISCOSITY = 0.01*RES;
