@@ -862,7 +862,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 					fz[i] += 2*rho[i]*rowVectorProduct(*MT, i, x3);
 				}
 			};
-			TNL::Algorithms::ParallelFor< TNL::Devices::Cuda >::exec((idx) 0, n, kernel);
+			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
 			#else
 			printf("ws_tnl_computeGPU_TNL failed: TNL not included in the build. \n");
 			#endif
@@ -908,7 +908,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 					fz[i] += 2*rho[i]*rowVectorProduct(*MT, i, x3);
 				}
 			};
-			TNL::Algorithms::ParallelFor< TNL::Devices::Cuda >::exec((idx) 0, n, kernel);
+			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
 			#else
 			printf("ws_tnl_computeHybrid_TNL failed: TNL not included in the build. \n");
 			#endif
@@ -950,7 +950,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 					fz[i] += 2*rho[i]*rowVectorProduct(*MT, i, x3);
 				}
 			};
-			TNL::Algorithms::ParallelFor< TNL::Devices::Cuda >::exec((idx) 0, n, kernel);
+			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
 			#else
 			printf("ws_tnl_computeHybrid_TNL_zerocopy failed: TNL not included in the build. \n");
 			#endif
@@ -1038,7 +1038,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 					lbm.blocks.front().hfz()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
 				}
 			};
-			TNL::Algorithms::ParallelFor< TNL::Devices::Host >::exec((idx) 0, n, kernel);
+			TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, n, kernel);
 			#else
 			printf("ws_tnl_computeCPU_TNL failed: TNL not included in the build. \n");
 			#endif
