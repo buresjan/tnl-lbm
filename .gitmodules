@@ -1,0 +1,3 @@
+[submodule "libs/tnl"]
+	path = libs/tnl
+	url = https://gitlab.com/tnl-project/tnl.git
