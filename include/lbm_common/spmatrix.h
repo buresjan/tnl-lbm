@@ -1,8 +1,6 @@
 #ifndef __SpMatrix_H
 #define __SpMatrix_H
 
-#include "defs.h"
-
 #ifdef USE_UMFPACK
 //#include "suitesparse/umfpack.h"
 #include <umfpack.h>
@@ -25,10 +23,10 @@ struct SpMatrix
 	int m_n;    // size of the matrix Nb*NbEq
 	int m_nz;   // number of all non-zeros entries of the matrix
 	REAL null;	// dummy value to return
-	
+
 	bool doFactorizeOnce; // factorize the matrix once only and store the information for future use
 	bool factorized; // is the matrix factorized?
-	
+
 	int Solver; // SOLVER_UMFPACK
 
 	#ifdef USE_PETSC
@@ -37,7 +35,7 @@ struct SpMatrix
 	KSP            PETSC_ksp;         /* linear solver context */
 	bool PETSC_INITIALIZED;
 	#endif
-	
+
 	#ifdef USE_UMFPACK
 	bool UMFPACK_INITIALIZED;
 	void *Symbolic, *Numeric;
@@ -56,7 +54,7 @@ struct SpMatrix
 
 	inline REAL  &get(int i, int j) { return get(i,j,1); }
 	REAL  &get(int i, int j, int verbose);		/// returns exact position of a matrix entry
-	
+
 	inline REAL & operator()(int i, int j) { return get(i,j,1); }
 	inline REAL & operator()(int i, int j, int verbose) { return get(i,j,verbose); }
 
@@ -67,10 +65,10 @@ struct SpMatrix
 	int print2d();
 
 	int solve(REAL  *b, REAL  *x);
-	
+
 	int initializePETSC();
 	int initializeUMFPACK();
-	
+
 	int solveUMFPACK(REAL  *b, REAL  *x);
 	int solvePETSC(REAL  *b, REAL  *x);
 

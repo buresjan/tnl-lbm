@@ -1,4 +1,4 @@
-#include "core.h"
+#include "lbm3d/core.h"
 
 // cylinder in 3D - Schafer- Turek problem
 // ibmlbm

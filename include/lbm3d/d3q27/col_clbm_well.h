@@ -1,4 +1,4 @@
-#include "d3q27_common_well.h"
+#include "common_well.h"
 
 template <
 	typename TRAITS,

@@ -1,20 +1,20 @@
 //#define AB_PATTERN
 
-#include "core.h"
-#include "d3q7_eq.h"
-#include "d3q7_col_srt.h"
-#include "d3q7_col_mrt.h"
-#include "d3q7_col_clbm.h"
+#include "lbm3d/core.h"
+#include "lbm3d/d3q7/eq.h"
+#include "lbm3d/d3q7/col_srt.h"
+#include "lbm3d/d3q7/col_mrt.h"
+#include "lbm3d/d3q7/col_clbm.h"
 // exactly one streaming header must be included
 #ifdef AA_PATTERN
-	#include "d3q7_streaming_AA.h"
+	#include "lbm3d/d3q7/streaming_AA.h"
 #endif
 #ifdef AB_PATTERN
-	#include "d3q7_streaming_AB.h"
+	#include "d3q7/streaming_AB.h"
 #endif
-#include "d3q7_bc.h"
-#include "d3q7_macro.h"
-#include "state_NSE_ADE.h"
+#include "lbm3d/d3q7/bc.h"
+#include "lbm3d/d3q7/macro.h"
+#include "lbm3d/state_NSE_ADE.h"
 
 template < typename TRAITS >
 struct NSE_Data_FreeRhoConstInflow : NSE_Data< TRAITS >

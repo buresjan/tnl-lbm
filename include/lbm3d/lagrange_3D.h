@@ -5,7 +5,7 @@
 #include <math.h>
 #include "defs.h"
 #include "lbm.h"
-#include "spmatrix.h"
+#include "lbm_common/spmatrix.h"
 
 
 #ifdef USE_TNL
@@ -30,7 +30,7 @@
 #endif
 
 #ifdef USE_CUSPARSE
-	#include "sprectmatrix.h"
+	#include "lbm_common/sprectmatrix.h"
 #endif
 
 enum {

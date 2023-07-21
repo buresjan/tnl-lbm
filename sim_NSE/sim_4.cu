@@ -1,4 +1,4 @@
-#include "core.h"
+#include "lbm3d/core.h"
 
 // ball in 3D
 // ibmlbm

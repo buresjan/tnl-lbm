@@ -1,4 +1,4 @@
-#include "d3q7_common.h"
+#include "common.h"
 
 template <
 	typename TRAITS,

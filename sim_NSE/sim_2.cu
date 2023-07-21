@@ -1,4 +1,4 @@
-#include "core.h"
+#include "lbm3d/core.h"
 
 // 3D test problem: forcing/input velocity
 // analytical solution for rectangular duct: forcing accelerated

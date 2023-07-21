@@ -2,8 +2,9 @@
 
 #include "state.h"
 
-#include "fileutils.h"
-#include "timeutils.h"
+#include "lbm_common/png_tool.h"
+#include "lbm_common/fileutils.h"
+#include "lbm_common/timeutils.h"
 
 template< typename NSE >
 int State<NSE>::addLagrange3D()

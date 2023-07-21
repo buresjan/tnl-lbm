@@ -1,6 +1,6 @@
 // improved BRK (SRT) model by Geier 2017
 // for standard DF (no well-conditioned)
-#include "d3q27_common.h"
+#include "common.h"
 
 template <
 	typename TRAITS,

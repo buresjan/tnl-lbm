@@ -1,4 +1,4 @@
-#include "d3q27_common.h"
+#include "common.h"
 
 // Cumulant operator (based on lbm_cum.h) + Smagorinsky LES
 // src: mail Robert Straka from 2018.09.15:

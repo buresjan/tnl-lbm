@@ -1,4 +1,5 @@
-#include "d3q27_common_well.h"
+#include "common_well.h"
+
 template <
 	typename TRAITS,
 	typename LBM_EQ=D3Q27_EQ_WELL<TRAITS>

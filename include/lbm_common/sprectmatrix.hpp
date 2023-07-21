@@ -14,7 +14,7 @@ int SpRectMatrix<DREAL>::xpos(int i, int j) // i,j, in [0, n-1] !!
 		case CSC_FORMAT:
 			// CSC format:
 			// based on Ai and Ap structures get x
-			// i ... row index - they are in Ai[ ] 
+			// i ... row index - they are in Ai[ ]
 			// j ... column index
 			if (j>=m_nc || j<0) { printf("SpRectMatrix<DREAL>::xpos xpos(%d,%d) : column index out of range! max %d \n",i,j,m_nc); return 0;}
 			for (int k=Ap[j];k<Ap[j+1];k++) if (Ai[k]==i) return k; // this is the xpos
@@ -23,7 +23,7 @@ int SpRectMatrix<DREAL>::xpos(int i, int j) // i,j, in [0, n-1] !!
 			// CSR format:
 			// based on Ai and Ap structures get x
 			// i ... row index
-			// j ... column index - they are in Ai[ ] 
+			// j ... column index - they are in Ai[ ]
 			if (i>=m_nr || i<0) { printf("SpRectMatrix<DREAL>::xpos xpos(%d,%d) : row index out of range! max %d \n",i,j,m_nr); return 0; }
 			for (int k=Ap[i];k<Ap[i+1];k++) if (Ai[k]==j) return k; // this is the xpos
 		break;
@@ -35,7 +35,7 @@ template < typename DREAL >
 DREAL& SpRectMatrix<DREAL>::get(int i, int j, int verbose)
 {
 	int xp = xpos(i,j);
-	if (xp < 0) return null; 
+	if (xp < 0) return null;
 	return Ax[xp];
 }
 
@@ -132,24 +132,24 @@ int SpRectMatrix<DREAL>::print2d()
 template < typename DREAL >
 void SpRectMatrix<DREAL>::cusparseInit()
 {
-    // Get handle to the CUBLAS context 
+    // Get handle to the CUBLAS context
 //    cublasHandle_t cublasHandle = 0;
 //    cublasStatus_t cublasStatus;
-//    cublasStatus = 
+//    cublasStatus =
     cublasCreate(&cublasHandle);
 
 //    checkCudaErrors(cublasStatus);
 
-    // Get handle to the CUSPARSE context 
+    // Get handle to the CUSPARSE context
 //    cusparseHandle_t cusparseHandle = 0;
 //    cusparseStatus_t cusparseStatus;
-//    cusparseStatus = 
+//    cusparseStatus =
     cusparseCreate(&cusparseHandle);
 
 //    checkCudaErrors(cusparseStatus);
 
 //    cusparseMatDescr_t descr = 0;
-//    cusparseStatus = 
+//    cusparseStatus =
     cusparseCreateMatDescr(&descr);
 //    checkCudaErrors(cusparseStatus);
 
@@ -220,7 +220,7 @@ int SpRectMatrix<DREAL>::dsolveCG(DREAL *d_r, DREAL *d_x)
 	normb = sqrt(normb);
 
 	cusparseTcsrmv(cusparseHandle,CUSPARSE_OPERATION_NON_TRANSPOSE, N, N, m_nz, &alpha, descr, dAx, dAp, dAi, d_x, &beta, dy);
-/*	
+/*
 	// print dy
 	DREAL *w,*q;
 	w = new DREAL[N];
@@ -234,12 +234,12 @@ int SpRectMatrix<DREAL>::dsolveCG(DREAL *d_r, DREAL *d_x)
 	cudaMemcpy(w, dAx, N*sizeof(DREAL), cudaMemcpyDeviceToHost);
 	for (int i=0;i<N;i++) printf("dAx[%d]=%e | Ax[%d]=%e\n ",i,w[i],i,Ax[i] );
 	delete [] w;
-*/	
-	
-    
+*/
+
+
 	cublasTaxpy(cublasHandle, N, &alpham1, dy, 1, d_r, 1);
 	cublasTdot(cublasHandle, N, d_r, 1, d_r, 1, &r1);
-	
+
 //	printf("r1 = %e\n",r1);
 
 	k = 1;
@@ -257,9 +257,9 @@ int SpRectMatrix<DREAL>::dsolveCG(DREAL *d_r, DREAL *d_x)
             {
                 cublasTcopy(cublasHandle, N, d_r, 1, dp, 1);
             }
-            
+
             cusparseTcsrmv(cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE, N, N, m_nz, &alpha, descr, dAx, dAp, dAi, dp, &beta, dy);
-            
+
             // analyze
             /*
 		w = new DREAL[N];
@@ -279,8 +279,8 @@ int SpRectMatrix<DREAL>::dsolveCG(DREAL *d_r, DREAL *d_x)
 	for (int i=0;i<N;i++) printf("dAi[%d]=%d vs Ai[%d]=%d\n",i,v[i], i,Ai[i]);
 	delete [] v;
             */
-            
-            
+
+
             cublasTdot(cublasHandle, N, dp, 1, dy, 1, &dot);
             a = r1 / dot;
 //            printf("a %e r1 %e dot %e\n",a,r1,dot);
@@ -318,11 +318,11 @@ void SpRectMatrix<DREAL>::unitMatrixInit(int N)
 	int *unitAp = new int[N+1];
 	for (int i=0;i<=N;i++) unitAp[i]=i;
 	for (int i=0;i<N;i++) unitAi[i]=i;
-	
+
 	cudaMalloc((void **)&dunitAi, N*sizeof(int));
 	cudaMalloc((void **)&dunitAp, (N+1)*sizeof(int));
 //	cudaMalloc((void **)&dunitV, (N)*sizeof(DREAL));
-	
+
 	cudaMemcpy(dunitAi, unitAi, N*sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(dunitAp, unitAp, (N+1)*sizeof(int), cudaMemcpyHostToDevice);
 
@@ -376,10 +376,10 @@ SpRectMatrix<DREAL>::SpRectMatrix()
 	dy=0; // dummy unneeded
 	dp=0;
 	descr=0;
-	
+
 	cusparseHandle=0;
 	cublasHandle=0;
-	
+
 	solverTolerance = (DREAL)(3e-4);
 	solverMaxIter = 10000;
 }
@@ -402,7 +402,7 @@ SpRectMatrix<DREAL>::~SpRectMatrix()
 
 	if (dy) cudaFree(dy);
 	if (dp) cudaFree(dp);
-	
+
 	if (cusparseHandle) cusparseDestroy(cusparseHandle);
 	if (cublasHandle) cublasDestroy(cublasHandle);
 }

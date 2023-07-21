@@ -1,4 +1,5 @@
-#include "d3q27_common.h"
+#include "common.h"
+
 // FEI and LUO standard CLBM ... not working
 template <
 	typename TRAITS,

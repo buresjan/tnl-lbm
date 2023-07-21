@@ -1,5 +1,6 @@
-// ]improved BRK (SRT) model by Geier 2017
-#include "d3q27_common_well.h"
+// improved BRK (SRT) model by Geier 2017
+
+#include "common_well.h"
 
 template <
 	typename TRAITS,

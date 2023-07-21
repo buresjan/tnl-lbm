@@ -7,8 +7,6 @@
 #ifndef __SpRectMatrix_H
 #define __SpRectMatrix_H
 
-#include "defs.h"
-
 #ifdef __CUDACC__
 
     // CUDA Runtime
@@ -17,10 +15,10 @@
     // Using updated (v2) interfaces for CUBLAS and CUSPARSE
     #include <cusparse_v2.h>
     #include <cublas_v2.h>
-    
+
     // debug
 //    #include "helper_cuda.h"
-    
+
 
 #endif
 
@@ -29,31 +27,31 @@
 //#define CSC_FORMAT 1
 //#define CSR_FORMAT 2
 
-template < typename DREAL > 
+template < typename DREAL >
 struct SpRectMatrix
 {
 	enum { CSC_FORMAT, CSR_FORMAT };
 
 #ifdef __CUDACC__
     // cublas and cusparse wrapper
-	cusparseStatus_t 
-	cusparseTcsrmv(cusparseHandle_t handle, cusparseOperation_t transA, 
-	int m, int n, int nnz, const float           *alpha, 
-	const cusparseMatDescr_t descrA, 
-	const float           *csrValA, 
+	cusparseStatus_t
+	cusparseTcsrmv(cusparseHandle_t handle, cusparseOperation_t transA,
+	int m, int n, int nnz, const float           *alpha,
+	const cusparseMatDescr_t descrA,
+	const float           *csrValA,
 	const int *csrRowPtrA, const int *csrColIndA,
-	const float           *x, const float           *beta, 
-	float           *y) { 
+	const float           *x, const float           *beta,
+	float           *y) {
 		return cusparseScsrmv(handle, transA, m, n, nnz, alpha, descrA,  csrValA,  csrRowPtrA,  csrColIndA, x,  beta,  y);
 	}
-	cusparseStatus_t 
-	cusparseTcsrmv(cusparseHandle_t handle, cusparseOperation_t transA, 
-	int m, int n, int nnz, const double          *alpha, 
-	const cusparseMatDescr_t descrA, 
-	const double          *csrValA, 
+	cusparseStatus_t
+	cusparseTcsrmv(cusparseHandle_t handle, cusparseOperation_t transA,
+	int m, int n, int nnz, const double          *alpha,
+	const cusparseMatDescr_t descrA,
+	const double          *csrValA,
 	const int *csrRowPtrA, const int *csrColIndA,
-	const double          *x, const double          *beta, 
-	double          *y) { 
+	const double          *x, const double          *beta,
+	double          *y) {
 		return cusparseDcsrmv(handle, transA, m, n, nnz, alpha, descrA,  csrValA,  csrRowPtrA,  csrColIndA, x,  beta,  y);
 	}
 	cublasStatus_t cublasTaxpy(cublasHandle_t handle, int n,
@@ -106,13 +104,13 @@ struct SpRectMatrix
 	int m_nc; // number of cols
 	int m_nz; // number of all non-zeros entries of the matrix
 	DREAL null; // dummy value to return
-	
+
 	////	// CSR or CSC format based on FLAG_CSC_format=true: CSC format or FLAG_CSC_format=false: CSR format
 	int *Ai;
 	int *Ap;
 	DREAL *Ax;
-	
-	
+
+
 #ifdef __CUDACC__
 	// CUDA
 	DREAL *dAx;
@@ -121,13 +119,13 @@ struct SpRectMatrix
 	DREAL *dy, *dp;
 
 	int *dunitAi; // unit matrix in CSR format: cublas cannot multiply 2 vectors per components ....ugh
-	int *dunitAp; // unit matrix in CSR format 
+	int *dunitAp; // unit matrix in CSR format
 	DREAL *dunitV; // auxiliary vector
-	
+
 	cusparseMatDescr_t descr;
 	cusparseHandle_t cusparseHandle;
 	cublasHandle_t cublasHandle;
-	
+
 	void cusparseInit();
 	void unitMatrixInit(int N);
 #endif
@@ -143,10 +141,10 @@ struct SpRectMatrix
 
 	inline DREAL &get(int i, int j) { return get(i,j,1); }
 	DREAL &get(int i, int j, int verbose);		/// returns exact position of a matrix entry
-	
+
 	inline DREAL& operator()(int i, int j) { return get(i,j,1); }
 	inline DREAL& operator()(int i, int j, int verbose) { return get(i,j,verbose); }
-	
+
 	// matrix * input = output
 //	void multiply(DREAL *input, DREAL*output) { return multiply(input, output, 1.0); }
 //	void multiply(DREAL *input, DREAL*output, DREAL multiplicator);
@@ -157,7 +155,7 @@ struct SpRectMatrix
 	// CUDA CUSPARSE
 	void dmultiply(DREAL *input, DREAL*output) { return dmultiply(input, output, (DREAL)1.0); }
 	void dmultiply(DREAL *input, DREAL*output, DREAL multiplicator);
-	
+
 	void dVectorMultiply(int N, DREAL*a, DREAL *b, DREAL alpha); // b[i] *= a[i]
 	void dVectorAddition(int N, DREAL*a, DREAL* b, DREAL alpha); // a[i] += b[i]
 	void dVectorMultiplyAndAdd(int N, DREAL*a, DREAL*b, DREAL alpha, DREAL*output); // output[i] += a[i]*b[i]*alpha

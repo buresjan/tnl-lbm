@@ -13,7 +13,6 @@
 #include "kernels.h"
 #include "lbm.h"
 #include "vtk_writer.h"
-#include "png_tool.h"
 
 // ibm: lagrangian filament/surface
 #include "lagrange_3D.h"

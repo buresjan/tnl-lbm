@@ -10,7 +10,6 @@
 #include <string.h>
 #include <iostream>
 #include <png.h>
-#include "ciselnik.h"
 
 #include <TNL/Containers/StaticVector.h>
 #include <TNL/Containers/NDArray.h>
@@ -19,6 +18,8 @@
 #include <TNL/Containers/Partitioner.h>
 #include <TNL/MPI.h>
 #include <TNL/Cuda/Stream.h>
+
+#include "../lbm_common/ciselnik.h"
 
 using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 
@@ -302,35 +303,35 @@ static TNL::Containers::SyncDirection df_sync_directions[27] = {
 
 // default
 #include "lbm_data.h"  // LBM_Data is a general template (for any Q)
-#include "d3q27_macro.h"
-#include "d3q27_bc.h"
+#include "d3q27/macro.h"
+#include "d3q27/bc.h"
 
-#include "d3q27_eq.h"
-#include "d3q27_eq_inv_cum.h"
-#include "d3q27_eq_well.h"
-#include "d3q27_eq_entropic.h"
+#include "d3q27/eq.h"
+#include "d3q27/eq_inv_cum.h"
+#include "d3q27/eq_well.h"
+#include "d3q27/eq_entropic.h"
 
 // exactly one streaming header must be included
 #ifdef AA_PATTERN
-	#include "d3q27_streaming_AA.h"
+	#include "d3q27/streaming_AA.h"
 #endif
 #ifdef AB_PATTERN
-	#include "d3q27_streaming_AB.h"
+	#include "d3q27/streaming_AB.h"
 #endif
 
-#include "d3q27_col_cum.h"
-#include "d3q27_col_bgk.h"
-#include "d3q27_col_clbm.h"
-#include "d3q27_col_fclbm.h"
-#include "d3q27_col_mrt.h"
-#include "d3q27_col_srt.h"
-#include "d3q27_col_cum_sgs.h"
-#include "d3q27_col_kbc_n.h"
-#include "d3q27_col_kbc_c.h"
-#include "d3q27_col_srt_modif_force.h"
-#include "d3q27_col_clbm_fei.h"
+#include "d3q27/col_cum.h"
+#include "d3q27/col_bgk.h"
+#include "d3q27/col_clbm.h"
+#include "d3q27/col_fclbm.h"
+#include "d3q27/col_mrt.h"
+#include "d3q27/col_srt.h"
+#include "d3q27/col_cum_sgs.h"
+#include "d3q27/col_kbc_n.h"
+#include "d3q27/col_kbc_c.h"
+#include "d3q27/col_srt_modif_force.h"
+#include "d3q27/col_clbm_fei.h"
 
-#include "d3q27_col_srt_well.h"
-#include "d3q27_col_clbm_well.h"
-#include "d3q27_col_cum_well.h"
-#include "d3q27_col_bgk_well.h"
+#include "d3q27/col_srt_well.h"
+#include "d3q27/col_clbm_well.h"
+#include "d3q27/col_cum_well.h"
+#include "d3q27/col_bgk_well.h"

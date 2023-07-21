@@ -1,4 +1,4 @@
-#include "core.h"
+#include "lbm3d/core.h"
 
 // 3D test domain
 template < typename NSE >

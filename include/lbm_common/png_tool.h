@@ -1,5 +1,6 @@
 #pragma once
-#include "defs.h"
+
+#include <png.h>
 
 struct PNGTool
 {
@@ -7,7 +8,7 @@ struct PNGTool
 	int height;
 	bool allocated;
 	png_bytep *row_pointers;
-	
+
 	// coords a,b in [0,1]
 	// rule:
 	// a=0 ... x=0
@@ -18,7 +19,7 @@ struct PNGTool
 		// spocitej x a y
 		int y=ib*(height-1);
 		int x=ia*(width-1);
-		
+
 		png_bytep row = row_pointers[y];
 		png_bytep px = &(row[x * 4]);
 
@@ -28,7 +29,7 @@ struct PNGTool
 
 		return ((r & 0xff) << 16) + ((g & 0xff) << 8) + (b & 0xff);
 	}
-	
+
 	bool readPNG(const char *filename)
 	{
 		FILE *fp = fopen(filename, "rb");
@@ -37,12 +38,12 @@ struct PNGTool
 
 		png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 		if(!png) { printf("file %s png read error\n",filename); return false; }
-	
+
 		png_infop info = png_create_info_struct(png);
 		if(!png) { printf("file %s png read error\n",filename); return false; }
 
 		if(setjmp(png_jmpbuf(png))) { printf("file %s png read error\n",filename); return false;}
-    
+
 		png_init_io(png, fp);
 
 		png_read_info(png, info);
@@ -73,13 +74,13 @@ struct PNGTool
 		fclose(fp);
 		return true;
 	}
-	
+
 
 	PNGTool(const char*filename)
 	{
 		allocated = readPNG(filename);
 	}
-	
+
 	~PNGTool()
 	{
 		// free

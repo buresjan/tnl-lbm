@@ -15,7 +15,7 @@
  */
 // N1-N4 models with the raw/natural moment representation of DFs
 
-#include "d3q27_common.h"
+#include "common.h"
 
 // speed of sound
 #define _csqr n1o3

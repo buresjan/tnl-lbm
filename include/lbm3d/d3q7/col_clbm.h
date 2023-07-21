@@ -1,4 +1,4 @@
-#include "d3q7_common.h"
+#include "common.h"
 
 // CLBM non-og standard monomials
 // central moment equilibria

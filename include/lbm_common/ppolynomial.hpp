@@ -6,14 +6,14 @@ const int MAX_TOKENS_PER_LINE = 100;
 int PPolynomial::parse_input_file(const char* inputfile)
 {
 	// open file
-	ifstream fin;
+	std::ifstream fin;
 	fin.open(inputfile); // open a file
-	if (!fin.good()) { printf("PPolynomial::parse_input_file::file %s does not exist.\n",inputfile); return -1; } 
+	if (!fin.good()) { printf("PPolynomial::parse_input_file::file %s does not exist.\n",inputfile); return -1; }
 	///CTRL->error("Mesh","Mesh","file %s does not exist",inputfile); // exit if file not found
-	
+
 	m_order=-1;
 	m_pieces=-1;
-	
+
 	int lines = 0;
 //	bool not_eof=true;
 	// read each line of the file and determine number of elements, sides, nodes
@@ -22,10 +22,10 @@ int PPolynomial::parse_input_file(const char* inputfile)
 		// read an entire line into memory
 		char buf[MAX_CHARS_PER_LINE];
 		fin.getline(buf, MAX_CHARS_PER_LINE);
-	
+
 		// parse the line into blank-delimited tokens
 		int n = 0; // a for-loop index
-    
+
 		// array to store memory addresses of the tokens in buf
 		const char* token[MAX_TOKENS_PER_LINE] = {}; // initialize to 0
 
@@ -39,20 +39,20 @@ int PPolynomial::parse_input_file(const char* inputfile)
 				if (!token[n]) break; // no more tokens
 			}
 		}
-				
+
 		// now read the file as we expected
 		if (lines==0)
 		{
 			// we read the order of the polynomial first
-			if (n!=1) { printf("PPolynomial::parse_input_file::line %d has incorrect number of tokens %d.\n",lines,n); return -1; } 
+			if (n!=1) { printf("PPolynomial::parse_input_file::line %d has incorrect number of tokens %d.\n",lines,n); return -1; }
 			sscanf(token[0],"%d",&m_order);
 //			printf("order read %d\n",m_order);
 		}
-		
+
 		if (lines==1)
 		{
 			// we read the order of the polynomial first
-			if (n!=1) { printf("PPolynomial::parse_input_file::line %d has incorrect number of tokens %d.\n",lines,n); return -1; } 
+			if (n!=1) { printf("PPolynomial::parse_input_file::line %d has incorrect number of tokens %d.\n",lines,n); return -1; }
 			sscanf(token[0],"%d",&m_pieces);
 //			printf("pieces read %d\n",m_pieces);
 			// create m_divisions
@@ -62,8 +62,8 @@ int PPolynomial::parse_input_file(const char* inputfile)
 			for (int i=0;i<m_pieces;i++) m_coefs[i] = new double[m_order];
 			m_FLAG_allocated=true;
 		}
-		
-	
+
+
 		if (m_FLAG_allocated)
 		{
 			if (lines>=2 && lines<2+m_pieces+1)
@@ -93,7 +93,7 @@ int PPolynomial::parse_input_file(const char* inputfile)
 				if (strcmp(token[1],"tria")==0) tria++; else
 				if (strcmp(token[1],"quad")==0) quad++; else
 				CTRL->error("Mesh","parse_input_mdf_file_2D","unknown %dD object %s",m_dimension,token[1]);
-				loc_entities[2]++; 
+				loc_entities[2]++;
 			} else
 			if (strcmp(token[0],"Side")==0)
 			{
@@ -107,9 +107,9 @@ int PPolynomial::parse_input_file(const char* inputfile)
 			{
 				loc_entities[2]++;
 			}
-			
+
 		}
-*/		
+*/
 		lines++;
 	}
 	fin.close();
@@ -199,7 +199,7 @@ PPolynomial::PPolynomial(const char *inputfilename)
 
 PPolynomial::~PPolynomial()
 {
-	if (m_FLAG_allocated) 
+	if (m_FLAG_allocated)
 	{
 		delete [] m_divisions;
 		for (int i=0;i<m_pieces;i++) delete [] m_coefs[i];

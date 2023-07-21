@@ -115,7 +115,7 @@ static int move_file(const char* src, const char* dst)
 	int source = open(src, O_RDONLY, 0);
 	struct stat stat_source;
 	fstat(source, &stat_source);
-	int dest = open(dst, O_WRONLY | O_CREAT /*| O_TRUNC/**/, stat_source.st_mode);
+	int dest = open(dst, O_WRONLY | O_CREAT /*| O_TRUNC*/, stat_source.st_mode);
 	off_t offset = 0LL;
 	ssize_t rc = 0;
 	while (offset < stat_source.st_size) {
