@@ -497,7 +497,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 template< typename LBM >
 void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 {
-#ifdef USE_TNL
 	if (ws_tnl_constructed) return;
 	ws_tnl_constructed=true;
 	int rDirac=1;
@@ -777,10 +776,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		case ws_computeHybrid_TNL_zerocopy:    compute_desc = "ws_computeHybrid_TNL_zerocopy"; break;
 	}
 	log("constructed WuShu matrices for ws_compute=%s", compute_desc);
-#endif // USE_TNL
 }
 
-#ifdef USE_TNL
 template< typename Matrix, typename Vector >
 __cuda_callable__
 typename Matrix::RealType
@@ -797,7 +794,6 @@ rowVectorProduct( const Matrix& matrix, typename Matrix::IndexType i, const Vect
 
     return result;
 }
-#endif
 
 //require: rho, vx, vy, vz
 template< typename LBM >
@@ -819,17 +815,14 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 	int m=LL.size();
 	idx n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
 
-	#ifdef USE_TNL
 	using VectorView = TNL::Containers::VectorView< dreal, TNL::Devices::Cuda, idx >;
 	using ConstVectorView = TNL::Containers::VectorView< const dreal, TNL::Devices::Cuda, idx >;
-	#endif
 
 	switch (ws_compute)
 	{
 		#ifdef USE_CUDA
 		case ws_computeGPU_TNL:
 		{
-			#ifdef USE_TNL
 			// no Device--Host copy is required
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_db[1], -1.0);
@@ -863,15 +856,11 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
-			#else
-			printf("ws_tnl_computeGPU_TNL failed: TNL not included in the build. \n");
-			#endif
 			break;
 		}
 
 		case ws_computeHybrid_TNL:
 		{
-			#ifdef USE_TNL
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_db[1], -1.0);
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_db[2], -1.0);
@@ -909,15 +898,11 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
-			#else
-			printf("ws_tnl_computeHybrid_TNL failed: TNL not included in the build. \n");
-			#endif
 			break;
 		}
 
 		case ws_computeHybrid_TNL_zerocopy:
 		{
-			#ifdef USE_TNL
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_hbz[0], -1.0);
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_hbz[1], -1.0);
 			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_hbz[2], -1.0);
@@ -951,9 +936,6 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
-			#else
-			printf("ws_tnl_computeHybrid_TNL_zerocopy failed: TNL not included in the build. \n");
-			#endif
 			break;
 		}
 
@@ -1015,7 +997,6 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		#endif // USE_CUDA
 		case ws_computeCPU_TNL:
 		{
-			#ifdef USE_TNL
 			// vx, vy, vz, rho must be copied from the device
 			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvx(), n), ws_tnl_hb[0], -1.0);
 			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvy(), n), ws_tnl_hb[1], -1.0);
@@ -1039,9 +1020,6 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, n, kernel);
-			#else
-			printf("ws_tnl_computeCPU_TNL failed: TNL not included in the build. \n");
-			#endif
 			break;
 		}
 		case ws_computeCPU:
@@ -1108,7 +1086,6 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const char* resultsDir) : lbm(inputLB
 {
 	sprintf(logfile, "%s/ibm_solver.log", resultsDir);
 
-	#ifdef USE_TNL
 	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
@@ -1120,7 +1097,6 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const char* resultsDir) : lbm(inputLB
 	ws_tnl_dsolver.setConvergenceResidue(3e-4);
 	ws_tnl_dprecond = std::make_shared< dPreconditioner >();
 //	ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
-	#endif
 	#endif
 
 	#ifdef USE_CUSPARSE

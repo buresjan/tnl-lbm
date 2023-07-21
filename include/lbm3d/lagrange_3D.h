@@ -7,27 +7,24 @@
 #include "lbm.h"
 #include "lbm_common/spmatrix.h"
 
+#include <TNL/Matrices/SparseMatrix.h>
+#include <TNL/Algorithms/Segments/SlicedEllpack.h>
+#include <TNL/Pointers/DevicePointer.h>
+#include <TNL/Algorithms/parallelFor.h>
+#include <TNL/Solvers/Linear/CG.h>
+#include <TNL/Solvers/Linear/Preconditioners/Diagonal.h>
+#include <TNL/Solvers/Linear/Preconditioners/ILU0.h>
+#include <TNL/Allocators/CudaHost.h>
 
-#ifdef USE_TNL
-	#include <TNL/Matrices/SparseMatrix.h>
-	#include <TNL/Algorithms/Segments/SlicedEllpack.h>
-	#include <TNL/Pointers/DevicePointer.h>
-	#include <TNL/Algorithms/parallelFor.h>
-	#include <TNL/Solvers/Linear/CG.h>
-	#include <TNL/Solvers/Linear/Preconditioners/Diagonal.h>
-	#include <TNL/Solvers/Linear/Preconditioners/ILU0.h>
-	#include <TNL/Allocators/CudaHost.h>
-
-	template< typename Device, typename Index, typename IndexAlocator >
-	using SlicedEllpackSegments = TNL::Algorithms::Segments::SlicedEllpack< Device, Index, IndexAlocator >;
-	template< typename Real, typename Device, typename Index >
-	using SlicedEllpack = TNL::Matrices::SparseMatrix< Real,
-	                                                   Device,
-	                                                   Index,
-	                                                   TNL::Matrices::GeneralMatrix,
-	                                                   SlicedEllpackSegments
-	                                                 >;
-#endif
+template< typename Device, typename Index, typename IndexAlocator >
+using SlicedEllpackSegments = TNL::Algorithms::Segments::SlicedEllpack< Device, Index, IndexAlocator >;
+template< typename Real, typename Device, typename Index >
+using SlicedEllpack = TNL::Matrices::SparseMatrix< Real,
+													Device,
+													Index,
+													TNL::Matrices::GeneralMatrix,
+													SlicedEllpackSegments
+													>;
 
 #ifdef USE_CUSPARSE
 	#include "lbm_common/sprectmatrix.h"
@@ -85,7 +82,6 @@ struct Lagrange3D
 
 	LBM &lbm;
 
-#ifdef USE_TNL
 //	using hVector = TNL::Containers::Vector< real, TNL::Devices::Host, idx, TNL::Allocators::CudaHost<real> >;
 	using hVector = TNL::Containers::Vector< dreal, TNL::Devices::Host, idx, TNL::Allocators::CudaHost<dreal> >;
 	using dVector = TNL::Containers::Vector< dreal, TNL::Devices::Cuda, idx >;
@@ -123,7 +119,6 @@ struct Lagrange3D
 	typename std::shared_ptr< dPreconditioner > ws_tnl_dprecond;
 	#endif
 	bool ws_tnl_constructed=false;
-#endif // USE_TNL
 
 	// WuShu using sparse matrices
 	SpMatrix<real> *ws_A;
