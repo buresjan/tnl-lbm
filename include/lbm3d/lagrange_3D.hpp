@@ -788,7 +788,7 @@ rowVectorProduct( const Matrix& matrix, typename Matrix::IndexType i, const Vect
 
     for( typename Matrix::IndexType c = 0; c < row.getSize(); c++ ) {
         const typename Matrix::IndexType column = row.getColumnIndex( c );
-        if( column != matrix.getPaddingIndex() )
+        if( column != TNL::Matrices::paddingIndex< typename Matrix::IndexType > )
             result += row.getValue( c ) * vector[ column ];
     }
 
