@@ -511,7 +511,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const char* 
 	char idd[500];
 	real value;
 	int dofs;
-	int count=0, index=0;
+	int index=0;
 	while (outputData(*this, index++, 0, idd, offset.x(), offset.y(), offset.z(), value, dofs))
 	{
 		// insert description
@@ -534,7 +534,6 @@ void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const char* 
 			}
 		}
 		vtk.writeBuffer(fp);
-		count++;
 	}
 
 	fclose(fp);
@@ -601,7 +600,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const cha
 	char idd[500];
 	real value;
 	int dofs;
-	int count=0, index=0;
+	int index=0;
 	while (outputData(*this, index++, 0, idd, ox, oy, oz, value, dofs))
 	{
 		// insert description
@@ -624,7 +623,6 @@ void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const cha
 			}
 		}
 		vtk.writeBuffer(fp);
-		count++;
 	}
 
 	fclose(fp);
@@ -676,7 +674,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const ch
 	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
 		vtk.writeInt(fp, hmap(x,y,z));
 
-	int count=0, index=0;
+	int index=0;
 	char idd[500];
 	real value;
 	int dofs;
@@ -701,7 +699,6 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const ch
 			}
 		}
 		vtk.writeBuffer(fp);
-		count++;
 	}
 
 	fclose(fp);
@@ -752,7 +749,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const ch
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
 		vtk.writeInt(fp, hmap(x,y,z));
 
-	int count=0, index=0;
+	int index=0;
 	char idd[500];
 	real value;
 	int dofs;
@@ -776,8 +773,6 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const ch
 			}
 		}
 		vtk.writeBuffer(fp);
-		count++;
-
 	}
 
 	fclose(fp);
@@ -827,7 +822,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const ch
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
 		vtk.writeInt(fp, hmap(x,y,z));
 
-	int count=0, index=0;
+	int index=0;
 	char idd[500];
 	real value;
 	int dofs;
@@ -851,7 +846,6 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const ch
 			}
 		}
 		vtk.writeBuffer(fp);
-		count++;
 	}
 
 	fclose(fp);

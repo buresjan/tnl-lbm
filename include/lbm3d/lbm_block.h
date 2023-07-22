@@ -53,15 +53,15 @@ struct LBM_BLOCK
 	int neighbour_left = 0;
 	int neighbour_right = 0;
 
-	// block indices
-	int left_id;  // index of the left neighbor block
-	int id;       // index of this block
-	int right_id; // index of the right neighbor block
-
 	// lattice sizes and offsets
 	idx3d global;
 	idx3d local;
 	idx3d offset;
+
+	// block indices
+	int left_id;  // index of the left neighbor block
+	int id;       // index of this block
+	int right_id; // index of the right neighbor block
 
 	// constructors
 	LBM_BLOCK() = delete;

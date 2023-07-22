@@ -6,9 +6,9 @@
 // filament varianty
 enum { NIC, NORMAL, MIRROR, FLIP, MIRRORFLIP };
 
-const int DOMAIN_INNER = -1;
-const int DOMAIN_OUTER = -2;
-const int DOMAIN_BNDRY = -3;
+//const int DOMAIN_INNER = -1;
+//const int DOMAIN_OUTER = -2;
+//const int DOMAIN_BNDRY = -3;
 
 template < typename TRAITS >
 struct MacroLocal : D3Q27_MACRO_Base< TRAITS >
@@ -193,8 +193,7 @@ struct StateLocal : State<NSE>
 		// output
 		FILE*f;
 		char str[200], dir[200];
-		char txt[200];
-		real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
+		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
 		sprintf(dir,"results_%s",id);
 		mkdir(dir,0755);
 		sprintf(dir,"results_%s/probes",id);
@@ -257,7 +256,6 @@ struct StateLocal : State<NSE>
 template < typename STATE >
 int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_CUSPARSE)
 {
-	using idx = typename STATE::TRAITS::idx;
 	using real = typename STATE::TRAITS::real;
 
 	// based on sigma, estimate N
@@ -329,7 +327,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	int block_size=32;
 	real BALL_DIAMETER = 0.01;
 	real real_domain_height= BALL_DIAMETER*11;// [m]
-	real real_domain_length= BALL_DIAMETER*11;// [m] // extra 1cm on both sides
+	//real real_domain_length= BALL_DIAMETER*11;// [m] // extra 1cm on both sides
 	idx LBM_Y = RES*block_size; // for 4 cm
 	idx LBM_Z = LBM_Y;
 	real PHYS_DL = real_domain_height/((real)LBM_Y);

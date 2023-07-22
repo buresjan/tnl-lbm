@@ -168,7 +168,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 
 	typedef std::vector<DD_struct> VECDD;
 	typedef std::vector<int> VEC;
-	typedef std::vector<real> VECR;
+	//typedef std::vector<real> VECR;
 	VEC *v = new VEC[m];
 	VECDD *vr = new VECDD[m];
 
@@ -764,7 +764,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	printf("tnl wushu lagrange_3D_end\n");
 	printf("number of lagrangian points: %d\n", m);
 
-	const char* compute_desc;
+	const char* compute_desc = "undefined";
 	switch (ws_compute)
 	{
 		case ws_computeCPU:                    compute_desc = "ws_computeCPU"; break;

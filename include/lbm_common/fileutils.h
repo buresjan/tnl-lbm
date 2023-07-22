@@ -134,7 +134,7 @@ static int move_file(const char* src, const char* dst)
 		}
 	}
 	if (offset != stat_source.st_size) {
-		fprintf(stderr, "incomplete transfer from sendfile: %lld of %lld bytes\n", rc, (long long)stat_source.st_size);
+		fprintf(stderr, "incomplete transfer from sendfile: %lld of %lld bytes\n", (long long)rc, (long long)stat_source.st_size);
 		return -1;
 	}
 	close(source);

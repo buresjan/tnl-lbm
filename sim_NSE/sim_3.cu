@@ -6,9 +6,9 @@
 // filament varianty
 enum { NIC, NORMAL, MIRROR, FLIP, MIRRORFLIP };
 
-const int DOMAIN_INNER = -1;
-const int DOMAIN_OUTER = -2;
-const int DOMAIN_BNDRY = -3;
+//const int DOMAIN_INNER = -1;
+//const int DOMAIN_OUTER = -2;
+//const int DOMAIN_BNDRY = -3;
 
 template < typename TRAITS >
 struct MacroLocal : D3Q27_MACRO_Base< TRAITS >
@@ -229,8 +229,7 @@ struct StateLocal : State<NSE>
 		// output
 		FILE*f;
 		char str[200], dir[200];
-		char txt[200];
-		real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
+		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
 		sprintf(dir,"results_%s",id);
 		mkdir(dir,0755);
 		sprintf(dir,"results_%s/probes",id);
@@ -313,7 +312,6 @@ struct StateLocal : State<NSE>
 template < typename STATE >
 int setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_CUSPARSE)
 {
-	using idx = typename STATE::TRAITS::idx;
 	using real = typename STATE::TRAITS::real;
 
 	// based on sigma, estimate N
@@ -392,7 +390,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 
 	real PHYS_VISCOSITY = 0.001; // [m^2/s]
 //	real Umax = 0.45; // [m/s]
-	real Ubar = Re * PHYS_VISCOSITY / cylinder_diameter;;
+	real Ubar = Re * PHYS_VISCOSITY / cylinder_diameter;
 	real Umax = 9.0/4.0*Ubar; // [m/s] // Re=20 --> 0.45m/s
 
 	real LBM_VISCOSITY = 0.001;

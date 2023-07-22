@@ -1061,21 +1061,21 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 	}
 
 	// save probes
-	for (int i=0;i<probe1Dvec.size();i++)
+	for (std::size_t i=0;i<probe1Dvec.size();i++)
 	{
-		sprintf(nid,"probe1D_%d",i);
+		sprintf(nid,"probe1D_%lu",i);
 //		saveLoadTextData(direction, tmp_dirname, nid, "%d\n", probe1Dvec[i].cycle);
 		saveLoadTextData(direction, tmp_dirname, nid, probe1Dvec[i].cycle);
 	}
-	for (int i=0;i<probe1Dlinevec.size();i++)
+	for (std::size_t i=0;i<probe1Dlinevec.size();i++)
 	{
-		sprintf(nid,"probe1Dline_%d",i);
+		sprintf(nid,"probe1Dline_%lu",i);
 //		saveLoadTextData(direction, tmp_dirname, nid, "%d\n", probe1Dlinevec[i].cycle);
 		saveLoadTextData(direction, tmp_dirname, nid, probe1Dlinevec[i].cycle);
 	}
-	for (int i=0;i<probe2Dvec.size();i++)
+	for (std::size_t i=0;i<probe2Dvec.size();i++)
 	{
-		sprintf(nid,"probe2D_%d",i);
+		sprintf(nid,"probe2D_%lu",i);
 //		saveLoadTextData(direction, tmp_dirname, nid, "%d\n", probe2Dvec[i].cycle);
 		saveLoadTextData(direction, tmp_dirname, nid, probe2Dvec[i].cycle);
 	}
@@ -1130,14 +1130,14 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 			if (i == 0)
 			{
 				log("[moving files from local scratch to temporary files in the destination directory]");
-				sprintf(src_suffix, "");
-				sprintf(dst_suffix, ".tmp");
+				sprintf(src_suffix, "%s", "");
+				sprintf(dst_suffix, "%s", ".tmp");
 			}
 			else
 			{
 				log("[renaming temporary files to the target files]");
-				sprintf(src_suffix, ".tmp");
-				sprintf(dst_suffix, "");
+				sprintf(src_suffix, "%s", ".tmp");
+				sprintf(dst_suffix, "%s", "");
 				sprintf(tmp_dirname, final_dirname);
 			}
 
@@ -1154,22 +1154,22 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 			}
 
 			// save probes
-			for (int i=0;i<probe1Dvec.size();i++)
+			for (std::size_t i=0;i<probe1Dvec.size();i++)
 			{
-				sprintf(src, "probe1D_%d_rank%03d%s", i, nse.rank, src_suffix);
-				sprintf(dst, "probe1D_%d_rank%03d%s", i, nse.rank, dst_suffix);
+				sprintf(src, "probe1D_%lu_rank%03d%s", i, nse.rank, src_suffix);
+				sprintf(dst, "probe1D_%lu_rank%03d%s", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
-			for (int i=0;i<probe1Dlinevec.size();i++)
+			for (std::size_t i=0;i<probe1Dlinevec.size();i++)
 			{
-				sprintf(src,"probe1Dline_%d_rank%03d%s", i, nse.rank, src_suffix);
-				sprintf(dst,"probe1Dline_%d_rank%03d%s", i, nse.rank, dst_suffix);
+				sprintf(src,"probe1Dline_%lu_rank%03d%s", i, nse.rank, src_suffix);
+				sprintf(dst,"probe1Dline_%lu_rank%03d%s", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
-			for (int i=0;i<probe2Dvec.size();i++)
+			for (std::size_t i=0;i<probe2Dvec.size();i++)
 			{
-				sprintf(src,"probe2D_%d_rank%03d%s", i, nse.rank, src_suffix);
-				sprintf(dst,"probe2D_%d_rank%03d%s", i, nse.rank, dst_suffix);
+				sprintf(src,"probe2D_%lu_rank%03d%s", i, nse.rank, src_suffix);
+				sprintf(dst,"probe2D_%lu_rank%03d%s", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 

@@ -10,7 +10,7 @@ void VTKWriter::forceBigEndian(unsigned char *bytes)
 			shouldSwap = 1;
 		doneTest = 1;
 	}
-	
+
 	if (shouldSwap)
 	{
 		unsigned char tmp = bytes[0];
@@ -40,9 +40,9 @@ void VTKWriter::writeFloat(FILE*fp, float val)
 	if (!fp) return;
 	forceBigEndian((unsigned char *) &val);
 	//fwrite(&val, sizeof(float), 1, fp);
-	if (buffer_pos>=buffer_len) 
-	{ 
-		printf("vtk.writeFloat::unexpected pos %d vs. max %d\n",buffer_pos, buffer_len-1);
+	if (buffer_pos>=buffer_len)
+	{
+		printf("vtk.writeFloat::unexpected pos %ld vs. max %ld\n",buffer_pos, buffer_len-1);
 		return;
 	}
 	buffer[buffer_pos] = val;

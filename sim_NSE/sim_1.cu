@@ -55,7 +55,7 @@ struct StateLocal : State<NSE>
 		// draw a cylinder
 		if (0)
 		{
-			int cy=floor(0.2/nse.lat.physDl);
+			//int cy=floor(0.2/nse.lat.physDl);
 			int cz=floor(0.2/nse.lat.physDl);
 			int cx=floor(0.45/nse.lat.physDl);
 			real radius=0.05; // 10 cm diameter
@@ -72,7 +72,7 @@ struct StateLocal : State<NSE>
 		if (1)
 		{
 			//int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.20/nse.lat.physDl);
+			//int cz=floor(0.20/nse.lat.physDl);
 			int cx=floor(0.20/nse.lat.physDl);
 			//int range=nse.lat.global.z()/4;
 			int width=nse.lat.global.z()/10;

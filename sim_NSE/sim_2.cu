@@ -189,8 +189,8 @@ struct StateLocal : State<NSE>
 		// compute error
 		real local_l1sum=0;
 		real local_l2sum=0;
-		real local_la1sum=0;
-		real local_la2sum=0;
+		//real local_la1sum=0;
+		//real local_la2sum=0;
 		real diff;
 		real an;
 		for (int i = nse.blocks.front().offset.x() + 1; i < nse.blocks.front().offset.x() + nse.blocks.front().local.x() - 1; i++)
@@ -199,8 +199,8 @@ struct StateLocal : State<NSE>
 		{
 			an = analytical_ux(j,k);
 			diff = fabs(nse.blocks.front().hmacro(MACRO::e_vx,i,j,k) - an);
-			local_la1sum += an;
-			local_la2sum += SQ(an);
+			//local_la1sum += an;
+			//local_la2sum += SQ(an);
 			local_l1sum += diff;
 			local_l2sum += SQ(diff);
 		}
@@ -208,8 +208,8 @@ struct StateLocal : State<NSE>
 		// MPI reduction of the local results
 		real l1sum=TNL::MPI::reduce(local_l1sum, MPI_SUM, MPI_COMM_WORLD);
 		real l2sum=TNL::MPI::reduce(local_l2sum, MPI_SUM, MPI_COMM_WORLD);
-		real la1sum=TNL::MPI::reduce(local_la1sum, MPI_SUM, MPI_COMM_WORLD);
-		real la2sum=TNL::MPI::reduce(local_la2sum, MPI_SUM, MPI_COMM_WORLD);
+		//real la1sum=TNL::MPI::reduce(local_la1sum, MPI_SUM, MPI_COMM_WORLD);
+		//real la2sum=TNL::MPI::reduce(local_la2sum, MPI_SUM, MPI_COMM_WORLD);
 
 		// considering PHYS_DL, converting to physical units
 		real l1error_phys = l1sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
@@ -357,12 +357,12 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 
 		#ifdef USE_CUDA
 			// convert analytical solution from double to float
-			dreal analytical[state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()];
+			std::unique_ptr< dreal[] > analytical{ new dreal[ state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z() ] };
 			for (int j = 0; j < state.nse.blocks.front().local.y(); j++)
 			for (int k = 0; k < state.nse.blocks.front().local.z(); k++)
 				analytical[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
 			// copy the analytical profile to the GPU
-			cudaMemcpy(state.nse.blocks.front().data.vx_profile, analytical, state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
+			cudaMemcpy(state.nse.blocks.front().data.vx_profile, analytical.get(), state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
 		#else
 			for (int j = 0; j < state.nse.blocks.front().local.y(); j++)
 			for (int k = 0; k < state.nse.blocks.front().local.z(); k++)
