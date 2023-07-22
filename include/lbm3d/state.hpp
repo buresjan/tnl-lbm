@@ -9,9 +9,8 @@
 template< typename NSE >
 int State<NSE>::addLagrange3D()
 {
-	char dir[FILENAME_CHARS];
-	sprintf(dir,"results_%s",id);
-	FF.emplace_back(nse, dir);
+	const std::string dir = fmt::format("results_{}", id);
+	FF.emplace_back(nse, std::move(dir));
 	return FF.size()-1;
 }
 
@@ -53,60 +52,51 @@ bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::log(const char* fmt, ARGS... args)
+void State<NSE>::log(const char* fmts, ARGS... args)
 {
-	char dir[FILENAME_CHARS];
-	sprintf(dir,"results_%s",id);
-	mkdir(dir,0777);
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"%s/log_rank%03d",dir,nse.rank);
+	const std::string dir = fmt::format("results_{}", id);
+	mkdir(dir.c_str(), 0777);
+	const std::string fname = fmt::format("{}/log_rank{:03d}", dir, nse.rank);
 
-	FILE*f = fopen(fname,"at"); // append information
-	if (f==0)
-	{
-		printf("unable to create/access file %s",fname);
+	FILE* f = fopen(fname.c_str(), "at"); // append information
+	if (f==0) {
+		fmt::print(stderr, "unable to create/access file {}", fname);
 		return;
 	}
 	// insert time stamp
-	char tname[FILENAME_CHARS];
-	timestamp(tname);
-	fprintf(f, "%s ", tname);
-	fprintf(f,fmt, args...);
-	fprintf(f,"\n");
+	fmt::print(f, "{} ", timestamp());
+	fmt::print(f, fmts, args...);
+	fmt::print(f, "\n");
 	fclose(f);
 
-	printf(fmt, args...);
-	printf("\n");
+	fmt::print(fmts, args...);
+	fmt::print("\n");
 
 }
 
 /// outputs information into log file "type"
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::setid(const char* fmt, ARGS... args)
+void State<NSE>::setid(const char* fmts, ARGS... args)
 {
-	sprintf(id, fmt, args...);
+	id = fmt::format(fmts, args...);
 }
 
 template< typename NSE >
-void State<NSE>::flagCreate(const char*flagname)
+void State<NSE>::flagCreate(const char* flagname)
 {
 	if (nse.rank != 0) return;
 
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/%s",id,flagname);
-	create_file(fname);
+	const std::string fname = fmt::format("results_{}/{}", id, flagname);
+	create_file(fname.c_str());
 
-	FILE*f = fopen(fname,"at"); // append information
-	if (f==0)
-	{
-		printf("unable to create/access file %s",fname);
+	FILE*f = fopen(fname.c_str(), "at"); // append information
+	if (f==0) {
+		fmt::print(stderr, "unable to create/access file {}", fname);
 		return;
 	}
 	// insert time stamp
-	char tname[FILENAME_CHARS];
-	timestamp(tname);
-	fprintf(f, "%s\n", tname);
+	fmt::print(f, "{}\n", timestamp());
 	fclose(f);
 }
 
@@ -115,41 +105,36 @@ void State<NSE>::flagDelete(const char*flagname)
 {
 	if (nse.rank != 0) return;
 
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/%s",id,flagname);
-	if (fileExists(fname)) remove(fname);
+	const std::string fname = fmt::format("results_{}/{}", id, flagname);
+	if (fileExists(fname.c_str()))
+		remove(fname.c_str());
 }
 
 template< typename NSE >
-bool State<NSE>::flagExists(const char*flagname)
+bool State<NSE>::flagExists(const char* flagname)
 {
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/%s",id,flagname);
-	return fileExists(fname);
+	const std::string fname = fmt::format("results_{}/{}", id, flagname);
+	return fileExists(fname.c_str());
 }
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::mark(const char* fmt, ARGS... args)
+void State<NSE>::mark(const char* fmts, ARGS... args)
 {
 	if (nse.rank != 0) return;
 
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/mark",id);
-	create_file(fname);
+	const std::string fname = fmt::format("results_{}/mark", id);
+	create_file(fname.c_str());
 
-	FILE*f = fopen(fname,"at"); // append information
-	if (f==0)
-	{
-		printf("unable to create/access file %s",fname);
+	FILE* f = fopen(fname.c_str(), "at"); // append information
+	if (f==0) {
+		fmt::print(stderr, "unable to create/access file {}", fname);
 		return;
 	}
 	// insert time stamp
-	char tname[FILENAME_CHARS];
-	timestamp(tname);
-	fprintf(f, "%s ", tname);
-	fprintf(f,fmt, args...);
-	fprintf(f,"\n");
+	fmt::print(f, "{} ", timestamp());
+	fmt::print(f, fmts, args...);
+	fmt::print(f, "\n");
 	fclose(f);
 }
 
@@ -160,16 +145,15 @@ bool State<NSE>::isMark()
 	bool result;
 	if (nse.rank == 0)
 	{
-		char fname[FILENAME_CHARS];
-		sprintf(fname,"results_%s/mark", id);
-		if (fileExists(fname))
+		const std::string fname = fmt::format("results_{}/mark", id);
+		if (fileExists(fname.c_str()))
 		{
-			log("Mark %s already exists.",fname);
+			log("Mark {} already exists.", fname);
 			result = true;
 		}
 		else
 		{
-			log("Mark %s does not exist. Creating new mark.",fname);
+			log("Mark {} does not exist. Creating new mark.", fname);
 			mark("");
 			result = false;
 		}
@@ -193,11 +177,10 @@ void State<NSE>::writeVTK_Surface(const char* name, real time, int cycle, Lagran
 {
 	VTKWriter vtk;
 
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/vtk3D/rank%03d_%s.vtk",id,nse.rank,name);
-	create_file(fname);
+	const std::string fname = fmt::format("results_{}/vtk3D/rank{:03d}_{}.vtk", id, nse.rank, name);
+	create_file(fname.c_str());
 
-	FILE* fp = fopen(fname, "w+");
+	FILE* fp = fopen(fname.c_str(), "w+");
 	vtk.writeHeader(fp);
 
 	fprintf(fp, "DATASET POLYDATA\n");
@@ -241,16 +224,15 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrang
 {
 	VTKWriter vtk;
 
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"results_%s/vtk3D/rank%03d_%s.vtk",id,nse.rank,name);
-	create_file(fname);
+	const std::string fname = fmt::format("results_{}/vtk3D/rank{:03d}_{}.vtk", id, nse.rank, name);
+	create_file(fname.c_str());
 
-	FILE* fp = fopen(fname, "w+");
+	FILE* fp = fopen(fname.c_str(), "w+");
 	vtk.writeHeader(fp);
 
 	fprintf(fp, "DATASET POLYDATA\n");
 
-	fprintf(fp, "POINTS %d float\n", fil.LL.size());
+	fprintf(fp, "POINTS %lu float\n", fil.LL.size());
 	for (std::size_t i=0;i<fil.LL.size();i++)
 	{
 		vtk.writeFloat(fp, fil.LL[i].x);
@@ -273,11 +255,11 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrang
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add1Dcut(point_t from, point_t to, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut(point_t from, point_t to, const char* fmts, ARGS... args)
 {
 	probe1Dlinevec.push_back( T_PROBE1DLINECUT() );
 	int last = probe1Dlinevec.size()-1;
-	sprintf(probe1Dlinevec[last].name, fmt, args...);
+	probe1Dlinevec[last].name = fmt::format(fmts, args...);
 	probe1Dlinevec[last].from = from;
 	probe1Dlinevec[last].to = to;
 	probe1Dlinevec[last].cycle = 0;
@@ -285,13 +267,13 @@ void State<NSE>::add1Dcut(point_t from, point_t to, const char* fmt, ARGS... arg
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add1Dcut_X(real y, real z, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut_X(real y, real z, const char* fmts, ARGS... args)
 {
 	if (!nse.isAnyLocalY(nse.lat.phys2lbmY(y)) || !nse.isAnyLocalZ(nse.lat.phys2lbmZ(z))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
-	sprintf(probe1Dvec[last].name, fmt, args...);
+	probe1Dvec[last].name = fmt::format(fmts, args...);
 	probe1Dvec[last].type = 0;
 	probe1Dvec[last].pos1 = nse.lat.phys2lbmY(y);
 	probe1Dvec[last].pos2 = nse.lat.phys2lbmZ(z);
@@ -300,13 +282,13 @@ void State<NSE>::add1Dcut_X(real y, real z, const char* fmt, ARGS... args)
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add1Dcut_Y(real x, real z, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut_Y(real x, real z, const char* fmts, ARGS... args)
 {
 	if (!nse.isAnyLocalX(nse.lat.phys2lbmX(x)) || !nse.isAnyLocalZ(nse.lat.phys2lbmZ(z))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
-	sprintf(probe1Dvec[last].name, fmt, args...);
+	probe1Dvec[last].name = fmt::format(fmts, args...);
 	probe1Dvec[last].type = 1;
 	probe1Dvec[last].pos1 = nse.lat.phys2lbmX(x);
 	probe1Dvec[last].pos2 = nse.lat.phys2lbmZ(z);
@@ -315,13 +297,13 @@ void State<NSE>::add1Dcut_Y(real x, real z, const char* fmt, ARGS... args)
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add1Dcut_Z(real x, real y, const char* fmt, ARGS... args)
+void State<NSE>::add1Dcut_Z(real x, real y, const char* fmts, ARGS... args)
 {
 	if (!nse.isAnyLocalX(nse.lat.phys2lbmX(x)) || !nse.isAnyLocalY(nse.lat.phys2lbmY(y))) return;
 
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
-	sprintf(probe1Dvec[last].name, fmt, args...);
+	probe1Dvec[last].name = fmt::format(fmts, args...);
 	probe1Dvec[last].type = 2;
 	probe1Dvec[last].pos1 = nse.lat.phys2lbmX(x);
 	probe1Dvec[last].pos2 = nse.lat.phys2lbmY(y);
@@ -336,11 +318,10 @@ void State<NSE>::writeVTKs_1D()
 		// browse all 1D probeline cuts
 		for (std::size_t i=0;i<probe1Dvec.size(); i++)
 		{
-			char fname[FILENAME_CHARS];
-			sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dvec[i].name, nse.rank, probe1Dvec[i].cycle);
+			const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dvec[i].name, nse.rank, probe1Dvec[i].cycle);
 			// create parent directories
-			create_file(fname);
-			log("[1dcut %s]",fname);
+			create_file(fname.c_str());
+			log("[1dcut {}]", fname);
 //			probeLine(probe1Dvec[i].from[0],probe1Dvec[i].from[1],probe1Dvec[i].from[2],probe1Dvec[i].to[0],probe1Dvec[i].to[1],probe1Dvec[i].to[2],fname);
 			switch (probe1Dvec[i].type)
 			{
@@ -358,21 +339,19 @@ void State<NSE>::writeVTKs_1D()
 	// browse all 1D probe cuts
 	for (std::size_t i=0;i<probe1Dlinevec.size(); i++)
 	{
-		char fname[FILENAME_CHARS];
-//		sprintf(fname,"results_%s/probes1D/%s_%06d_t%f", id, probe1Dvec[i].name, probe1Dvec[i].cycle, nse.physTime());
-		sprintf(fname,"results_%s/probes1D/%s_rank%03d_%06d", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
+		const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
 		// create parent directories
-		create_file(fname);
-		log("[1dcut %s]",fname);
+		create_file(fname.c_str());
+		log("[1dcut {}]", fname);
 		write1Dcut(probe1Dlinevec[i].from, probe1Dlinevec[i].to, fname);
 		probe1Dlinevec[i].cycle++;
 	}
 }
 
 template< typename NSE >
-void State<NSE>::write1Dcut(point_t from, point_t to, const char * fname)
+void State<NSE>::write1Dcut(point_t from, point_t to, const std::string& fname)
 {
-	FILE*fout = fopen(fname,"wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt"); // append information
 	point_t i = nse.lat.phys2lbmPoint(from);
 	point_t f = nse.lat.phys2lbmPoint(to);
 	real dist = NORM(i[0]-f[0],i[1]-f[1],i[2]-f[2]);
@@ -424,9 +403,9 @@ void State<NSE>::write1Dcut(point_t from, point_t to, const char * fname)
 }
 
 template< typename NSE >
-void State<NSE>::write1Dcut_X(idx y, idx z, const char * fname)
+void State<NSE>::write1Dcut_X(idx y, idx z, const std::string& fname)
 {
-	FILE*fout = fopen(fname,"wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt"); // append information
 	// probe vertical profile at x_m
 	char idd[500];
 	real value;
@@ -464,9 +443,9 @@ void State<NSE>::write1Dcut_X(idx y, idx z, const char * fname)
 }
 
 template< typename NSE >
-void State<NSE>::write1Dcut_Y(idx x, idx z, const char * fname)
+void State<NSE>::write1Dcut_Y(idx x, idx z, const std::string& fname)
 {
-	FILE*fout = fopen(fname,"wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt"); // append information
 	// probe vertical profile at x_m
 	char idd[500];
 	real value;
@@ -504,9 +483,9 @@ void State<NSE>::write1Dcut_Y(idx x, idx z, const char * fname)
 }
 
 template< typename NSE >
-void State<NSE>::write1Dcut_Z(idx x, idx y, const char * fname)
+void State<NSE>::write1Dcut_Z(idx x, idx y, const std::string& fname)
 {
-	FILE*fout = fopen(fname,"wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt"); // append information
 	// probe vertical profile at x_m
 	char idd[500];
 	real value;
@@ -556,18 +535,17 @@ void State<NSE>::write1Dcut_Z(idx x, idx y, const char * fname)
 template< typename NSE >
 void State<NSE>::writeVTKs_3D()
 {
-	char dir[FILENAME_CHARS], filename[FILENAME_CHARS], basename[FILENAME_CHARS];
-	sprintf(dir,"results_%s/vtk3D", id);
-	mkdir_p(dir,0755);
+	const std::string dir = fmt::format("results_{}/vtk3D", id);
+	mkdir_p(dir.c_str(), 0755);
 
 	for (const auto& block : nse.blocks)
 	{
-		char tmp_dirname[FILENAME_CHARS];
+		std::string tmp_dirname;
 		const char* local_scratch = getenv("LOCAL_SCRATCH");
 		if (!local_scratch || local_scratch[0] == '\0')
 		{
 			// $LOCAL_SCRATCH is not defined or empty - default to regular subdirectory in results_*
-			sprintf(tmp_dirname, dir);
+			tmp_dirname = dir;
 			local_scratch = NULL;
 		}
 		else
@@ -576,18 +554,18 @@ void State<NSE>::writeVTKs_3D()
 			// the end, after all MPI processes have completed. This avoids small buffered writes
 			// into the shared filesystem on clusters as well as corruption of previous state due
 			// to MPI errors...
-			sprintf(tmp_dirname, "%s/%s", local_scratch, dir);
+			tmp_dirname = fmt::format("{}/{}", local_scratch, dir);
 		}
-		mkdir_p(tmp_dirname,0755);
+		mkdir_p(tmp_dirname.c_str(), 0755);
 
-		sprintf(basename,"block%03d_%d.vtk", block.id, cnt[VTK3D].count);
-		sprintf(filename,"%s/%s", tmp_dirname, basename);
+		const std::string basename = fmt::format("block{:03d}_{:d}.vtk", block.id, cnt[VTK3D].count);
+		const std::string filename = fmt::format("{}/{}", tmp_dirname, basename);
 		auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 		{
 			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 		};
 		block.writeVTK_3D(nse.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-		log("[vtk %s written, time %f, cycle %d] ", filename, nse.physTime(), cnt[VTK3D].count);
+		log("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
 
 		if (local_scratch)
 		{
@@ -608,12 +586,12 @@ void State<NSE>::writeVTKs_3D()
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step, const char* fmt, ARGS... args)
+void State<NSE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step, const char* fmts, ARGS... args)
 {
 	probe3Dvec.push_back( T_PROBE3DCUT() );
 	int last = probe3Dvec.size()-1;
 
-	sprintf(probe3Dvec[last].name, fmt, args...);
+	probe3Dvec[last].name = fmt::format(fmts, args...);
 
 	probe3Dvec[last].ox = ox;
 	probe3Dvec[last].oy = oy;
@@ -634,10 +612,9 @@ void State<NSE>::writeVTKs_3Dcut()
 	{
 		for (const auto& block : nse.blocks)
 		{
-			char fname[FILENAME_CHARS];
-			sprintf(fname,"results_%s/vtk3Dcut/%s_block%03d_%d.vtk", id, probevec.name, block.id, probevec.cycle);
+			const std::string fname = fmt::format("results_{}/vtk3Dcut/{}_block{:03d}_{:d}.vtk", id, probevec.name, block.id, probevec.cycle);
 			// create parent directories
-			create_file(fname);
+			create_file(fname.c_str());
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -656,7 +633,7 @@ void State<NSE>::writeVTKs_3Dcut()
 				probevec.lz,
 				probevec.step
 			);
-			log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+			log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 		}
 		probevec.cycle++;
 	}
@@ -673,14 +650,14 @@ void State<NSE>::writeVTKs_3Dcut()
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add2Dcut_X(idx x, const char* fmt, ARGS... args)
+void State<NSE>::add2Dcut_X(idx x, const char* fmts, ARGS... args)
 {
 	if (!nse.isAnyLocalX(x)) return;
 
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
 
-	sprintf(probe2Dvec[last].name, fmt, args...);
+	probe2Dvec[last].name = fmt::format(fmts, args...);
 
 	probe2Dvec[last].type = 0;
 	probe2Dvec[last].cycle = 0;
@@ -689,14 +666,14 @@ void State<NSE>::add2Dcut_X(idx x, const char* fmt, ARGS... args)
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add2Dcut_Y(idx y, const char* fmt, ARGS... args)
+void State<NSE>::add2Dcut_Y(idx y, const char* fmts, ARGS... args)
 {
 	if (!nse.isAnyLocalY(y)) return;
 
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
 
-	sprintf(probe2Dvec[last].name, fmt, args...);
+	probe2Dvec[last].name = fmt::format(fmts, args...);
 
 	probe2Dvec[last].type = 1;
 	probe2Dvec[last].cycle = 0;
@@ -705,14 +682,14 @@ void State<NSE>::add2Dcut_Y(idx y, const char* fmt, ARGS... args)
 
 template< typename NSE >
 template< typename... ARGS >
-void State<NSE>::add2Dcut_Z(idx z, const char* fmt, ARGS... args)
+void State<NSE>::add2Dcut_Z(idx z, const char* fmts, ARGS... args)
 {
 	if (!nse.isAnyLocalZ(z)) return;
 
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
 
-	sprintf(probe2Dvec[last].name, fmt, args...);
+	probe2Dvec[last].name = fmt::format(fmts, args...);
 
 	probe2Dvec[last].type = 2;
 	probe2Dvec[last].cycle = 0;
@@ -729,10 +706,9 @@ void State<NSE>::writeVTKs_2D()
 	{
 		for (const auto& block : nse.blocks)
 		{
-			char fname[FILENAME_CHARS];
-			sprintf(fname,"results_%s/vtk2D/%s_block%03d_%d.vtk", id, probevec.name, block.id, probevec.cycle);
+			const std::string fname = fmt::format("results_{}/vtk2D/{}_block{:03d}_{:d}.vtk", id, probevec.name, block.id, probevec.cycle);
 			// create parent directories
-			create_file(fname);
+			create_file(fname.c_str());
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -746,7 +722,7 @@ void State<NSE>::writeVTKs_2D()
 				case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 					break;
 			}
-			log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+			log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 		}
 		probevec.cycle++;
 	}
@@ -763,10 +739,13 @@ void State<NSE>::writeVTKs_2D()
 
 
 template< typename NSE >
-bool State<NSE>::projectPNG_X(const char * filename, idx x0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
+bool State<NSE>::projectPNG_X(const std::string& filename, idx x0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
-	PNGTool P(filename);
+	if (!fileExists(filename.c_str())) {
+		fmt::print(stderr, "file {} does not exist\n", filename);
+		return false;
+	}
+	PNGTool P(filename.c_str());
 
 	for (auto& block : nse.blocks)
 	{
@@ -799,10 +778,13 @@ bool State<NSE>::projectPNG_X(const char * filename, idx x0, bool rotate, bool m
 }
 
 template< typename NSE >
-bool State<NSE>::projectPNG_Y(const char * filename, idx y0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
+bool State<NSE>::projectPNG_Y(const std::string& filename, idx y0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
-	PNGTool P(filename);
+	if (!fileExists(filename.c_str())) {
+		fmt::print(stderr, "file {} does not exist\n", filename);
+		return false;
+	}
+	PNGTool P(filename.c_str());
 
 	for (auto& block : nse.blocks)
 	{
@@ -836,10 +818,13 @@ bool State<NSE>::projectPNG_Y(const char * filename, idx y0, bool rotate, bool m
 
 
 template< typename NSE >
-bool State<NSE>::projectPNG_Z(const char * filename, idx z0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
+bool State<NSE>::projectPNG_Z(const std::string& filename, idx z0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
-	PNGTool P(filename);
+	if (!fileExists(filename.c_str())) {
+		fmt::print(stderr, "file {} does not exist\n", filename);
+		return false;
+	}
+	PNGTool P(filename.c_str());
 
 	for (auto& block : nse.blocks)
 	{
@@ -882,17 +867,15 @@ bool State<NSE>::projectPNG_Z(const char * filename, idx z0, bool rotate, bool m
 
 
 template< typename NSE >
-void State<NSE>::move(const char* srcdir, const char* dstdir, const char* srcfilename, const char* dstfilename)
+void State<NSE>::move(const std::string& srcdir, const std::string& dstdir, const std::string& srcfilename, const std::string& dstfilename)
 {
-	char src[FILENAME_CHARS];
-	char dst[FILENAME_CHARS];
-	sprintf(src, "%s/%s", srcdir, srcfilename);
-	sprintf(dst, "%s/%s", dstdir, dstfilename);
+	const std::string src = fmt::format("{}/{}", srcdir, srcfilename);
+	const std::string dst = fmt::format("{}/{}", dstdir, dstfilename);
 
 	// rename works only on the same filesystem
-	if (rename(src, dst) == 0)
+	if (rename(src.c_str(), dst.c_str()) == 0)
 	{
-		log("renamed %s to %s", src, dst);
+		log("renamed {} to {}", src, dst);
 		return;
 	}
 	if (errno != EXDEV)
@@ -902,118 +885,80 @@ void State<NSE>::move(const char* srcdir, const char* dstdir, const char* srcfil
 	}
 
 	// manual copy data and meta data
-	if (move_file(src, dst) == 0)
-		log("moved %s to %s", src, dst);
+	if (move_file(src.c_str(), dst.c_str()) == 0)
+		log("moved {} to {}", src, dst);
 	else
 		log("move: manual move failed");
 }
 
-//template< typename NSE >
-//template< typename... ARGS >
-//int State<NSE>::saveLoadTextData(int direction, const char*dirname, const char*filename, const char*fmt, ARGS&... args)
-//{
-//	// check if main dir exists
-//	mkdir_p(dirname, 0777);
-//	char fname[FILENAME_CHARS];
-//	sprintf(fname,"%s/%s_rank%03d", dirname, filename, nse.rank);
-//
-//	if (direction==MemoryToFile)
-//	{
-//		FILE*f = fopen(fname,"wt");
-//		if (f==0)
-//		{
-//			log("unable to create file %s",fname);
-//			return 0;
-//		}
-//		fprintf(f,fmt, args...);
-//		fclose(f);
-//		log("[saveLoadTextData: saved data into %s]",fname);
-//	}
-//	if (direction==FileToMemory)
-//	{
-//		FILE*f = fopen(fname,"rt");
-//		if (f==0)
-//		{
-//			log("unable to access file %s",fname);
-//			return 0;
-//		}
-//		fscanf(f,fmt, &args...);
-//		fclose(f);
-//		log("[saveLoadTextData: read data from %s]",fname);
-//	}
-//	return 1;
-//}
-
 template< typename NSE >
 template< typename... ARGS >
-int State<NSE>::saveLoadTextData(int direction, const char*dirname, const char*filename, ARGS&... args)
+int State<NSE>::saveLoadTextData(int direction, const std::string& dirname, const std::string& filename, ARGS&... args)
 {
 	// check if main dir exists
-	mkdir_p(dirname, 0777);
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"%s/%s_rank%03d", dirname, filename, nse.rank);
+	mkdir_p(dirname.c_str(), 0777);
+	const std::string fname = fmt::format("{}/{}_rank{:03d}", dirname, filename, nse.rank);
 
 	const std::string fmt = getSaveLoadFmt(args...);
 
 	if (direction==MemoryToFile)
 	{
-		FILE*f = fopen(fname,"wt");
+		FILE* f = fopen(fname.c_str(), "wt");
 		if (f==0)
 		{
-			log("unable to create file %s",fname);
+			log("unable to create file {}", fname);
 			return 0;
 		}
-		fprintf(f,fmt.c_str(), args...);
+		fprintf(f, fmt.c_str(), args...);
 		fclose(f);
-		log("[saveLoadTextData: saved data into %s]",fname);
+		log("[saveLoadTextData: saved data into {}]", fname);
 	}
 	if (direction==FileToMemory)
 	{
-		FILE*f = fopen(fname,"rt");
+		FILE* f = fopen(fname.c_str(), "rt");
 		if (f==0)
 		{
-			log("unable to access file %s",fname);
+			log("unable to access file {}", fname);
 			return 0;
 		}
-		fscanf(f,fmt.c_str(), &args...);
+		fscanf(f, fmt.c_str(), &args...);
 		fclose(f);
-		log("[saveLoadTextData: read data from %s]",fname);
+		log("[saveLoadTextData: read data from {}]", fname);
 	}
 	return 1;
 }
 
 template< typename NSE >
 template< typename VARTYPE >
-int State<NSE>::saveloadBinaryData(int direction, const char*dirname, const char*filename, VARTYPE*data, idx length)
+int State<NSE>::saveloadBinaryData(int direction, const std::string& dirname, const std::string& filename, VARTYPE* data, idx length)
 {
 	// check if main dir exists
-	mkdir_p(dirname, 0777);
-	char fname[FILENAME_CHARS];
-	sprintf(fname,"%s/%s_rank%03d", dirname, filename, nse.rank);
+	mkdir_p(dirname.c_str(), 0777);
+	const std::string fname = fmt::format("{}/{}_rank{:03d}", dirname, filename, nse.rank);
 
 	if (direction==MemoryToFile)
 	{
-		FILE*f = fopen(fname,"wb");
+		FILE* f = fopen(fname.c_str(), "wb");
 		if (f==0)
 		{
-			log("unable to create file %s",fname);
+			log("unable to create file {}", fname);
 			return 0;
 		}
 		fwrite(data, sizeof(VARTYPE), length, f);
 		fclose(f);
-		log("[saveLoadBinaryData: saved data into %s]",fname);
+		log("[saveLoadBinaryData: saved data into {}]", fname);
 	}
 	if (direction==FileToMemory)
 	{
-		FILE*f = fopen(fname,"rb");
+		FILE* f = fopen(fname.c_str(), "rb");
 		if (f==0)
 		{
-			log("unable to access file %s",fname);
+			log("unable to access file {}", fname);
 			return 0;
 		}
 		fread(data, sizeof(VARTYPE), length, f);
 		fclose(f);
-		log("[saveLoadBinaryData: read data from %s]",fname);
+		log("[saveLoadBinaryData: read data from {}]", fname);
 	}
 	return 1;
 }
@@ -1021,16 +966,15 @@ int State<NSE>::saveloadBinaryData(int direction, const char*dirname, const char
 template< typename NSE >
 void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 {
-	char final_dirname[FILENAME_CHARS];
-	sprintf(final_dirname, "results_%s/%s", id, subdirname);
-	mkdir_p(final_dirname, 0777);
+	const std::string final_dirname = fmt::format("results_{}/{}", id, subdirname);
+	mkdir_p(final_dirname.c_str(), 0777);
 
-	char tmp_dirname[FILENAME_CHARS];
+	std::string tmp_dirname;
 	const char* local_scratch = getenv("LOCAL_SCRATCH");
 	if (direction == FileToMemory || !local_scratch || local_scratch[0] == '\0')
 	{
 		// $LOCAL_SCRATCH is not defined or empty - default to regular subdirectory in results_*
-		sprintf(tmp_dirname, final_dirname);
+		tmp_dirname = final_dirname;
 		local_scratch = NULL;
 	}
 	else
@@ -1039,7 +983,7 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 		// the end, after all MPI processes have completed. This avoids small buffered writes
 		// into the shared filesystem on clusters as well as corruption of previous state due
 		// to MPI errors...
-		sprintf(tmp_dirname, "%s/%s", local_scratch, final_dirname);
+		tmp_dirname = fmt::format("{}/{}", local_scratch, final_dirname);
 	}
 
 	char nid[200];
@@ -1123,74 +1067,70 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 
 			// first iteration: create temporary files in the destination directory
 			// second iteration: rename the temporary files to the target files
-			char src[200];
-			char dst[200];
-			char src_suffix[5];
-			char dst_suffix[5];
+			std::string src_suffix;
+			std::string dst_suffix;
 			if (i == 0)
 			{
 				log("[moving files from local scratch to temporary files in the destination directory]");
-				sprintf(src_suffix, "%s", "");
-				sprintf(dst_suffix, "%s", ".tmp");
+				dst_suffix = ".tmp";
 			}
 			else
 			{
 				log("[renaming temporary files to the target files]");
-				sprintf(src_suffix, "%s", ".tmp");
-				sprintf(dst_suffix, "%s", "");
-				sprintf(tmp_dirname, final_dirname);
+				src_suffix = ".tmp";
+				tmp_dirname = final_dirname;
 			}
 
-			sprintf(src, "config_rank%03d%s", nse.rank, src_suffix);
-			sprintf(dst, "config_rank%03d%s", nse.rank, dst_suffix);
+			std::string src = fmt::format("config_rank{:03d}{}", nse.rank, src_suffix);
+			std::string dst = fmt::format("config_rank{:03d}{}", nse.rank, dst_suffix);
 			move(tmp_dirname, final_dirname, src, dst);
 
 			// save all counter states
 			for (int c=0;c<MAX_COUNTER;c++)
 			{
-				sprintf(src, "cnt_%d_rank%03d%s", c, nse.rank, src_suffix);
-				sprintf(dst, "cnt_%d_rank%03d%s", c, nse.rank, dst_suffix);
+				src = fmt::format("cnt_{:d}_rank{:03d}{}", c, nse.rank, src_suffix);
+				dst = fmt::format("cnt_{:d}_rank{:03d}{}", c, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 
 			// save probes
 			for (std::size_t i=0;i<probe1Dvec.size();i++)
 			{
-				sprintf(src, "probe1D_%lu_rank%03d%s", i, nse.rank, src_suffix);
-				sprintf(dst, "probe1D_%lu_rank%03d%s", i, nse.rank, dst_suffix);
+				src = fmt::format("probe1D_{:d}_rank{:03d}{}", i, nse.rank, src_suffix);
+				dst = fmt::format("probe1D_{:d}_rank{:03d}{}", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 			for (std::size_t i=0;i<probe1Dlinevec.size();i++)
 			{
-				sprintf(src,"probe1Dline_%lu_rank%03d%s", i, nse.rank, src_suffix);
-				sprintf(dst,"probe1Dline_%lu_rank%03d%s", i, nse.rank, dst_suffix);
+				src = fmt::format("probe1Dline_{:d}_rank{:03d}{}", i, nse.rank, src_suffix);
+				dst = fmt::format("probe1Dline_{:d}_rank{:03d}{}", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 			for (std::size_t i=0;i<probe2Dvec.size();i++)
 			{
-				sprintf(src,"probe2D_%lu_rank%03d%s", i, nse.rank, src_suffix);
-				sprintf(dst,"probe2D_%lu_rank%03d%s", i, nse.rank, dst_suffix);
+				src = fmt::format("probe2D_{:d}_rank{:03d}{}", i, nse.rank, src_suffix);
+				dst = fmt::format("probe2D_{:d}_rank{:03d}{}", i, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 
 			// save DFs
 			for (int dfty=0;dfty<DFMAX;dfty++)
 			{
-				sprintf(src, "df_%d_rank%03d%s", dfty, nse.rank, src_suffix);
-				sprintf(dst, "df_%d_rank%03d%s", dfty, nse.rank, dst_suffix);
+				src = fmt::format("df_{:d}_rank{:03d}{}", dfty, nse.rank, src_suffix);
+				dst = fmt::format("df_{:d}_rank{:03d}{}", dfty, nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 
 			// save map
-			sprintf(src, "map_rank%03d%s", nse.rank, src_suffix);
-			sprintf(dst, "map_rank%03d%s", nse.rank, dst_suffix);
+			src = fmt::format("map_rank{:03d}{}", nse.rank, src_suffix);
+			dst = fmt::format("map_rank{:03d}{}", nse.rank, dst_suffix);
 			move(tmp_dirname, final_dirname, src, dst);
 
 			// save macro
 			if (NSE::MACRO::N>0)
 			{
-				sprintf(src, "macro_rank%03d%s", nse.rank, src_suffix);
-				sprintf(dst, "macro_rank%03d%s", nse.rank, dst_suffix);
+				src = fmt::format("macro_rank{:03d}{}", nse.rank, src_suffix);
+				dst = fmt::format("macro_rank{:03d}{}", nse.rank, dst_suffix);
 				move(tmp_dirname, final_dirname, src, dst);
 			}
 		}
@@ -1243,7 +1183,7 @@ bool State<NSE>::wallTimeReached()
 		long actualtimediff = timer_total.getRealTime();
 		if (actualtimediff >= wallTime)
 		{
-			log("wallTime reached: %ld / %ld [sec]", actualtimediff, wallTime);
+			log("wallTime reached: {} / {} [sec]", actualtimediff, wallTime);
 			local_result = true;
 		}
 	}
@@ -1306,14 +1246,14 @@ bool State<NSE>::estimateMemoryDemands()
 //	cudaGetDeviceCount(&num_gpus);
 
 	// display CPU and GPU configuration
-//	log("number of CUDA devices:\t%d", num_gpus);
+//	log("number of CUDA devices:\t{}", num_gpus);
 //	for (int i = 0; i < num_gpus; i++)
 	{
 		int gpu_id;
 		cudaGetDevice(&gpu_id);
 		cudaDeviceProp dprop;
 		cudaGetDeviceProperties(&dprop, gpu_id);
-		log("Rank %d uses GPU id %d: %s", nse.rank, gpu_id, dprop.name);
+		log("Rank {} uses GPU id {}: {}", nse.rank, gpu_id, dprop.name);
 		// NOTE: cudaSetDevice breaks MPI !!!
 //		cudaSetDevice(i);
 		size_t free=0, total=0;
@@ -1326,17 +1266,17 @@ bool State<NSE>::estimateMemoryDemands()
 //	CPUtotal += CPUDFs;
 	#endif
 
-	log("Local memory budget analysis / estimation for MPI rank %d", nse.rank);
-	log("CPU RAM for DFs:   %ld MiB", (long)(CPUDFs/1024/1024));
-//	log("CPU RAM for lat:   %ld MiB", (long)(memDFs/1024/1024));
-	log("CPU RAM for map:   %ld MiB", (long)(memMap/1024/1024));
-	log("CPU RAM for macro: %ld MiB", (long)(memMacro/1024/1024));
-	log("TOTAL CPU RAM %ld MiB estimated needed, %ld MiB available (%6.4f%%)", (long)(CPUtotal/1024/1024), (long)(CPUavail/1024/1024), (double)(100.0*CPUtotal/CPUavail));
+	log("Local memory budget analysis / estimation for MPI rank {}", nse.rank);
+	log("CPU RAM for DFs:   {:d} MiB", CPUDFs/1024/1024);
+//	log("CPU RAM for lat:   {:d} MiB", memDFs/1024/1024);
+	log("CPU RAM for map:   {:d} MiB", memMap/1024/1024);
+	log("CPU RAM for macro: {:d} MiB", memMacro/1024/1024);
+	log("TOTAL CPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%)", CPUtotal/1024/1024, CPUavail/1024/1024, 100.0*CPUtotal/CPUavail);
 	#ifdef USE_CUDA
-	log("GPU RAM for DFs:   %ld MiB", (long)(DFMAX*memDFs/1024/1024));
-	log("GPU RAM for map:   %ld MiB", (long)(memMap/1024/1024));
-	log("GPU RAM for macro: %ld MiB", (long)(memMacro/1024/1024));
-	log("TOTAL GPU RAM %ld MiB estimated needed, %ld MiB available (%6.4f%%), total GPU RAM: %ld MiB", (long)(GPUtotal/1024/1024), (long)(GPUavail/1024/1024), (double)(100.0*GPUtotal/GPUavail), (long)(GPUtotal_hw/1024/1024));
+	log("GPU RAM for DFs:   {:d} MiB", DFMAX*memDFs/1024/1024);
+	log("GPU RAM for map:   {:d} MiB", memMap/1024/1024);
+	log("GPU RAM for macro: {:d} MiB", memMacro/1024/1024);
+	log("TOTAL GPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%), total GPU RAM: {:d} MiB", GPUtotal/1024/1024, GPUavail/1024/1024, 100.0*GPUtotal/GPUavail, GPUtotal_hw/1024/1024);
 	if (GPUavail <= GPUtotal) return false;
 	#endif
 	if (CPUavail <= CPUtotal) return false;
@@ -1378,11 +1318,11 @@ void State<NSE>::SimInit()
 
 	timer_SimInit.start();
 
-	log("MPI info: rank=%d, nproc=%d, lat.global=[%d,%d,%d]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
+	log("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
 	for (auto& block : nse.blocks)
-		log("LBM block %d: local=[%d,%d,%d], offset=[%d,%d,%d]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
+		log("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-	log("\nSTART: simulation NSE:%s lbmVisc %e physDl %e physDt %e", NSE::COLL::id, nse.lbmViscosity(), nse.lat.physDl, nse.physDt);
+	log("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lbmViscosity(), nse.lat.physDl, nse.physDt);
 
 	// reset counters
 	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -1793,7 +1733,7 @@ void State<NSE>::AfterSimUpdate()
 
 		if (verbosity > 0)
 		{
-			log("GLUPS=%.3f iter=%d t=%1.3fs dt=%1.2e lbmVisc=%1.2e WT=%.0fs ETA=%.0fs",
+			log("GLUPS={:.3f} iter={:d} t={:1.3f}s dt={:1.2e} lbmVisc={:1.2e} WT={:.0f}s ETA={:.0f}s",
 				LUPS * 1e-9,
 				nse.iterations,
 				nse.physTime(),
@@ -1816,13 +1756,13 @@ void State<NSE>::AfterSimFinished()
 	if (nse.iterations > 1)
 	if (verbosity > 0)
 	{
-		log("total walltime: %.1f s, SimInit time: %.1f s, SimUpdate time: %.1f s, AfterSimUpdate time: %.1f s",
+		log("total walltime: {:.1f} s, SimInit time: {:.1f} s, SimUpdate time: {:.1f} s, AfterSimUpdate time: {:.1f} s",
 			getWallTime(),
 			timer_SimInit.getRealTime(),
 			timer_SimUpdate.getRealTime(),
 			timer_AfterSimUpdate.getRealTime()
 		);
-		log("compute time: %.1f s, compute overlaps time: %.1f s, wait for communication time: %.1f s, wait for computation time: %.1f s",
+		log("compute time: {:.1f} s, compute overlaps time: {:.1f} s, wait for communication time: {:.1f} s, wait for computation time: {:.1f} s",
 			timer_compute.getRealTime(),
 			timer_compute_overlaps.getRealTime(),
 			timer_wait_communication.getRealTime(),
@@ -1830,7 +1770,7 @@ void State<NSE>::AfterSimFinished()
 		);
 		const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
 		const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / timer_compute.getRealTime());
-		log("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): %.3f, based on compute time: %.3f",
+		log("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): {:.3f}, based on compute time: {:.3f}",
 			avgLUPS * 1e-9,
 			computeLUPS * 1e-9
 		);

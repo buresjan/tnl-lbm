@@ -51,11 +51,11 @@ struct State_NSE_ADE : State<NSE>
 
 	void SimInit() override
 	{
-		log("MPI info: rank=%d, nproc=%d, lat.global=[%d,%d,%d]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
+		log("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
 		for (auto& block : nse.blocks)
-			log("LBM block %d: local=[%d,%d,%d], offset=[%d,%d,%d]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
+			log("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-		log("\nSTART: simulation NSE:%s-ADE:%s lbmViscosity %e lbmDiffusion %e physDl %e physDt %e", NSE::COLL::id, ADE::COLL::id, nse.lbmViscosity(), ade.lbmViscosity(), nse.lat.physDl, nse.physDt);
+		log("\nSTART: simulation NSE:{}-ADE:{} lbmViscosity {:e} lbmDiffusion {:e} physDl {:e} physDt {:e}", NSE::COLL::id, ADE::COLL::id, nse.lbmViscosity(), ade.lbmViscosity(), nse.lat.physDl, nse.physDt);
 
 		// reset counters
 		for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -338,31 +338,30 @@ struct State_NSE_ADE : State<NSE>
 
 	void writeVTKs_3D() override
 	{
-		char dir[FILENAME_CHARS], filename[FILENAME_CHARS], basename[FILENAME_CHARS];
-		sprintf(dir,"results_%s/vtk3D", this->id);
-		mkdir_p(dir,0755);
+		const std::string dir = fmt::format("results_{}/vtk3D", this->id);
+		mkdir_p(dir.c_str(), 0755);
 
 		for (const auto& block : nse.blocks)
 		{
-			sprintf(basename,"NSE_block%03d_%d.vtk", block.id, cnt[VTK3D].count);
-			sprintf(filename,"%s/%s", dir, basename);
+			const std::string basename = fmt::format("NSE_block{:03d}_{:d}.vtk", block.id, cnt[VTK3D].count);
+			const std::string filename = fmt::format("{}/{}", dir, basename);
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
 			block.writeVTK_3D(nse.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-			this->log("[vtk %s written, time %f, cycle %d] ", filename, nse.physTime(), cnt[VTK3D].count);
+			this->log("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
 		}
 		for (const auto& block : ade.blocks)
 		{
-			sprintf(basename,"ADE_block%03d_%d.vtk", block.id, cnt[VTK3D].count);
-			sprintf(filename,"%s/%s", dir, basename);
+			const std::string basename = fmt::format("ADE_block{:03d}_{:d}.vtk", block.id, cnt[VTK3D].count);
+			const std::string filename = fmt::format("{}/{}", dir, basename);
 			auto outputData = [this] (const BLOCK_ADE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
 			block.writeVTK_3D(ade.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-			this->log("[vtk %s written, time %f, cycle %d] ", filename, nse.physTime(), cnt[VTK3D].count);
+			this->log("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
 		}
 	}
 
@@ -374,10 +373,9 @@ struct State_NSE_ADE : State<NSE>
 		{
 			for (const auto& block : nse.blocks)
 			{
-				char fname[FILENAME_CHARS];
-				sprintf(fname,"results_%s/vtk3Dcut/%s_NSE_block%03d_%d.vtk", this->id, probevec.name, block.id, probevec.cycle);
+				const std::string fname = fmt::format("results_{}/vtk3Dcut/{}_NSE_block{:03d}_{:d}.vtk", this->id, probevec.name, block.id, probevec.cycle);
 				// create parent directories
-				create_file(fname);
+				create_file(fname.c_str());
 				auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 				{
 					return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -396,14 +394,13 @@ struct State_NSE_ADE : State<NSE>
 					probevec.lz,
 					probevec.step
 				);
-				this->log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			for (const auto& block : ade.blocks)
 			{
-				char fname[FILENAME_CHARS];
-				sprintf(fname,"results_%s/vtk3Dcut/%s_ADE_block%03d_%d.vtk", this->id, probevec.name, block.id, probevec.cycle);
+				const std::string fname = fmt::format("results_{}/vtk3Dcut/{}_ADE_block{:03d}_{:d}.vtk", this->id, probevec.name, block.id, probevec.cycle);
 				// create parent directories
-				create_file(fname);
+				create_file(fname.c_str());
 				auto outputData = [this] (const BLOCK_ADE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 				{
 					return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -422,7 +419,7 @@ struct State_NSE_ADE : State<NSE>
 					probevec.lz,
 					probevec.step
 				);
-				this->log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			probevec.cycle++;
 		}
@@ -436,10 +433,9 @@ struct State_NSE_ADE : State<NSE>
 		{
 			for (const auto& block : nse.blocks)
 			{
-				char fname[FILENAME_CHARS];
-				sprintf(fname,"results_%s/vtk2D/%s_NSE_block%03d_%d.vtk", this->id, probevec.name, block.id, probevec.cycle);
+				const std::string fname = fmt::format("results_{}/vtk2D/{}_NSE_block{:03d}_{:d}.vtk", this->id, probevec.name, block.id, probevec.cycle);
 				// create parent directories
-				create_file(fname);
+				create_file(fname.c_str());
 				auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 				{
 					return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -453,14 +449,13 @@ struct State_NSE_ADE : State<NSE>
 					case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 						break;
 				}
-				log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			for (const auto& block : ade.blocks)
 			{
-				char fname[FILENAME_CHARS];
-				sprintf(fname,"results_%s/vtk2D/%s_ADE_block%03d_%d.vtk", this->id, probevec.name, block.id, probevec.cycle);
+				const std::string fname = fmt::format("results_{}/vtk2D/{}_ADE_block{:03d}_{:d}.vtk", this->id, probevec.name, block.id, probevec.cycle);
 				// create parent directories
-				create_file(fname);
+				create_file(fname.c_str());
 				auto outputData = [this] (const BLOCK_ADE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 				{
 					return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -474,7 +469,7 @@ struct State_NSE_ADE : State<NSE>
 					case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 						break;
 				}
-				log("[vtk %s written, time %f, cycle %d] ", fname, nse.physTime(), probevec.cycle);
+				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			probevec.cycle++;
 		}

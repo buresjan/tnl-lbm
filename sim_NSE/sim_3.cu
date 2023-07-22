@@ -161,7 +161,7 @@ struct StateLocal : State<NSE>
 		real rho = 1.0;//nse.physFluidDensity;
 //		real target_velocity = nse.lbm2physVelocity(lbm_input_velocity);
 		real lbm_input_velocity = nse.phys2lbmVelocity(phys_input_U_bar);
-		log("Reynolds = %f lbmvel %f physvel %f (phys_input_U_bar %f)",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
+		log("Reynolds = {:f} lbmvel {:f} physvel {:f} (phys_input_U_bar {:f})",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
 
 		// FIXME: MPI !!!
 		// todo: compute C_D: integrate over the whole domain
@@ -184,7 +184,7 @@ struct StateLocal : State<NSE>
 		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 		real phys_cl_full = -nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-		log("FULL: u0 %e Fx %e Fy %e Fz %e C_D{phys} %e C_D{LB} %f C_L{phys} %e C_L{LB} %f", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
+		log("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{phys} {:e} C_D{LB} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
 
 // not used for evaluation of the results
 //		// FIXME: MPI !!!
@@ -206,8 +206,8 @@ struct StateLocal : State<NSE>
 //		real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cl=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-//		log("INNN: u0 %e Fx %e Fy %e Fz %e C_D{phys} %e C_D{LB} %f", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-////		log("Reynolds = %f lbmvel 0.07 physvel %f",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
+//		log("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
+////		log("Reynolds = {:f} lbmvel 0.07 physvel {:f}",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
 
 // not used for evaluation of the results
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
@@ -219,60 +219,56 @@ struct StateLocal : State<NSE>
 //		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cl_lagr=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-//		log("LAGR: u0 %e Fx %e Fy %e Fz %e C_D{phys} %e C_D{LB} %f", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
+//		log("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
 
 		// empty files
-		char iotype[10];
-		if (firstrun) sprintf(iotype,"wt"); else sprintf(iotype,"at");
+		const char* iotype = (firstrun) ? "wt" : "at";
 		firstrun=false;
 		// output
-		FILE*f;
-		char str[200], dir[200];
+		FILE* f;
 		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
-		sprintf(dir,"results_%s",id);
-		mkdir(dir,0755);
-		sprintf(dir,"results_%s/probes",id);
-		mkdir(dir,0755);
+		const std::string dir = fmt::format("results_%s/probes", id);
+		mkdir_p(dir.c_str(), 0755);
 
-		sprintf(str,"%s/probe_cd_full",dir);
-		f = fopen(str,iotype);
-		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cd_full);
+		std::string str = fmt::format("{}/probe_cd_full", dir);
+		f = fopen(str.c_str(), iotype);
+		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_full);
 		fclose(f);
 
-//		sprintf(str,"%s/probe_cd",dir);
-//		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cd);
+//		str = fmt::format("{}/probe_cd", dir);
+//		f = fopen(str.c_str(), iotype);
+//		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd);
 //		fclose(f);
 
-//		sprintf(str,"%s/probe_cd_lagr",dir);
-//		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cd_lagr);
+//		str = fmt::format("{}/probe_cd_lagr", dir);
+//		f = fopen(str.c_str(), iotype);
+//		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_lagr);
 //		fclose(f);
 
-//		sprintf(str,"%s/probe_cd_all",dir);
-//		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\t%e\t%e\n",nse.physTime(),lbm_cd_full, lbm_cd, lbm_cd_lagr);
+//		str = fmt::format("{}/probe_cd_all", dir);
+//		f = fopen(str.c_str(), iotype);
+//		fprintf(f, "%e\t%e\t%e\t%e\n", nse.physTime(), lbm_cd_full, lbm_cd, lbm_cd_lagr);
 //		fclose(f);
 
-		sprintf(str,"%s/probe_cl_full",dir);
-		f = fopen(str,iotype);
-		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cl_full);
+		str = fmt::format("{}/probe_cl_full", dir);
+		f = fopen(str.c_str(), iotype);
+		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cl_full);
 		fclose(f);
 
-//		sprintf(str,"%s/probe_cl",dir);
-//		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cl);
+//		str = fmt::format("{}/probe_cl", dir);
+//		f = fopen(str.c_str(), iotype);
+//		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cl);
 //		fclose(f);
 
-//		sprintf(str,"%s/probe_cl_lagr",dir);
-//		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\n",nse.physTime(),lbm_cl_lagr);
+//		str = fmt::format("{}/probe_cl_lagr", dir);
+//		f = fopen(str.c_str(), iotype);
+//		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cl_lagr);
 //		fclose(f);
 
-//		sprintf(str,"%s/probe_cl_all",dir);
-//		f = fopen(str,iotype);
-//		fprintf(f,"%e\t%e\t%e\t%e\n",nse.physTime(),lbm_cl_full, lbm_cl, lbm_cl_lagr);
+//		str = fmt::format("{}/probe_cl_all", dir);
+//		f = fopen(str.c_str(), iotype);
+//		fprintf(f, "%e\t%e\t%e\t%e\n", nse.physTime(), lbm_cl_full, lbm_cl, lbm_cl_lagr);
 //		fclose(f);
 	}
 
@@ -349,7 +345,7 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 	state.FF[INDEX].diracDeltaType = dirac_delta;
 	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
 	state.FIL_INDEX=INDEX;
-	state.log("added %d lagrangian points",points);
+	state.log("added {} lagrangian points", points);
 
 	// compute sigma: take lag grid into account
 	state.FF[INDEX].computeMaxMinDist();
@@ -359,11 +355,11 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 //	real sigma_min = state.FF[INDEX].computeMinDist();
 //	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
 
-	state.log("Cylinder: wanted sigma %e dx=%e dm=%e (%d points total, N1=%d N2=%d) sigma_min %e, sigma_max %e",sigma,dx,dm,points,N1,N2,sigma_min, sigma_max);
-//	state.log("Added %d Lagrangian points (requested %d) partial area %e",Ncount, N, a);
-//	state.log("Lagrange created: WuShuCompute %d ws_regularDirac %s",state.FF[INDEX].WuShuCompute,(state.FF[INDEX].ws_regularDirac)?"true":"false");
-	state.log("h=physdl %e sigma min %e sigma_ku_h %e",state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	state.log("h=physdl %e sigma max %e sigma_ku_h %e",state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
+	state.log("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min %e, sigma_max %e", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
+//	state.log("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
+//	state.log("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
+	state.log("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
+	state.log("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
 
 	state.writeVTK_Points("cylinder",0,0,state.FF[INDEX]);
 	return INDEX;
@@ -395,7 +391,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 
 	real LBM_VISCOSITY = 0.001;
 
-//	printf("input phys velocity %f\ninput lbm velocity %f\nRe %f\nlbm viscosity %f\nphys viscosity %f\n", i_PHYS_VELOCITY, i_LBM_VELOCITY, i_Re, i_LBM_VISCOSITY, i_PHYS_VISCOSITY);
+//	fmt::print("input phys velocity {:f}\ninput lbm velocity {:f}\nRe {:f}\nlbm viscosity {:f}\nphys viscosity {:f}\n", i_PHYS_VELOCITY, i_LBM_VELOCITY, i_Re, i_LBM_VISCOSITY, i_PHYS_VISCOSITY);
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 
 	// initialize the lattice
@@ -405,7 +401,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.physDl = PHYS_DL;
 
 	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
-	state.setid("sim_3_%s_%s_dirac_%d_res_%d_Re_%d_nas_%05.4f_compute_%d", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, (int)Re, nasobek, compute);
+	state.setid("sim_3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
 	if (state.isMark()) return 0;
 
 	#ifdef HAVE_MPI
@@ -444,7 +440,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 		case 5: ws_compute = ws_computeGPU_TNL; break;
 		case 6: ws_compute = ws_computeHybrid_TNL; break;
 		case 7: ws_compute = ws_computeHybrid_TNL_zerocopy; break;
-		default: state.log("Unknown parameter compute=%d, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
+		default: state.log("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
 	}
 
 	// add cuts
@@ -524,7 +520,7 @@ int main(int argc, char **argv)
 		const int pars=6;
 		if (argc <= pars)
 		{
-			printf("error: required %d parameters required:\n %s method{0,1} dirac{1,2,3,4} Re{100,200} hi[0,%d] res[1,22] compute[1,7]\n", pars, argv[0],hmax-1);
+			fprintf(stderr, "error: %d parameters required:\n %s method{0,1} dirac{1,2,3,4} Re{100,200} hi[0,%d] res[1,22] compute[1,7]\n", pars, argv[0],hmax-1);
 			return 1;
 		}
 		int method = atoi(argv[1]);	// 0=modified 1=original
@@ -534,11 +530,11 @@ int main(int argc, char **argv)
 		int res = atoi(argv[5]);	// res=1,2,3
 		int compute = atoi(argv[6]); // compute=1,2,3,4,5,6,7
 
-		if (method > 1 || method < 0) { printf("error: method=%d out of bounds [0, 1]\n",method); return 1; }
-		if (dirac < 1 || dirac > 4) { printf("error: dirac=%d out of bounds [1,4]\n",dirac); return 1; }
-		if (hi >= hmax || hi < 0) { printf("error: hi=%d out of bounds [0, %d]\n",hi,hmax-1); return 1; }
-		if (res < 1) { printf("error: res=%d out of bounds [1, ...]\n",res); return 1; }
-		if (compute < 1 || compute > 7) { printf("error: compute=%d out of bounds [1,7]\n",compute); return 1; }
+		if (method > 1 || method < 0) { fprintf(stderr, "error: method=%d out of bounds [0, 1]\n",method); return 1; }
+		if (dirac < 1 || dirac > 4) { fprintf(stderr, "error: dirac=%d out of bounds [1,4]\n",dirac); return 1; }
+		if (hi >= hmax || hi < 0) { fprintf(stderr, "error: hi=%d out of bounds [0, %d]\n",hi,hmax-1); return 1; }
+		if (res < 1) { fprintf(stderr, "error: res=%d out of bounds [1, ...]\n",res); return 1; }
+		if (compute < 1 || compute > 7) { fprintf(stderr, "error: compute=%d out of bounds [1,7]\n",compute); return 1; }
 		if (hi<hmax) h=hvals[hi];
 		run(res, (double)Re, h, dirac, method, compute);
 	}

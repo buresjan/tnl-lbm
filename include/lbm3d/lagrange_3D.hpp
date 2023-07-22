@@ -14,7 +14,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMinDist()
 		if (d<minDist) minDist=d;
 	}
 	if (i%1000==0)
-	printf("computeMinDist %d of %d\n", i, LL.size());
+	fmt::print("computeMinDist {} of {}\n", i, LL.size());
 	}
 	return minDist;
 }
@@ -81,7 +81,7 @@ int Lagrange3D<LBM>::findIndex(int i, int j)
 	return index_array[i][j];
 	// brute force
 //	for (std::size_t k=0;k<LL.size();k++) if (LL[k].lag_x == i && LL[k].lag_y == j) return k;
-//	printf("findIndex(%d,%d): not found\n",i,j);
+//	fmt::print("findIndex({},{}): not found\n",i,j);
 //	return 0;
 }
 
@@ -141,7 +141,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAI
 			else
 				return (1.0 + sqrt(1.0 - 3.0*r*r))/3.0;
 	}
-	printf("warning: zero Dirac delta: type=%d\n",i);
+	fmt::print("warning: zero Dirac delta: type={}\n", i);
 	return 0;
 }
 
@@ -173,7 +173,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	VECDD *vr = new VECDD[m];
 
 
-	printf("wushu construct loop 1: start\n");
+	fmt::print("wushu construct loop 1: start\n");
 //	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
 	real *LLx = new real[m];
 	real *LLy = new real[m];
@@ -187,11 +187,12 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		LLlagx[i]=LL[i].lag_x;
 	}
 
-	printf("wushu construct loop 1: cont\n");
+	fmt::print("wushu construct loop 1: cont\n");
 	#pragma omp parallel for schedule(dynamic)
 	for (int el=0;el<m;el++)
 	{
-		if (el%100==0)printf("progress %5.2f %%    \r",100.0*el/(real)m);
+		if (el%100==0)
+			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
 		for (int ka=0;ka<m;ka++)
 		{
 			bool proceed=true;
@@ -249,9 +250,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	// count non zero
 	int nz=0;
 	for (int el=0;el<m;el++) nz += vr[el].size();
-//	printf("non-zeros: %d\n",nz);
+//	fmt::print("non-zeros: {}\n", nz);
 
-	printf("wushu construct loop 1: end\n");
+	fmt::print("wushu construct loop 1: end\n");
 
 
 
@@ -282,7 +283,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (int i=0;i<nz;i++) ws_dA->Ax[i] = 0; // empty
 	#endif
 
-//	printf("Ai construct\n");
+//	fmt::print("Ai construct\n");
 	int count=0;
 	for (int i=0;i<m;i++)
 	{
@@ -290,7 +291,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		#ifdef USE_CUSPARSE
 		ws_dA->Ap[i+1] = ws_dA->Ap[i] + v[i].size();
 		#endif
-//		printf("Ap[%d]=%d (%d)\n",i+1,ws_A->Ap[i+1],nz);
+//		fmt::print("Ap[{}]={} ({})\n", i+1, ws_A->Ap[i+1], nz);
 		for (std::size_t j=0;j<v[i].size();j++)
 		{
 			ws_A->Ai[count]=v[i][j];
@@ -309,11 +310,12 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	// fill only non zero elements-relevant
 /*
 	 // brute force
-	printf("wushu construct loop 2: start\n");
+	fmt::print("wushu construct loop 2: start\n");
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-//		if (i%20==0) printf("\r progress: %04d of %04d",i,m);
+//		if (i%20==0)
+//			fmt::print("\r progress: {:04d} of {:04d}", i, m);
 		for (int gz=0;gz<lbm.blocks.front().local.z();gz++)
 		for (int gy=0;gy<lbm.blocks.front().local.y();gy++)
 		for (int gx=0;gx<lbm.blocks.front().local.x();gx++)
@@ -326,10 +328,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 			}
 		}
 	}
-	printf("wushu construct loop 2: end\n");
+	fmt::print("wushu construct loop 2: end\n");
 */
 
-	printf("wushu construct loop 2: start\n");
+	fmt::print("wushu construct loop 2: start\n");
 	idx support=5; // search in this support
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
@@ -352,14 +354,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 			}
 		}
 	}
-	printf("wushu construct loop 2: end\n");
+	fmt::print("wushu construct loop 2: end\n");
 
 
-	printf("wushu construct loop 3: start\n");
+	fmt::print("wushu construct loop 3: start\n");
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-		if (i%100==0)printf("progress %5.2f %%    \r",100.0*i/(real)m);
+		if (i%100==0)
+			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
 		for (std::size_t ka=0;ka<vr[i].size();ka++)
 		{
 			int j=vr[i][ka].ka;
@@ -395,9 +398,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		}
 	}
 	delete [] vr; // free
-	printf("wushu construct loop 3: end\n");
+	fmt::print("wushu construct loop 3: end\n");
 
-	printf("wushu construct loop 4: start\n");
+	fmt::print("wushu construct loop 4: start\n");
 	for (int k=0;k<3;k++)
 	{
 		ws_x[k] = new real[m];
@@ -440,7 +443,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	ws_M->Ap[0]=0;
 	for (int i=0;i<nz;i++) ws_M->Ax[i] = 0; // empty
 
-//	printf("Ai construct\n");
+//	fmt::print("Ai construct\n");
 	count=0;
 	for (int i=0;i<m;i++)
 	{
@@ -489,7 +492,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	}
 	delete [] vn;
 	delete [] vx;
-	printf("wushu construct loop 4: end\n");
+	fmt::print("wushu construct loop 4: end\n");
 	#endif
 }
 
@@ -515,7 +518,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	VEC *v = new VEC[m];
 	VECDD *vr = new VECDD[m];
 
-	printf("tnl wushu construct loop 1: start\n");
+	fmt::print("tnl wushu construct loop 1: start\n");
 //	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
 	real *LLx = new real[m];
 	real *LLy = new real[m];
@@ -529,11 +532,12 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		LLlagx[i]=LL[i].lag_x;
 	}
 
-	printf("tnl wushu construct loop 1: cont\n");
+	fmt::print("tnl wushu construct loop 1: cont\n");
 	#pragma omp parallel for schedule(dynamic)
 	for (int el=0;el<m;el++)
 	{
-		if (el%100==0)printf("progress %5.2f %%    \r",100.0*el/(real)m);
+		if (el%100==0)
+			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
 		for (int ka=0;ka<m;ka++)
 		{
 			bool proceed=true;
@@ -589,7 +593,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	delete [] LLz;
 	delete [] LLlagx;
 
-	printf("tnl wushu construct loop 1: end\n");
+	fmt::print("tnl wushu construct loop 1: end\n");
 
 	// allocate matrix A
 	ws_tnl_hA = std::make_shared< hEllpack >();
@@ -617,7 +621,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	d_x = new  std::vector<real>[m];
 	// fill only non zero elements-relevant
 
-	printf("tnl wushu construct loop 2: start\n");
+	fmt::print("tnl wushu construct loop 2: start\n");
 	idx support=5; // search in this support
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
@@ -640,13 +644,14 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
-	printf("tnl wushu construct loop 2: end\n");
+	fmt::print("tnl wushu construct loop 2: end\n");
 
-	printf("tnl wushu construct loop 3: start\n");
+	fmt::print("tnl wushu construct loop 3: start\n");
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-		if (i%100==0)printf("progress %5.2f %%    \r",100.0*i/(real)m);
+		if (i%100==0)
+			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
 		for (std::size_t ka=0;ka<vr[i].size();ka++)
 		{
 			int j=vr[i][ka].ka;
@@ -676,7 +681,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		}
 	}
 	delete [] vr; // free
-	printf("tnl wushu construct loop 3: end\n");
+	fmt::print("tnl wushu construct loop 3: end\n");
 
 	// create vectors for the solution of the linear system
 	for (int k=0;k<3;k++)
@@ -709,7 +714,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
 	ws_tnl_hM.setRowCapacities(hM_row_lengths);
 
-//	printf("Ai construct\n");
+//	fmt::print("Ai construct\n");
 	for (int i=0;i<m;i++)
 	{
 		auto row = ws_tnl_hM.getRow(i);
@@ -761,8 +766,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	#endif
-	printf("tnl wushu lagrange_3D_end\n");
-	printf("number of lagrangian points: %d\n", m);
+	fmt::print("tnl wushu lagrange_3D_end\n");
+	fmt::print("number of lagrangian points: {}\n", m);
 
 	const char* compute_desc = "undefined";
 	switch (ws_compute)
@@ -775,7 +780,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		case ws_computeHybrid_TNL:             compute_desc = "ws_computeHybrid_TNL"; break;
 		case ws_computeHybrid_TNL_zerocopy:    compute_desc = "ws_computeHybrid_TNL_zerocopy"; break;
 	}
-	log("constructed WuShu matrices for ws_compute=%s", compute_desc);
+	log("constructed WuShu matrices for ws_compute={}", compute_desc);
 }
 
 template< typename Matrix, typename Vector >
@@ -834,7 +839,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t=%es k=%d TNL CG solver: WT=%e iterations=%d residual=%e", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
+				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
 			}
 			ConstVectorView x1(ws_tnl_dx[0].getData(), ws_tnl_dx[0].getSize());
 			ConstVectorView x2(ws_tnl_dx[1].getData(), ws_tnl_dx[1].getSize());
@@ -873,7 +878,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t=%es k=%d TNL CG solver: WT=%e iterations=%d residual=%e", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// copy to GPU
 			for (int k=0;k<3;k++) ws_tnl_dx[k] = ws_tnl_hx[k];
@@ -913,7 +918,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t=%es k=%d TNL CG solver: WT=%e iterations=%d residual=%e", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// continue on GPU
 			ConstVectorView x1(ws_tnl_hxz[0].getData(), ws_tnl_hxz[0].getSize());
@@ -957,7 +962,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
 			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfz());
 			#else
-			printf("ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build. \n");
+			fmt::print(stderr, "ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build.\n");
 			#endif
 			break;
 		}
@@ -990,7 +995,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
 			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfz());
 			#else
-			printf("ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build. \n");
+			fmt::print(stderr, "ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build.\n");
 			#endif
 			break;
 		}
@@ -1008,7 +1013,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t=%es k=%d TNL CG solver: WT=%e iterations=%d residual=%e", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			auto kernel = [&] (idx i) mutable
 			{
@@ -1054,37 +1059,34 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			break;
 		}
 		default:
-			printf("lagrange_3D: Wu Shu compute flag %d unrecognized.\n", ws_compute);
+			fmt::print(stderr, "lagrange_3D: Wu Shu compute flag {} unrecognized.\n", ws_compute);
 			break;
 	}
 }
 
 template< typename LBM >
 template< typename... ARGS >
-void Lagrange3D<LBM>::log(const char* fmt, ARGS... args)
+void Lagrange3D<LBM>::log(const char* fmts, ARGS... args)
 {
-	FILE*f = fopen(logfile,"at"); // append information
-	if (f==0)
-	{
-		printf("unable to create/access file %s",logfile);
+	FILE* f = fopen(logfile.c_str(), "at"); // append information
+	if (f==0) {
+		fmt::print(stderr, "unable to create/access file {}\n", logfile);
 		return;
 	}
 	// insert time stamp
-	char tname[FILENAME_CHARS];
-	timestamp(tname);
-	fprintf(f, "%s ", tname);
-	fprintf(f,fmt, args...);
-	fprintf(f,"\n");
+	fmt::print(f, "{} ", timestamp());
+	fmt::print(f, fmts, args...);
+	fmt::print(f, "\n");
 	fclose(f);
 
-//	printf(fmt, args...);
-//	printf("\n");
+	//fmt::print(fmts, args...);
+	//fmt::print("\n");
 }
 
 template< typename LBM >
-Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const char* resultsDir) : lbm(inputLBM)
+Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir) : lbm(inputLBM)
 {
-	sprintf(logfile, "%s/ibm_solver.log", resultsDir);
+	logfile = fmt::format("{}/ibm_solver.log", resultsDir);
 
 	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 	ws_tnl_hsolver.setMaxIterations(10000);

@@ -47,10 +47,11 @@ features are:
     - [CUDA](https://docs.nvidia.com/cuda/index.html) toolkit (version 11 or newer)
     - compatible host compiler (e.g. [GCC](https://gcc.gnu.org/) or
       [Clang](https://clang.llvm.org/))
-    - [zlib](https://www.zlib.net/) (available in most Linux distributions)
-    - [libpng](http://www.libpng.org/pub/png/libpng.html) (available in most Linux distributions)
     - [CUDA-aware][CUDA-aware MPI] MPI library – for distributed computing
       (tested with [OpenMPI](https://www.open-mpi.org/))
+    - [zlib](https://www.zlib.net/) (available in most Linux distributions)
+    - [libpng](http://www.libpng.org/pub/png/libpng.html) (available in most Linux distributions)
+    - [fmt](https://github.com/fmtlib/fmt/) – string formatting library
 
 4. Configure the build using `cmake` in the root path of the Git repository:
 

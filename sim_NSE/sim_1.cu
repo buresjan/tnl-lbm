@@ -115,7 +115,7 @@ struct StateLocal : State<NSE>
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
 				lbmInflowDensity = block.dmacro.getElement(MACRO::e_rho, x, y, z);
-				log("[probe: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
+				log("[probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
 	}
@@ -160,7 +160,7 @@ struct StateLocal : State<NSE>
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
 				lbmInflowDensity = block.hmacro(MACRO::e_rho, x, y, z);
-				log("[loadState: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
+				log("[loadState: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
 	}
@@ -181,7 +181,7 @@ struct StateLocal : State<NSE>
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
 				lbmInflowDensity = block.hmacro(MACRO::e_rho, x, y, z);
-				log("[loadState: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
+				log("[loadState: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
 	}
@@ -217,7 +217,7 @@ int sim01_test(int RESOLUTION = 2)
 	lat.physDl = PHYS_DL;
 
 	StateLocal< NSE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
-	state.setid("sim_1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
+	state.setid("sim_1_res{:02d}_np{:03d}", RESOLUTION, state.nse.nproc);
 
 	#ifdef HAVE_MPI
 	// disable MPI communication over the periodic boundary

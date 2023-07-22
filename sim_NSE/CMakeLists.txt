@@ -12,11 +12,11 @@ foreach(target IN ITEMS ${TARGETS})
     # create the target
     add_executable(${target} ${target}.cu)
 
-    # add TNL to the target
-    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA)
-
     # add special flags used in lbm3d
     target_compile_definitions(${target} PUBLIC "-DUSE_CUDA")
+
+    # add dependencies to the target
+    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA fmt::fmt-header-only)
 
     # enable OpenMP for the target
     if(OPENMP_FOUND)

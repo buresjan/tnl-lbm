@@ -4,11 +4,14 @@
 	#define AA_PATTERN
 #endif
 
-#include <stdio.h>
+#include <cstdio>
 #include <cstdlib>
-#include <math.h>
-#include <string.h>
+#include <cmath>
+
+#include <string>
 #include <iostream>
+#include <utility>
+
 #include <png.h>
 
 #include <TNL/Containers/StaticVector.h>
@@ -222,8 +225,6 @@ struct LBM_CONFIG
 // TODO: replace these macros with functions TNL::min and TNL::max
 #define MAX( a , b) (((a)>(b))?(a):(b))
 #define MIN( a , b) (((a)<(b))?(a):(b))
-
-#define FILENAME_CHARS 500
 
 #define SQ(x) ((x) * (x)) // square function; replaces SQ(x) by ((x) * (x)) in the code
 #define NORM(x, y, z) sqrt(SQ(x) + SQ(y) + SQ(z))

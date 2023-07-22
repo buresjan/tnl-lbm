@@ -467,11 +467,11 @@ void LBM_BLOCK<CONFIG>::forAllLatticeSites(F f)
 
 template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const char* filename, real time, int cycle) const
+void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle) const
 {
 	VTKWriter vtk;
 
-	FILE* fp = fopen(filename, "w+");
+	FILE* fp = fopen(filename.c_str(), "w+");
 	vtk.writeHeader(fp);
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)local.x(), (int)local.y(), (int)local.z());
@@ -541,7 +541,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const char* 
 
 template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const char* filename, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step) const
+void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step) const
 {
 	if (!isLocalIndex(ox, oy, oz)) return;
 
@@ -560,7 +560,7 @@ void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const cha
 	idx Y = ly / step + (ly % step != 0);
 	idx Z = lz / step + (lz % step != 0);
 
-	FILE* fp = fopen(filename, "w+");
+	FILE* fp = fopen(filename.c_str(), "w+");
 	vtk.writeHeader(fp);
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)X, (int)Y, (int)Z);
@@ -630,13 +630,13 @@ void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const cha
 
 template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx XPOS) const
+void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx XPOS) const
 {
 	if (!isLocalX(XPOS)) return;
 
 	VTKWriter vtk;
 
-	FILE* fp = fopen(name, "w+");
+	FILE* fp = fopen(filename.c_str(), "w+");
 	vtk.writeHeader(fp);
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n",1, (int)local.y(), (int)local.z());
@@ -706,13 +706,13 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const ch
 
 template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx YPOS) const
+void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx YPOS) const
 {
 	if (!isLocalY(YPOS)) return;
 
 	VTKWriter vtk;
 
-	FILE* fp = fopen(name, "w+");
+	FILE* fp = fopen(filename.c_str(), "w+");
 	vtk.writeHeader(fp);
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)local.x(), 1, (int)local.z());
@@ -780,13 +780,13 @@ void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const ch
 
 template< typename CONFIG >
 	template< typename Output >
-void LBM_BLOCK<CONFIG>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const char* name, real time, int cycle, idx ZPOS) const
+void LBM_BLOCK<CONFIG>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ZPOS) const
 {
 	if (!isLocalZ(ZPOS)) return;
 
 	VTKWriter vtk;
 
-	FILE* fp = fopen(name, "w+");
+	FILE* fp = fopen(filename.c_str(), "w+");
 	vtk.writeHeader(fp);
 	fprintf(fp,"DATASET RECTILINEAR_GRID\n");
 	fprintf(fp,"DIMENSIONS %d %d %d\n", (int)local.x(), (int)local.y(), 1);

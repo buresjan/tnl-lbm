@@ -235,7 +235,7 @@ struct StateLocal : State<NSE>
 		l1errors[error_idx] = l1error_phys;
 
 		if (nse.rank == 0)
-			log("at t=%1.2fs, iterations=%d l1error_phys=%e l2error_phys=%e stopping=%e",
+			log("at t={:1.2f}s, iterations={:d} l1error_phys={:e} l2error_phys={:e} stopping={:e}",
 				nse.physTime(), nse.iterations, l1error_phys, l2error_phys, stopping);
 	}
 
@@ -301,7 +301,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
-	state.setid("sim_2_%s_%s_%s_res_%d", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
+	state.setid("sim_2_{}_{}_{}_res_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
 
 	if (state.isMark())
 		return 0;
@@ -395,9 +395,9 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 		state.nse.physFinalTime /= factor;
 	}
 
-	state.log("PHYS_DL = %e", PHYS_DL);
-//	state.log("in lbm units: forcing=%e velocity=%e", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
-	state.log("in lbm units: forcing=%e", force);
+	state.log("PHYS_DL = {:e}", PHYS_DL);
+//	state.log("in lbm units: forcing={:e} velocity={:e}", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
+	state.log("in lbm units: forcing={:e}", force);
 
 	// add cuts
 //	state.add2Dcut_X(LBM_X/2,"cut_X");

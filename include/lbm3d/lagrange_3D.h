@@ -2,10 +2,15 @@
 
 #include <vector>
 #include <algorithm>
+#include <string>
+
 #include <math.h>
+
 #include "defs.h"
 #include "lbm.h"
 #include "lbm_common/spmatrix.h"
+
+#include <fmt/core.h>
 
 #include <TNL/Matrices/SparseMatrix.h>
 #include <TNL/Algorithms/Segments/SlicedEllpack.h>
@@ -186,13 +191,13 @@ struct Lagrange3D
 //	void integrateForce(real &Fx, real &Fy, real &Fz, real surface_element_size) { printf("integrateForce not implemented yet."); }
 
 	// special log file for the linear system solvers
-	char logfile[FILENAME_CHARS];
+	std::string logfile;
 
 	template < typename... ARGS >
 	void log(const char* fmt, ARGS... args);
 
 	// constructors
-	Lagrange3D(LBM &inputLBM, const char* resultsDir);
+	Lagrange3D(LBM &inputLBM, const std::string& resultsDir);
 	~Lagrange3D();
 
 	// disable copy-constructor and copy-assignment, leave only move-constructor and move-assignment

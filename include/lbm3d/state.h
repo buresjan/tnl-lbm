@@ -3,11 +3,13 @@
 #include <vector>
 #include <deque>
 #include <limits>
+#include <string>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <TNL/Timer.h>
+#include <fmt/core.h>
 
 #include "defs.h"
 #include "kernels.h"
@@ -24,7 +26,7 @@ struct probe3Dcut
 	IDX ox,oy,oz; // lower left front point
 	IDX lx,ly,lz; // length
 	IDX step; // 1: every voxel 2: every 3 voxels etc.
-	char name[FILENAME_CHARS];
+	std::string name;
 	int cycle;
 };
 
@@ -32,7 +34,7 @@ template < typename IDX >
 struct probe2Dcut
 {
 	int type; // 0=X, 1=Y, 2=Z
-	char name[FILENAME_CHARS];
+	std::string name;
 	IDX position; // x/y/z ... LBM units ... int
 	int cycle;
 };
@@ -41,7 +43,7 @@ template < typename IDX >
 struct probe1Dcut
 {
 	int type; // 0=X, 1=Y, 2=Z
-	char name[FILENAME_CHARS];
+	std::string name;
 	IDX pos1; // x/y/z
 	IDX pos2; // y/z
 	int cycle;
@@ -50,7 +52,7 @@ struct probe1Dcut
 template < typename REAL >
 struct probe1Dlinecut
 {
-	char name[FILENAME_CHARS];
+	std::string name;
 	using point_t = TNL::Containers::StaticVector< 3, REAL >;
 	point_t from; // physical units
 	point_t to;   // physical units
@@ -116,7 +118,7 @@ struct State
 
 	// vtk export
 	template< typename real1, typename real2 >
-	bool vtk_helper(const char*iid, real1 ivalue, int idofs, char*id, real2 &value, int &dofs) /// simplifies data output routine
+	bool vtk_helper(const char* iid, real1 ivalue, int idofs, char* id, real2 &value, int &dofs) /// simplifies data output routine
 	{
 		sprintf(id,"%s",iid);
 		dofs=idofs;
@@ -148,23 +150,23 @@ struct State
 	void add1Dcut_Y(real x, real z, const char* fmt, ARGS... args);
 	template < typename... ARGS >
 	void add1Dcut_Z(real x, real y, const char* fmt, ARGS... args);
-	void write1Dcut(point_t from, point_t to, const char * desc);
-	void write1Dcut_X(idx y, idx z, const char * desc);
-	void write1Dcut_Y(idx y, idx z, const char * desc);
-	void write1Dcut_Z(idx x, idx y, const char * desc);
+	void write1Dcut(point_t from, point_t to, const std::string& fname);
+	void write1Dcut_X(idx y, idx z, const std::string& fname);
+	void write1Dcut_Y(idx y, idx z, const std::string& fname);
+	void write1Dcut_Z(idx x, idx y, const std::string& fname);
 
 	int verbosity=1;
-	char id[FILENAME_CHARS] = "default";
+	std::string id = "default";
 
 	virtual bool outputData(const BLOCK_NSE& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) { return false; }
 
 	bool getPNGdimensions(const char * filename, int &w, int &h);
 
-	bool projectPNG_X(const char * filename, idx x0, bool rotate=false, bool mirror=false, bool flip=false,
+	bool projectPNG_X(const std::string& filename, idx x0, bool rotate=false, bool mirror=false, bool flip=false,
 	                  real amin=0, real amax=1, real bmin=0, real bmax=1);  // amin, amax, bmin, bmax ... used for cropping, see the code
-	bool projectPNG_Y(const char * filename, idx y0, bool rotate=false, bool mirror=false, bool flip=false,
+	bool projectPNG_Y(const std::string& filename, idx y0, bool rotate=false, bool mirror=false, bool flip=false,
 	                  real amin=0, real amax=1, real bmin=0, real bmax=1);  // amin, amax, bmin, bmax ... used for cropping, see the code
-	bool projectPNG_Z(const char * filename, idx z0, bool rotate=false, bool mirror=false, bool flip=false,
+	bool projectPNG_Z(const std::string& filename, idx z0, bool rotate=false, bool mirror=false, bool flip=false,
 	                  real amin=0, real amax=1, real bmin=0, real bmax=1);  // amin, amax, bmin, bmax ... used for cropping, see the code
 
 	// simulation control
@@ -199,12 +201,12 @@ struct State
 	void log(const char* fmt, ARGS... args);
 
 	// save & load state
-	void move(const char* srcdir, const char* dstdir, const char* srcfilename, const char* dstfilename);
+	void move(const std::string& srcdir, const std::string& dstdir, const std::string& srcfilename, const std::string& dstfilename);
 	template < typename VARTYPE >
-	int saveloadBinaryData(int direction, const char*dirname, const char*filename, VARTYPE*data, idx length);
+	int saveloadBinaryData(int direction, const std::string& dirname, const std::string& filename, VARTYPE* data, idx length);
 
 	template< typename... ARGS >
-	int saveLoadTextData(int direction, const char*subdirname, const char*filename, ARGS&... args);
+	int saveLoadTextData(int direction, const std::string& subdirname, const std::string& filename, ARGS&... args);
 
 	// old version
 	//template < typename... ARGS >

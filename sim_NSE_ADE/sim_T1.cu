@@ -506,7 +506,7 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
 				lbmInflowDensity = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
-				log("[probe: lbm inflow density changed from %e to %e", oldlbmInflowDensity, lbmInflowDensity);
+				log("[probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
 	}
@@ -542,7 +542,7 @@ int simT1_test(int RESOLUTION = 2)
 	lat.physDl = PHYS_DL;
 
 	StateLocal< NSE, ADE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
-	state.setid("sim_T1_res%02d_np%03d", RESOLUTION, state.nse.nproc);
+	state.setid("sim_T1_res{:02d}_np{:03d}", RESOLUTION, state.nse.nproc);
 //	state.printIter = 100;
 //	state.printIter = 100;
 	state.nse.physFinalTime = 10.0;
