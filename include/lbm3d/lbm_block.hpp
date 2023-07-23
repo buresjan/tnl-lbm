@@ -12,6 +12,13 @@ LBM_BLOCK<CONFIG>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, i
 	rank = communicator.rank();
 	nproc = communicator.size();
 
+#ifdef HAVE_MPI
+	// set communication pattern for all synchronizers
+	map_sync.setSynchronizationPattern(TNL::Containers::NDArraySyncPatterns::D1Q3);
+	for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
+		dreal_sync[i].setSynchronizationPattern(TNL::Containers::NDArraySyncPatterns::D1Q3);
+#endif
+
 	// initialize neighbours
 	if (neighbour_left < 0)
 		this->neighbour_left = (rank + nproc - 1) % nproc;
@@ -225,15 +232,18 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 	#endif
 
 	for (int i = 0; i < N; i++) {
-		// set neighbors (0 = x-direction)
-		dreal_sync[i + sync_offset].template setNeighbors< 0 >( neighbour_left, neighbour_right );
+		// set neighbors
+		dreal_sync[i + sync_offset].setNeighbor(TNL::Containers::SyncDirection::Left, neighbour_left);
+		dreal_sync[i + sync_offset].setNeighbor(TNL::Containers::SyncDirection::Right, neighbour_right);
+		// set tags
 		// TODO: make this a general parameter (for now we set an upper bound)
 		constexpr int blocks_per_rank = 32;
-		dreal_sync[i + sync_offset].setTags(
+		dreal_sync[i + sync_offset].setTags(TNL::Containers::SyncDirection::Left,
 			left_id < 0 ? -1 :
 				(2 * i + 1) * blocks_per_rank * nproc + left_id,   // from left
 			left_id < 0 ? -1 :
-				(2 * i + 0) * blocks_per_rank * nproc + id,        // to left
+				(2 * i + 0) * blocks_per_rank * nproc + id );      // to left
+		dreal_sync[i + sync_offset].setTags(TNL::Containers::SyncDirection::Right,
 			right_id < 0 ? -1 :
 				(2 * i + 0) * blocks_per_rank * nproc + right_id,  // from right
 			right_id < 0 ? -1 :
@@ -244,7 +254,7 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 		TNL::Containers::SyncDirection sync_direction = (is_df) ? df_sync_directions[i] : TNL::Containers::SyncDirection::All;
 		#ifdef AA_PATTERN
 		// reset shift of the lattice sites
-		dreal_sync[i + sync_offset].template setBuffersShift<0>(0);
+		dreal_sync[i + sync_offset].setBufferOffsets(0);
 		if (is_df) {
 			if (data.even_iter) {
 				// lattice sites for synchronization are not shifted, but DFs have opposite directions
@@ -256,7 +266,7 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 			else {
 				// DFs have canonical directions, but lattice sites for synchronization are shifted
 				// (values to be synchronized were written to the neighboring sites)
-				dreal_sync[i + sync_offset].template setBuffersShift<0>(1);
+				dreal_sync[i + sync_offset].setBufferOffsets(1);
 			}
 		}
 		#endif
@@ -273,11 +283,12 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 			streams.emplace( right_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
 		}
 		// set the CUDA stream
-		dreal_sync[i + sync_offset].setCudaStreams(streams.at(left_id), streams.at(right_id));
+		dreal_sync[i + sync_offset].setCudaStream(TNL::Containers::SyncDirection::Left, streams.at(left_id));
+		dreal_sync[i + sync_offset].setCudaStream(TNL::Containers::SyncDirection::Right, streams.at(right_id));
 		#endif
 		// start the synchronization
-		// NOTE: we don't use synchronizeAsync because we need pipelining
-		// NOTE: we could use only policy=deferred for synchronizeAsync, because  threadpool and async require MPI_THREAD_MULTIPLE which is slow
+		// NOTE: we don't use synchronize with policy because we need pipelining
+		// NOTE: we could use only synchronize with policy=deferred, because threadpool and async require MPI_THREAD_MULTIPLE which is slow
 		// stage 0: set inputs, allocate buffers
 		dreal_sync[i + sync_offset].stage_0(view, sync_direction);
 		// stage 1: fill send buffers
@@ -302,17 +313,21 @@ void LBM_BLOCK<CONFIG>::synchronizeMacroDevice_start()
 template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::synchronizeMapDevice_start()
 {
-	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
-	constexpr auto policy = std::decay_t<decltype(map_sync)>::AsyncPolicy::deferred;
+	// set neighbors
+	map_sync.setNeighbor(TNL::Containers::SyncDirection::Left, neighbour_left);
+	map_sync.setNeighbor(TNL::Containers::SyncDirection::Right, neighbour_right);
 
-	// set neighbors (0 = x-direction)
-	map_sync.template setNeighbors< 0 >( neighbour_left, neighbour_right );
-	map_sync.setTags(
+	// set tags
+	map_sync.setTags( TNL::Containers::SyncDirection::Left,
 			left_id < 0 ? -1 : nproc + left_id,  // from left
-			left_id < 0 ? -1 : id,               // to left
+			left_id < 0 ? -1 : id );             // to left
+	map_sync.setTags( TNL::Containers::SyncDirection::Right,
 			right_id < 0 ? -1 : right_id,        // from right
 			right_id < 0 ? -1 : nproc + id );    // to right
-	map_sync.synchronizeAsync(dmap, policy);
+
+	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
+	constexpr auto policy = std::decay_t<decltype(map_sync)>::AsyncPolicy::deferred;
+	map_sync.synchronize(policy, dmap);
 }
 #endif  // HAVE_MPI
 

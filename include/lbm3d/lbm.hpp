@@ -11,7 +11,7 @@ LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysVisco
 	nproc = communicator.size();
 
 	// uniform decomposition by default
-	auto local_range = TNL::Containers::Partitioner<idx>::splitRange(lat.global.x(), communicator);
+	auto local_range = TNL::Containers::splitRange<idx>(lat.global.x(), communicator);
 	idx3d local, offset;
 	local.x() = local_range.getEnd() - local_range.getBegin();
 	local.y() = lat.global.y();

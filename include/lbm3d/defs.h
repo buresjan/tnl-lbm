@@ -18,7 +18,7 @@
 #include <TNL/Containers/NDArray.h>
 #include <TNL/Containers/DistributedNDArray.h>
 #include <TNL/Containers/DistributedNDArraySynchronizer.h>
-#include <TNL/Containers/Partitioner.h>
+#include <TNL/Containers/BlockPartitioning.h>
 #include <TNL/MPI.h>
 #include <TNL/Cuda/Stream.h>
 
