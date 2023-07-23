@@ -1555,13 +1555,9 @@ void State<NSE>::SimUpdate()
 		// wait for the computations on boundaries to finish
 		// TODO: pipeline the stream synchronization with the MPI synchronizer (wait using CUDA stream events in the DistributedNDArraySynchronizer)
 		for (auto& block : nse.blocks)
-		{
-			const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-			const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-			cudaStreamSynchronize(cuda_stream_left);
-			cudaStreamSynchronize(cuda_stream_right);
-		}
+			for (auto& [id, stream] : block.streams)
+				if (id != block.id)
+					cudaStreamSynchronize(stream);
 		timer_compute_overlaps.stop();
 
 		// exchange the latest DFs and dmacro on overlaps between blocks

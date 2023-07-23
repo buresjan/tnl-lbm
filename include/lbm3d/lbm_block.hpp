@@ -258,10 +258,7 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 		if (is_df) {
 			if (data.even_iter) {
 				// lattice sites for synchronization are not shifted, but DFs have opposite directions
-				if (sync_direction == TNL::Containers::SyncDirection::Right)
-					sync_direction = TNL::Containers::SyncDirection::Left;
-				else if (sync_direction == TNL::Containers::SyncDirection::Left)
-					sync_direction = TNL::Containers::SyncDirection::Right;
+				sync_direction = opposite(sync_direction);
 			}
 			else {
 				// DFs have canonical directions, but lattice sites for synchronization are shifted

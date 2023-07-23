@@ -502,13 +502,9 @@ void computeNonNewtonianKernels(STATE& state)
 
 	// wait for the computations on boundaries to finish
 	for (auto& block : nse.blocks)
-	{
-		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-		cudaStreamSynchronize(cuda_stream_left);
-		cudaStreamSynchronize(cuda_stream_right);
-	}
+		for (auto& [id, stream] : block.streams)
+			if (id != block.id)
+				cudaStreamSynchronize(stream);
 
 	// exchange macroscopic quantities on overlaps between blocks
 	// TODO: avoid communication of DFs here
@@ -565,13 +561,9 @@ void computeNonNewtonianKernels(STATE& state)
 
 	// wait for the computations on boundaries to finish
 	for (auto& block : nse.blocks)
-	{
-		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-		cudaStreamSynchronize(cuda_stream_left);
-		cudaStreamSynchronize(cuda_stream_right);
-	}
+		for (auto& [id, stream] : block.streams)
+			if (id != block.id)
+				cudaStreamSynchronize(stream);
 
 	// exchange macroscopic quantities on overlaps between blocks
 	// TODO: avoid communication of DFs here

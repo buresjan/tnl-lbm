@@ -239,13 +239,9 @@ struct State_NSE_ADE : State<NSE>
 
 			// wait for the computations on boundaries to finish
 			for (auto& block : nse.blocks)
-			{
-				const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-				const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-				cudaStreamSynchronize(cuda_stream_left);
-				cudaStreamSynchronize(cuda_stream_right);
-			}
+				for (auto& [id, stream] : block.streams)
+					if (id != block.id)
+						cudaStreamSynchronize(stream);
 
 			// exchange the latest DFs and dmacro on overlaps between blocks
 			// (it is important to wait for the communication before waiting for the computation, otherwise MPI won't progress)
