@@ -1,5 +1,6 @@
 #pragma once
 
+#include "defs.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
@@ -243,7 +244,7 @@ void LBMKernelVelocity(
 	#endif
 	map_t gi_map = SD.map(x, y, z);
 
-	typename NSE::KernelStruct<dreal> KS;
+	typename NSE::template KernelStruct<dreal> KS;
 
 	// copy quantities
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
@@ -333,9 +334,9 @@ void LBMKernelStress(
 	#endif
 	map_t gi_map = SD.map(x, y, z);
 
-	typename NSE::KernelStruct<dreal> KS;
+	typename NSE::template KernelStruct<dreal> KS;
 
-	typename NSE::KernelStruct<dreal> KSxp, KSxm, KSyp, KSym, KSzp, KSzm;
+	typename NSE::template KernelStruct<dreal> KSxp, KSxm, KSyp, KSym, KSzp, KSzm;
 
 	// copy quantities
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
@@ -473,7 +474,7 @@ template <typename STATE>
 void computeNonNewtonianKernels(STATE& state)
 {
 	using NSE = typename STATE::NSE;
-	using TRAITS = typename LBM_NSE::TRAITS;
+	using TRAITS = typename NSE::TRAITS;
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
