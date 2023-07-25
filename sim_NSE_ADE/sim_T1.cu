@@ -10,7 +10,7 @@
 	#include "lbm3d/d3q7/streaming_AA.h"
 #endif
 #ifdef AB_PATTERN
-	#include "d3q7/streaming_AB.h"
+	#include "lbm3d/d3q7/streaming_AB.h"
 #endif
 #include "lbm3d/d3q7/bc.h"
 #include "lbm3d/d3q7/macro.h"
