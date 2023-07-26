@@ -3,12 +3,56 @@
 #include "defs.h"
 
 template < typename NSE >
+__cuda_callable__ void kernelInitIndices(
+	typename NSE::DATA SD,
+	typename NSE::TRAITS::map_t map,
+	short int nproc,
+	typename NSE::TRAITS::idx x,
+	typename NSE::TRAITS::idx y,
+	typename NSE::TRAITS::idx z,
+	typename NSE::TRAITS::idx& xp,
+	typename NSE::TRAITS::idx& xm,
+	typename NSE::TRAITS::idx& yp,
+	typename NSE::TRAITS::idx& ym,
+	typename NSE::TRAITS::idx& zp,
+	typename NSE::TRAITS::idx& zm
+)
+{
+	if (NSE::BC::isPeriodic(map)) {
+		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
+		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
+		// TODO: use nproc_y and nproc_z
+		yp = (nproc == 1 && y == SD.Y()-1) ? 0 : (y+1);
+		ym = (nproc == 1 && y == 0) ? (SD.Y()-1) : (y-1);
+		zp = (nproc == 1 && z == SD.Z()-1) ? 0 : (z+1);
+		zm = (nproc == 1 && z == 0) ? (SD.Z()-1) : (z-1);
+	} else {
+		#ifdef HAVE_MPI
+		// NOTE: ghost layers of lattice sites are assumed in all directions, so these expressions always work
+		xp = x+1;
+		xm = x-1;
+		yp = y+1;
+		ym = y-1;
+		zp = z+1;
+		zm = z-1;
+		#else
+		xp = TNL::min(x+1, SD.X()-1);
+		xm = TNL::max(x-1, 0);
+		yp = TNL::min(y+1, SD.Y()-1);
+		ym = TNL::max(y-1, 0);
+		zp = TNL::min(z+1, SD.Z()-1);
+		zm = TNL::max(z-1, 0);
+		#endif
+	}
+}
+
+template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMKernel(
 	typename NSE::DATA SD,
-	short int rank,
 	short int nproc,
-	typename NSE::TRAITS::idx offset_x
+	typename NSE::TRAITS::idx3d offset,
+	typename NSE::TRAITS::idx3d end
 )
 #else
 CUDA_HOSTDEV
@@ -17,7 +61,6 @@ void LBMKernel(
 	typename NSE::TRAITS::idx x,
 	typename NSE::TRAITS::idx y,
 	typename NSE::TRAITS::idx z,
-	short int rank,
 	short int nproc
 )
 #endif
@@ -27,38 +70,18 @@ void LBMKernel(
 	using map_t = typename NSE::TRAITS::map_t;
 
 	#ifdef USE_CUDA
-	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
-	idx y = threadIdx.y + blockIdx.y * blockDim.y;
-	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset.x();
+	idx y = threadIdx.y + blockIdx.y * blockDim.y + offset.y();
+	idx z = threadIdx.z + blockIdx.z * blockDim.z + offset.z();
 
-	if (x >= SD.X() || y >= SD.Y() || z >= SD.Z())
+	if (x >= end.x() || y >= end.y() || z >= end.z())
 		return;
 	#endif
 
 	map_t gi_map = SD.map(x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
-	if (NSE::BC::isPeriodic(gi_map))
-	{
-		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
-		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
-		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
-		yp = (y == SD.Y()-1) ? 0 : (y+1);
-		ym = (y == 0) ? (SD.Y()-1) : (y-1);
-		zp = (z == SD.Z()-1) ? 0 : (z+1);
-		zm = (z == 0) ? (SD.Z()-1) : (z-1);
-	} else {
-		// handle overlaps between GPUs
-		// NOTE: ghost layers of lattice sites are assumed in the x-direction, so x+1 and x-1 always work
-		xp = x+1;
-		xm = x-1;
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
-	}
+	kernelInitIndices<NSE>(SD,gi_map,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
 
 	typename NSE::template KernelStruct<dreal> KS;
 
@@ -82,9 +105,9 @@ template < typename NSE, typename ADE >
 __global__ void cudaLBMKernel(
 	typename NSE::DATA NSE_SD,
 	typename ADE::DATA ADE_SD,
-	short int rank,
 	short int nproc,
-	typename NSE::TRAITS::idx offset_x
+	typename NSE::TRAITS::idx3d offset,
+	typename NSE::TRAITS::idx3d end
 )
 #else
 CUDA_HOSTDEV
@@ -94,7 +117,6 @@ void LBMKernel(
 	typename NSE::TRAITS::idx x,
 	typename NSE::TRAITS::idx y,
 	typename NSE::TRAITS::idx z,
-	short int rank,
 	short int nproc
 )
 #endif
@@ -104,11 +126,11 @@ void LBMKernel(
 	using map_t = typename NSE::TRAITS::map_t;
 
 	#ifdef USE_CUDA
-	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
-	idx y = threadIdx.y + blockIdx.y * blockDim.y;
-	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset.x();
+	idx y = threadIdx.y + blockIdx.y * blockDim.y + offset.y();
+	idx z = threadIdx.z + blockIdx.z * blockDim.z + offset.z();
 
-	if (x >= NSE_SD.X() || y >= NSE_SD.Y() || z >= NSE_SD.Z())
+	if (x >= end.x() || y >= end.y() || z >= end.z())
 		return;
 	#endif
 
@@ -116,27 +138,7 @@ void LBMKernel(
 	const map_t ADE_mapgi = ADE_SD.map(x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
-	if (NSE::BC::isPeriodic(NSE_mapgi))
-	{
-		// handle overlaps between GPUs
-//		xp = (!NSE_SD.overlap_right && x == NSE_SD.X-1) ? 0 : (x+1);
-//		xm = (!NSE_SD.overlap_left && x == 0) ? (NSE_SD.X-1) : (x-1);
-		xp = (nproc == 1 && x == NSE_SD.X()-1) ? 0 : (x+1);
-		xm = (nproc == 1 && x == 0) ? (NSE_SD.X()-1) : (x-1);
-		yp = (y == NSE_SD.Y()-1) ? 0 : (y+1);
-		ym = (y == 0) ? (NSE_SD.Y()-1) : (y-1);
-		zp = (z == NSE_SD.Z()-1) ? 0 : (z+1);
-		zm = (z == 0) ? (NSE_SD.Z()-1) : (z-1);
-	} else {
-		// handle overlaps between GPUs
-		// NOTE: ghost layers of lattice sites are assumed in the x-direction, so x+1 and x-1 always work
-		xp = x+1;
-		xm = x-1;
-		yp = MIN(y+1, NSE_SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, NSE_SD.Z()-1);
-		zm = MAX(z-1,0);
-	}
+	kernelInitIndices<NSE>(NSE_SD,NSE_mapgi,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
 
 	// NSE part
 	typename NSE::template KernelStruct<dreal> NSE_KS;
@@ -211,7 +213,6 @@ template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMComputeVelocitiesStar(
 	typename NSE::DATA SD,
-	short int rank,
 	short int nproc
 )
 #else
@@ -220,7 +221,6 @@ void LBMComputeVelocitiesStar(
 	typename NSE::TRAITS::idx x,
 	typename NSE::TRAITS::idx y,
 	typename NSE::TRAITS::idx z,
-	short int rank,
 	short int nproc
 )
 #endif
@@ -246,27 +246,7 @@ void LBMComputeVelocitiesStar(
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
-	if (NSE::BC::isPeriodic(gi_map))
-	{
-		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
-		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
-		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
-		yp = (y == SD.Y()-1) ? 0 : (y+1);
-		ym = (y == 0) ? (SD.Y()-1) : (y-1);
-		zp = (z == SD.Z()-1) ? 0 : (z+1);
-		zm = (z == 0) ? (SD.Z()-1) : (z-1);
-	} else {
-		// handle overlaps between GPUs
-		// NOTE: ghost layers of lattice sites are assumed in the x-direction, so x+1 and x-1 always work
-		xp = x+1;
-		xm = x-1;
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
-	}
+	kernelInitIndices<NSE>(SD,gi_map,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
 
 	KS.fx = 0;
 	KS.fy = 0;
@@ -282,7 +262,6 @@ template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMComputeVelocitiesStarAndZeroForce(
 	typename NSE::DATA SD,
-	short int rank,
 	short int nproc
 )
 #else
@@ -291,7 +270,6 @@ void LBMComputeVelocitiesStarAndZeroForce(
 	typename NSE::TRAITS::idx x,
 	typename NSE::TRAITS::idx y,
 	typename NSE::TRAITS::idx z,
-	short int rank,
 	short int nproc
 )
 #endif
@@ -317,27 +295,7 @@ void LBMComputeVelocitiesStarAndZeroForce(
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
-	if (NSE::BC::isPeriodic(gi_map))
-	{
-		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
-		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
-		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
-		yp = (y == SD.Y()-1) ? 0 : (y+1);
-		ym = (y == 0) ? (SD.Y()-1) : (y-1);
-		zp = (z == SD.Z()-1) ? 0 : (z+1);
-		zm = (z == 0) ? (SD.Z()-1) : (z-1);
-	} else {
-		// handle overlaps between GPUs
-		// NOTE: ghost layers of lattice sites are assumed in the x-direction, so x+1 and x-1 always work
-		xp = x+1;
-		xm = x-1;
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
-	}
+	kernelInitIndices<NSE>(SD,gi_map,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
 
 	KS.fx = 0;
 	KS.fy = 0;

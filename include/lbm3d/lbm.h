@@ -57,7 +57,7 @@ struct LBM
 	LBM() = delete;
 	LBM(const LBM&) = delete;
 	LBM(LBM&&) = default;
-	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt);
+	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice = false);
 	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt);
 
 //	real Re(real physvel) { return fabs(physvel) * lat.physDl * (real)Y / physViscosity; } // TODO: change Y to charLength --- specify this explicitely

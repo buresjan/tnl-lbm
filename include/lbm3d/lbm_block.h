@@ -29,10 +29,6 @@ struct LBM_BLOCK
 
 	// KernelData contains only the necessary data for the CUDA kernel. these are copied just before the kernel is called
 	typename CONFIG::DATA data;
-#ifdef USE_CUDA
-	// CUDA thread block size for the LBM kernel
-	idx3d block_size{0, 0, 0};
-#endif
 
 	hmap_array_t hmap;
 	dmap_array_t dmap;
@@ -50,37 +46,61 @@ struct LBM_BLOCK
 	TNL::MPI::Comm communicator = MPI_COMM_WORLD;
 	int rank = 0;
 	int nproc = 1;
-	int neighbour_left = 0;
-	int neighbour_right = 0;
 
 	// lattice sizes and offsets
 	idx3d global;
 	idx3d local;
 	idx3d offset;
 
-	// block indices
-	int left_id;  // index of the left neighbor block
-	int id;       // index of this block
-	int right_id; // index of the right neighbor block
+	// index of this block
+	int id;
+
+	// indices of the neighboring blocks
+	std::map< TNL::Containers::SyncDirection, int > neighborIDs;
+
+	// owners of the neighboring blocks
+	std::map< TNL::Containers::SyncDirection, int > neighborRanks;
+
+	// synchronizers for dfs, macro and map
+	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[CONFIG::Q + MACRO::N];
+	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
+
+	// data for compute for the block itself and each neighbor
+	struct COMPUTE_DATA
+	{
+		// parameters for CUDA kernel launch
+		dim3 gridSize;
+		dim3 blockSize;
+		TNL::Backend::Stream stream;
+		// parameters for cudaLBMKernel
+		idx3d offset = 0;
+		idx3d size = 0;
+	};
+	std::map< TNL::Containers::SyncDirection, COMPUTE_DATA > computeData;
 
 	// constructors
 	LBM_BLOCK() = delete;
 	LBM_BLOCK(const LBM_BLOCK&) = delete;
 	LBM_BLOCK(LBM_BLOCK&&) = default;
-	LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left = -1, int neighbour_right = -1, int left_id = 0, int this_id = 0, int right_id = 0);
+	LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int this_id = 0);
+
+	// initialization method for MPI synchronization - must be called before starting the simulation!
+	template< typename Pattern >
+	void setLatticeDecomposition(
+		const Pattern& pattern,  // communication pattern for MPI synchronization - must be consistent with the lattice decomposition
+		const std::map< TNL::Containers::SyncDirection, int >& neighborIDs,
+		const std::map< TNL::Containers::SyncDirection, int >& neighborRanks
+	);
+
+	// auxiliary
+	dim3 getCudaBlockSize(const idx3d& local_size);
+	dim3 getCudaGridSize(const idx3d& local_size, const dim3& block_size, idx x = 0, idx y = 0, idx z = 0);
 
 	int df_overlap_X() { return data.indexer.template getOverlap< 0 >(); }
 	int df_overlap_Y() { return data.indexer.template getOverlap< 1 >(); }
 	int df_overlap_Z() { return data.indexer.template getOverlap< 2 >(); }
 
 #ifdef HAVE_MPI
-	// synchronizers for dfs, macro and map
-	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[CONFIG::Q + MACRO::N];
-	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
-
-	// CUDA streams for the block itself and each neighbor
-	std::map< int, TNL::Backend::Stream > streams;
-
 	// synchronization methods
 	template< typename Array >
 	void startDrealArraySynchronization(Array& array, int sync_offset);

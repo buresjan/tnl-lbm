@@ -5,35 +5,199 @@
 #include "block_size_optimizer.h"
 
 template< typename CONFIG >
-LBM_BLOCK<CONFIG>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int neighbour_left, int neighbour_right, int left_id, int this_id, int right_id)
-: communicator(communicator), global(global), local(local), offset(offset), left_id(left_id), id(this_id), right_id(right_id)
+LBM_BLOCK<CONFIG>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int this_id)
+: communicator(communicator), global(global), local(local), offset(offset), id(this_id)
 {
 	// initialize MPI info
 	rank = communicator.rank();
 	nproc = communicator.size();
+}
 
-#ifdef HAVE_MPI
+template< typename CONFIG >
+template< typename Pattern >
+void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
+	const Pattern& pattern,
+	const std::map< TNL::Containers::SyncDirection, int >& neighborIDs,
+	const std::map< TNL::Containers::SyncDirection, int >& neighborRanks)
+{
+	this->neighborIDs = neighborIDs;
+	this->neighborRanks = neighborRanks;
+
 	// set communication pattern for all synchronizers
-	map_sync.setSynchronizationPattern(TNL::Containers::NDArraySyncPatterns::D1Q3);
+	map_sync.setSynchronizationPattern(pattern);
 	for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
-		dreal_sync[i].setSynchronizationPattern(TNL::Containers::NDArraySyncPatterns::D1Q3);
-#endif
+		dreal_sync[i].setSynchronizationPattern(pattern);
 
-	// initialize neighbours
-	if (neighbour_left < 0)
-		this->neighbour_left = (rank + nproc - 1) % nproc;
-	else
-		this->neighbour_left = neighbour_left;
-	if (neighbour_right < 0)
-		this->neighbour_right = (rank + 1) % nproc;
-	else
-		this->neighbour_right = neighbour_right;
+	// set neighbors for all synchronizers
+	for (auto [direction, rank] : neighborRanks) {
+		map_sync.setNeighbor(direction, rank);
+		for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
+			dreal_sync[i].setNeighbor(direction, rank);
+	}
 
+	auto isPrimaryDirection = [] (TNL::Containers::SyncDirection direction) -> bool
+	{
+		if ((direction & TNL::Containers::SyncDirection::Left) != TNL::Containers::SyncDirection::None)
+			return true;
+		else if ((direction & TNL::Containers::SyncDirection::Right) != TNL::Containers::SyncDirection::None)
+			return false;
+		else if ((direction & TNL::Containers::SyncDirection::Bottom) != TNL::Containers::SyncDirection::None)
+			return true;
+		else if ((direction & TNL::Containers::SyncDirection::Top) != TNL::Containers::SyncDirection::None)
+			return false;
+		else if ((direction & TNL::Containers::SyncDirection::Back) != TNL::Containers::SyncDirection::None)
+			return true;
+		else // direction & TNL::Containers::SyncDirection::Front
+			return false;
+	};
+
+	// TODO: make this a general parameter (for now we set an upper bound)
+	constexpr int blocks_per_rank = 32;
+
+	// set tags for map_sync
+	for (auto [direction, neighbor_id] : neighborIDs) {
+		if (! isPrimaryDirection(direction) ^ isPrimaryDirection(opposite(direction)))
+			throw std::logic_error("Bug in isPrimaryDirection!!!");
+		if (neighbor_id < 0)
+			map_sync.setTags(direction, -1, -1);
+		else if (isPrimaryDirection(direction))
+			map_sync.setTags(direction, blocks_per_rank * nproc + neighbor_id, this->id);
+		else
+			map_sync.setTags(direction, neighbor_id, blocks_per_rank * nproc + this->id);
+	}
+
+	// set tags
+	for (int i = 0; i < CONFIG::Q + MACRO::N; i++) {
+		for (auto [direction, neighbor_id] : neighborIDs) {
+			if (! isPrimaryDirection(direction) ^ isPrimaryDirection(opposite(direction)))
+				throw std::logic_error("Bug in isPrimaryDirection!!!");
+			if (neighbor_id < 0)
+				dreal_sync[i].setTags(direction, -1, -1);
+			else {
+				const int offset0 = (2 * i + 0) * blocks_per_rank * nproc;
+				const int offset1 = (2 * i + 1) * blocks_per_rank * nproc;
+				if (isPrimaryDirection(direction))
+					dreal_sync[i].setTags(direction, offset1 + neighbor_id, offset0 + this->id);
+				else
+					dreal_sync[i].setTags(direction, offset0 + neighbor_id, offset1 + this->id);
+			}
+		}
+	}
+
+	// re-initialize compute data
+	computeData.clear();
+	for (auto direction : pattern)
+		computeData[direction] = {};
+	computeData[TNL::Containers::SyncDirection::None] = {};
+
+	// create CUDA streams
 #ifdef USE_CUDA
-	// initialize optimal thread block size for the LBM kernel
-	constexpr int max_threads = 256 / (sizeof(dreal) / sizeof(float));  // use 256 threads for SP and 128 threads for DP
-	block_size = get_optimal_block_size< typename TRAITS::xyz_permutation >(local, max_threads);
+	// get the range of stream priorities for current GPU
+	int priority_high, priority_low;
+	cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
+	// low-priority stream for the interior
+	computeData.at(TNL::Containers::SyncDirection::None).stream = TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_low);
+	// high-priority streams for boundaries
+	for (auto direction : pattern) {
+		computeData.at(direction).stream = TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high);
+		// set the stream to the synchronizer
+		for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
+			dreal_sync[i].setCudaStream(direction, computeData.at(direction).stream);
+	}
 #endif
+
+	// set the multi-index attributes in compute data
+	idx3d interior_offset = {0, 0, 0};
+	idx3d interior_size = local;
+
+	// for compute on boundaries
+	auto direction = TNL::Containers::SyncDirection::Left;
+	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
+		computeData.at(direction).offset = idx3d{0, 0, 0};
+		computeData.at(direction).size = idx3d{df_overlap_X(), local.y(), local.z()};
+		interior_offset.x()++;
+		interior_size.x() -= computeData.at(direction).size.x();
+		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, df_overlap_X());
+	}
+	direction = TNL::Containers::SyncDirection::Right;
+	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
+		computeData.at(direction).offset = idx3d{local.x() - df_overlap_X(), 0, 0};
+		computeData.at(direction).size = idx3d{df_overlap_X(), local.y(), local.z()};
+		interior_size.x() -= computeData.at(direction).size.x();
+		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, df_overlap_X());
+	}
+	direction = TNL::Containers::SyncDirection::Bottom;
+	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
+		computeData.at(direction).offset = idx3d{interior_offset.x(), 0, 0};
+		computeData.at(direction).size = idx3d{interior_size.x(), df_overlap_Y(), local.z()};
+		interior_offset.y()++;
+		interior_size.y() -= computeData.at(direction).size.y();
+		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, df_overlap_Y());
+	}
+	direction = TNL::Containers::SyncDirection::Top;
+	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
+		computeData.at(direction).offset = idx3d{interior_offset.x(), local.y() - df_overlap_Y(), 0};
+		computeData.at(direction).size = idx3d{interior_size.x(), df_overlap_Y(), local.z()};
+		interior_size.y() -= computeData.at(direction).size.y();
+		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, df_overlap_Y());
+	}
+	direction = TNL::Containers::SyncDirection::Back;
+	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
+		computeData.at(direction).offset = idx3d{interior_offset.x(), interior_offset.y(), 0};
+		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), df_overlap_Z()};
+		interior_offset.z()++;
+		interior_size.z() -= computeData.at(direction).size.z();
+		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, df_overlap_Z());
+	}
+	direction = TNL::Containers::SyncDirection::Front;
+	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
+		computeData.at(direction).offset = idx3d{interior_offset.x(), interior_offset.y(), local.z() - df_overlap_Z()};
+		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), df_overlap_Z()};
+		interior_size.z() -= computeData.at(direction).size.z();
+		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, df_overlap_Z());
+	}
+
+	// for compute on interior lattice sites
+	direction = TNL::Containers::SyncDirection::None;
+	computeData.at(direction).offset = interior_offset;
+	computeData.at(direction).size = interior_size;
+	computeData.at(direction).blockSize = getCudaBlockSize(interior_size);
+	computeData.at(direction).gridSize = getCudaGridSize(interior_size, computeData.at(direction).blockSize);
+}
+
+template< typename CONFIG >
+dim3 LBM_BLOCK<CONFIG>::getCudaBlockSize(const idx3d& local_size)
+{
+	// find optimal thread block size for the LBM kernel
+	// use 256 threads for SP and 128 threads for DP
+	constexpr int max_threads = 256 / (sizeof(dreal) / sizeof(float));
+	const idx3d result = get_optimal_block_size< typename TRAITS::xyz_permutation >(local_size, max_threads);
+	return {unsigned(result.x()), unsigned(result.y()), unsigned(result.z())};
+}
+
+template< typename CONFIG >
+dim3 LBM_BLOCK<CONFIG>::getCudaGridSize(const idx3d& local_size, const dim3& block_size, idx x, idx y, idx z)
+{
+	dim3 gridSize;
+	if (x > 0)
+		gridSize.x = x;
+	else
+		gridSize.x = TNL::roundUpDivision(local_size.x(), block_size.x);
+	if (y > 0)
+		gridSize.y = y;
+	else
+		gridSize.y = TNL::roundUpDivision(local_size.y(), block_size.y);
+	if (z > 0)
+		gridSize.z = z;
+	else
+		gridSize.z = TNL::roundUpDivision(local_size.z(), block_size.z);
+	return gridSize;
 }
 
 template< typename CONFIG >
@@ -232,22 +396,6 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 	#endif
 
 	for (int i = 0; i < N; i++) {
-		// set neighbors
-		dreal_sync[i + sync_offset].setNeighbor(TNL::Containers::SyncDirection::Left, neighbour_left);
-		dreal_sync[i + sync_offset].setNeighbor(TNL::Containers::SyncDirection::Right, neighbour_right);
-		// set tags
-		// TODO: make this a general parameter (for now we set an upper bound)
-		constexpr int blocks_per_rank = 32;
-		dreal_sync[i + sync_offset].setTags(TNL::Containers::SyncDirection::Left,
-			left_id < 0 ? -1 :
-				(2 * i + 1) * blocks_per_rank * nproc + left_id,   // from left
-			left_id < 0 ? -1 :
-				(2 * i + 0) * blocks_per_rank * nproc + id );      // to left
-		dreal_sync[i + sync_offset].setTags(TNL::Containers::SyncDirection::Right,
-			right_id < 0 ? -1 :
-				(2 * i + 0) * blocks_per_rank * nproc + right_id,  // from right
-			right_id < 0 ? -1 :
-				(2 * i + 1) * blocks_per_rank * nproc + id );      // to right
 		// rebind just the data pointer
 		view.bind(array.getData() + i * data.indexer.getStorageSize());
 		// determine sync direction
@@ -266,22 +414,6 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 				dreal_sync[i + sync_offset].setBufferOffsets(1);
 			}
 		}
-		#endif
-		#ifdef USE_CUDA
-		// lazy creation of CUDA streams
-		if (streams.empty()) {
-			// get the range of stream priorities for current GPU
-			int priority_high, priority_low;
-			cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
-			// low-priority stream for the interior
-			streams.emplace( id, TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_low) );
-			// high-priority streams for boundaries
-			streams.emplace( left_id, TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high) );
-			streams.emplace( right_id, TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high) );
-		}
-		// set the CUDA stream
-		dreal_sync[i + sync_offset].setCudaStream(TNL::Containers::SyncDirection::Left, streams.at(left_id));
-		dreal_sync[i + sync_offset].setCudaStream(TNL::Containers::SyncDirection::Right, streams.at(right_id));
 		#endif
 		// start the synchronization
 		// NOTE: we don't use synchronize with policy because we need pipelining
@@ -310,18 +442,6 @@ void LBM_BLOCK<CONFIG>::synchronizeMacroDevice_start()
 template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::synchronizeMapDevice_start()
 {
-	// set neighbors
-	map_sync.setNeighbor(TNL::Containers::SyncDirection::Left, neighbour_left);
-	map_sync.setNeighbor(TNL::Containers::SyncDirection::Right, neighbour_right);
-
-	// set tags
-	map_sync.setTags( TNL::Containers::SyncDirection::Left,
-			left_id < 0 ? -1 : nproc + left_id,  // from left
-			left_id < 0 ? -1 : id );             // to left
-	map_sync.setTags( TNL::Containers::SyncDirection::Right,
-			right_id < 0 ? -1 : right_id,        // from right
-			right_id < 0 ? -1 : nproc + id );    // to right
-
 	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
 	constexpr auto policy = std::decay_t<decltype(map_sync)>::AsyncPolicy::deferred;
 	map_sync.synchronize(policy, dmap);
@@ -373,6 +493,8 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 		hfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
 		hfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+		hfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
+		hfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 		hfs[dfty].allocate();
 		#endif
 	}
@@ -380,6 +502,8 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	hmap.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	hmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
+	hmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
 	hmap.allocate();
 #endif
 
@@ -387,8 +511,12 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	cpumacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	hmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+	hmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
+	hmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	hmacro.allocate();
 	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+	cpumacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
+	cpumacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	cpumacro.allocate();
 #endif
 	hmacro.setValue(0);
@@ -405,6 +533,8 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmap.setSizes(global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 	dmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	dmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
+	dmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
 	dmap.allocate();
 	#endif
 
@@ -413,6 +543,8 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 		dfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
 		dfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+		dfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
+		dfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 		dfs[dfty].allocate();
 		#endif
 	}
@@ -420,6 +552,8 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmacro.setSizes(0, global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 	dmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+	dmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
+	dmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	dmacro.allocate();
 	#endif
 #else

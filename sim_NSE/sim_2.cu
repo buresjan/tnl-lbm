@@ -238,8 +238,8 @@ struct StateLocal : State<NSE>
 	}
 
 
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, int RES)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice, int RES)
+		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt, periodic_lattice)
 	{
 		errors_count = 10;
 		l1errors = new real[errors_count];
@@ -296,7 +296,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
+	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, use_forcing, RES);
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
 	state.setid("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
@@ -367,16 +367,6 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 				state.nse.blocks.front().data.vx_profile[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
 		#endif
 		state.nse.blocks.front().data.size_y = state.nse.blocks.front().local.y();
-
-		#ifdef HAVE_MPI
-		// disable MPI communication over the periodic boundary
-		for (auto& block : state.nse.blocks) {
-			if (block.id == 0)
-				block.left_id = -1;
-			if (block.id == block.nproc - 1)
-				block.right_id = -1;
-		}
-		#endif
 	}
 
 	state.cnt[PRINT].period = 10.0;

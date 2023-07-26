@@ -16,6 +16,7 @@ struct State_NSE_ADE : State<NSE>
 	using State<NSE>::log;
 
 	using idx = typename TRAITS::idx;
+	using idx3d = typename TRAITS::idx3d;
 	using real = typename TRAITS::real;
 	using lat_t = Lattice<3, real, idx>;
 
@@ -156,27 +157,6 @@ struct State_NSE_ADE : State<NSE>
 			return;
 		}
 
-		#ifdef USE_CUDA
-		auto get_grid_size = [] (const auto& block, idx x = 0, idx y = 0, idx z = 0) -> dim3
-		{
-			dim3 gridSize;
-			if (x > 0)
-				gridSize.x = x;
-			else
-				gridSize.x = TNL::roundUpDivision(block.local.x(), block.block_size.x());
-			if (y > 0)
-				gridSize.y = y;
-			else
-				gridSize.y = TNL::roundUpDivision(block.local.y(), block.block_size.y());
-			if (z > 0)
-				gridSize.z = z;
-			else
-				gridSize.z = TNL::roundUpDivision(block.local.z(), block.block_size.z());
-
-			return gridSize;
-		};
-		#endif
-
 
 		// call hook method (used e.g. for extra kernels in the non-Newtonian model)
 		this->computeBeforeLBMKernel();
@@ -203,9 +183,10 @@ struct State_NSE_ADE : State<NSE>
 				auto& block_ade = ade.blocks[b];
 				// TODO: check that block_nse and block_ade have the same sizes
 
-				const dim3 blockSize = {unsigned(block_nse.block_size.x()), unsigned(block_nse.block_size.y()), unsigned(block_nse.block_size.z())};
-				const dim3 gridSize = get_grid_size(block_nse);
-				cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize>>>(block_nse.data, block_ade.data, nse.rank, nse.nproc, (idx) 0);
+				const auto direction = TNL::Containers::SyncDirection::None;
+				const dim3 blockSize = block_nse.computeData.at(direction).blockSize;
+				const dim3 gridSize = block_nse.computeData.at(direction).gridSize;
+				cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize>>>(block_nse.data, block_ade.data, nse.total_blocks, {0, 0, 0}, block_nse.local);
 			}
 			cudaDeviceSynchronize();
 			checkCudaDevice;
@@ -214,34 +195,51 @@ struct State_NSE_ADE : State<NSE>
 		}
 		else
 		{
+			const auto boundary_directions = {
+				TNL::Containers::SyncDirection::Bottom,
+				TNL::Containers::SyncDirection::Top,
+				TNL::Containers::SyncDirection::Back,
+				TNL::Containers::SyncDirection::Front,
+				TNL::Containers::SyncDirection::Left,
+				TNL::Containers::SyncDirection::Right,
+			};
+
+			// compute on boundaries
 			for (std::size_t b = 0; b < nse.blocks.size(); b++)
 			{
 				auto& block_nse = nse.blocks[b];
 				auto& block_ade = ade.blocks[b];
 				// TODO: check that block_nse and block_ade have the same sizes
 
-				const dim3 blockSize = {unsigned(block_nse.block_size.x()), unsigned(block_nse.block_size.y()), unsigned(block_nse.block_size.z())};
-				const dim3 gridSizeForBoundary = get_grid_size(block_nse, block_nse.df_overlap_X());
-				const dim3 gridSizeForInternal = get_grid_size(block_nse, block_nse.local.x() - 2*block_nse.df_overlap_X());
+				for (auto direction : boundary_directions)
+					if (auto search = block_nse.neighborIDs.find(direction); search != block_nse.neighborIDs.end() && search->second >= 0) {
+						const dim3 blockSize = block_nse.computeData.at(direction).blockSize;
+						const dim3 gridSize = block_nse.computeData.at(direction).gridSize;
+						const cudaStream_t stream = block_nse.computeData.at(direction).stream;
+						const idx3d offset = block_nse.computeData.at(direction).offset;
+						const idx3d size = block_nse.computeData.at(direction).size;
+						cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize, 0, stream>>>(block_nse.data, block_ade.data, nse.total_blocks, offset, offset + size);
+					}
+			}
 
-				// get CUDA streams
-				const cudaStream_t cuda_stream_left = block_nse.streams.at(block_nse.left_id);
-				const cudaStream_t cuda_stream_right = block_nse.streams.at(block_nse.right_id);
-				const cudaStream_t cuda_stream_main = block_nse.streams.at(block_nse.id);
-
-				// compute on boundaries (NOTE: 1D distribution is assumed)
-				cudaLBMKernel< NSE, ADE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block_nse.data, block_ade.data, block_nse.id, nse.total_blocks, (idx) 0);
-				cudaLBMKernel< NSE, ADE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block_nse.data, block_ade.data, block_nse.id, nse.total_blocks, block_nse.local.x() - block_nse.df_overlap_X());
-
-				// compute on internal lattice sites
-				cudaLBMKernel< NSE, ADE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block_nse.data, block_ade.data, block_nse.id, nse.total_blocks, block_nse.df_overlap_X());
+			// compute on interior lattice sites
+			for (std::size_t b = 0; b < nse.blocks.size(); b++)
+			{
+				auto& block_nse = nse.blocks[b];
+				auto& block_ade = ade.blocks[b];
+				const auto direction = TNL::Containers::SyncDirection::None;
+				const dim3 blockSize = block_nse.computeData.at(direction).blockSize;
+				const dim3 gridSize = block_nse.computeData.at(direction).gridSize;
+				const cudaStream_t stream = block_nse.computeData.at(direction).stream;
+				const idx3d offset = block_nse.computeData.at(direction).offset;
+				const idx3d size = block_nse.computeData.at(direction).size;
+				cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize, 0, stream>>>(block_nse.data, block_ade.data, nse.total_blocks, offset, offset + size);
 			}
 
 			// wait for the computations on boundaries to finish
 			for (auto& block : nse.blocks)
-				for (auto& [id, stream] : block.streams)
-					if (id != block.id)
-						cudaStreamSynchronize(stream);
+				for (auto direction : boundary_directions)
+					cudaStreamSynchronize(block.computeData.at(direction).stream);
 
 			// exchange the latest DFs and dmacro on overlaps between blocks
 			// (it is important to wait for the communication before waiting for the computation, otherwise MPI won't progress)
@@ -252,8 +250,8 @@ struct State_NSE_ADE : State<NSE>
 			// wait for the computation on the interior to finish
 			for (auto& block : nse.blocks)
 			{
-				const cudaStream_t cuda_stream_main = block.streams.at(block.id);
-				cudaStreamSynchronize(cuda_stream_main);
+				const cudaStream_t stream = block.computeData.at(TNL::Containers::SyncDirection::None).stream;
+				cudaStreamSynchronize(stream);
 			}
 
 			// synchronize the whole GPU and check errors
@@ -273,7 +271,7 @@ struct State_NSE_ADE : State<NSE>
 			for (idx z=0; z<block_nse.local.z(); z++)
 			for (idx y=0; y<block_nse.local.y(); y++)
 			{
-				LBMKernel< NSE, ADE >(block_nse.data, block_ade.data, x, y, z, nse.rank, nse.nproc);
+				LBMKernel< NSE, ADE >(block_nse.data, block_ade.data, x, y, z, nse.total_blocks);
 			}
 		}
 		#ifdef HAVE_MPI
