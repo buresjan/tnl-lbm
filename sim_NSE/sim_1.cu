@@ -21,21 +21,43 @@ struct StateLocal : State<NSE>
 
 	real lbmInflowDensity = no1;
 
+	void extrapolateInflowDensity()
+	{
+		// inflow density extrapolation
+		idx x = 5;
+		idx y = nse.lat.global.y()/3;
+		idx z = nse.lat.global.z()/3;
+
+		real oldlbmInflowDensity = lbmInflowDensity;
+		for (auto& block : nse.blocks)
+			if (block.isLocalIndex(x, y, z)) {
+				lbmInflowDensity = block.dmacro.getElement(MACRO::e_rho, x, y, z);
+				break;
+			}
+			else {
+				// set to zero so that MPI::reduce works with MPI_MAX
+				lbmInflowDensity = 0;
+			}
+		// make sure that all ranks get the same value
+		lbmInflowDensity = TNL::MPI::reduce(lbmInflowDensity, MPI_MAX, nse.communicator);
+		log("[probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+	}
+
 	virtual void setupBoundaries()
 	{
-		nse.setBoundaryX(0, BC::GEO_INFLOW); 		// left
-		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);
+		nse.setBoundaryX(0, BC::GEO_INFLOW); 	// left
+		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);	// right
 
 		nse.setBoundaryZ(1, BC::GEO_WALL);		// top
 		nse.setBoundaryZ(nse.lat.global.z()-2, BC::GEO_WALL);	// bottom
 		nse.setBoundaryY(1, BC::GEO_WALL); 		// back
-		nse.setBoundaryY(nse.lat.global.y()-2, BC::GEO_WALL);		// front
+		nse.setBoundaryY(nse.lat.global.y()-2, BC::GEO_WALL);	// front
 
 		// extra layer needed due to A-A pattern
 		nse.setBoundaryZ(0, BC::GEO_NOTHING);		// top
 		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_NOTHING);	// bottom
 		nse.setBoundaryY(0, BC::GEO_NOTHING); 		// back
-		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);		// front
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);	// front
 
 		// draw a sphere
 		if (0)
@@ -105,19 +127,7 @@ struct StateLocal : State<NSE>
 	virtual void probe1()
 	{
 		if (nse.iterations != 0)
-		{
-			// inflow density extrapolation
-			idx x = 5;
-			idx y = nse.lat.global.y()/2;
-			idx z = nse.lat.global.z()/2;
-			for (auto& block : nse.blocks)
-			if (block.isLocalIndex(x, y, z))
-			{
-				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = block.dmacro.getElement(MACRO::e_rho, x, y, z);
-				log("[probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
-			}
-		}
+			extrapolateInflowDensity();
 	}
 
 	virtual void updateKernelVelocities()
@@ -152,16 +162,7 @@ struct StateLocal : State<NSE>
 			if (forced) this->flagCreate("loadstate");
 
 			// set lbmInflowDensity from hmacro -- for consistency with restarted computations
-			idx x = 5;
-			idx y = nse.lat.global.y()/2;
-			idx z = nse.lat.global.z()/2;
-			for (auto& block : nse.blocks)
-			if (block.isLocalIndex(x, y, z))
-			{
-				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = block.hmacro(MACRO::e_rho, x, y, z);
-				log("[loadState: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
-			}
+			extrapolateInflowDensity();
 		}
 	}
 
@@ -173,16 +174,7 @@ struct StateLocal : State<NSE>
 			this->saveAndLoadState(FileToMemory, "current_state");
 
 			// set lbmInflowDensity from hmacro
-			idx x = 5;
-			idx y = nse.lat.global.y()/2;
-			idx z = nse.lat.global.z()/2;
-			for (auto& block : nse.blocks)
-			if (block.isLocalIndex(x, y, z))
-			{
-				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = block.hmacro(MACRO::e_rho, x, y, z);
-				log("[loadState: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
-			}
+			extrapolateInflowDensity();
 		}
 	}
 };
