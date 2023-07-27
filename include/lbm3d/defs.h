@@ -1,7 +1,11 @@
 #pragma once
 
 #if !defined(AB_PATTERN) && !defined(AA_PATTERN)
-	#define AA_PATTERN
+	// TODO: update multidimensional MPI synchronization for AA pattern
+	// (for the even time step which is similar to a "push scheme", we need to
+	// avoid race conditions on the corners - set smaller buffer size and adjust the offsets)
+	//#define AA_PATTERN
+	#define AB_PATTERN
 #endif
 
 #include <cstdio>
