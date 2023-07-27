@@ -57,6 +57,54 @@ decomposeLattice_D1Q3(
 }
 
 /**
+ * \brief Wraps \ref TNL::Containers::decomposeBlockOptimal with a permutation.
+ *
+ * \tparam Permutation is an \ref std::index_sequence that determines the order
+ *                     in which the \e x, \e y, \e z directions are preferrably
+ *                     decomposed.
+ * \param global The large block to decompose.
+ * \param num_blocks Number of blocks.
+ * \return A vector of the blocks into which the input was decomposed.
+ */
+template< typename Permutation, typename Index >
+std::vector< TNL::Containers::Block< 3, Index > >
+decomposeBlockOptimalWithPermutation( const TNL::Containers::Block< 3, Index >& global, Index num_blocks )
+{
+	static_assert( Permutation::size() == 3 );
+
+	// leading dimension
+	int i = TNL::Containers::detail::get< 2 >( Permutation{} );
+	// second dimension
+	int j = TNL::Containers::detail::get< 1 >( Permutation{} );
+	// last dimension
+	int k = TNL::Containers::detail::get< 0 >( Permutation{} );
+
+	// decompose a permuted global block
+	auto permuted_global = global;
+	permuted_global.begin[0] = global.begin[i];
+	permuted_global.begin[1] = global.begin[j];
+	permuted_global.begin[2] = global.begin[k];
+	permuted_global.end[0] = global.end[i];
+	permuted_global.end[1] = global.end[j];
+	permuted_global.end[2] = global.end[k];
+	const std::vector< TNL::Containers::Block< 3, Index > > permuted_result = TNL::Containers::decomposeBlockOptimal(permuted_global, num_blocks);
+
+	// upermute the blocks in the result
+	std::vector< TNL::Containers::Block< 3, Index > > result;
+	for( const auto& permuted_block : permuted_result ) {
+		auto& block = result.emplace_back( permuted_block );
+		block.begin[i] = permuted_block.begin[0];
+		block.begin[j] = permuted_block.begin[1];
+		block.begin[k] = permuted_block.begin[2];
+		block.end[i] = permuted_block.end[0];
+		block.end[j] = permuted_block.end[1];
+		block.end[k] = permuted_block.end[2];
+	}
+
+	return result;
+}
+
+/**
  * \brief Set neighbors for a synchronizer according to given synchronization pattern
  * and decomposition of a global block.
  *
@@ -211,7 +259,8 @@ decomposeLattice_D3Q27(
 
 	// find optimal decomposition
 	const TNL::Containers::Block<3, idx> globalBoundingBox = { idx3d{ 0, 0, 0 }, global_size };
-	const auto decomposition = TNL::Containers::decomposeBlockOptimal(globalBoundingBox, idx(nproc));
+	using Permutation = typename CONFIG::TRAITS::xyz_permutation;
+	const auto decomposition = decomposeBlockOptimalWithPermutation<Permutation>(globalBoundingBox, idx(nproc));
 	const TNL::Containers::Block<3, idx>& localBoundingBox = decomposition.at(rank);
 
 	// local size of the block
