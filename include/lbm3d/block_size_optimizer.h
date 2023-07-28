@@ -23,8 +23,14 @@ idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_
 	int i = TNL::Containers::detail::get< 2 >( Permutation{} );
 	// second dimension for optimization
 	int j = TNL::Containers::detail::get< 1 >( Permutation{} );
-	// last dimension (unimportant)
-	//int k = TNL::Containers::detail::get< 0 >( Permutation{} );
+	// last dimension
+	int k = TNL::Containers::detail::get< 0 >( Permutation{} );
+
+	// optimize the selection of leading dimensions for boundaries
+	if( domain_size[i] <= 4 && domain_size[j] >= 32 ) {
+		i = j;
+		j = k;
+	}
 
 #if 0
 /* Old algorithm which imposes additional restrictions on the domain:
@@ -73,6 +79,12 @@ idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_
 
 	idx3d best = {1, 1, 1};
 	best[i] = max_threads;
+	// TODO: it would be better to apply the permutation in the CUDA kernel...
+	if( i == 2 ) {
+		// CUDA limitation - max block dimension for z-axis is 64
+		best[i] = 64;
+		best[j] = max_threads / best[i];
+	}
 	while( best[i] > warp_size && domain_size[i] <= best[i] / 2 ) {
 		best[i] /= 2;
 		if( best[j] < domain_size[j] )
