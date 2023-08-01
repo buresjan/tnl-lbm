@@ -13,7 +13,7 @@ foreach(target IN ITEMS ${TARGETS})
     target_compile_definitions(${target} PUBLIC "-DUSE_CUDA")
 
     # add dependencies to the target
-    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA fmt::fmt-header-only)
+    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA fmt::fmt)
 
     # enable OpenMP for the target
     if(OPENMP_FOUND)

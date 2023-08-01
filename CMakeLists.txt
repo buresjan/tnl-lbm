@@ -58,10 +58,11 @@ else()
     add_subdirectory(libs/tnl)
     set(SYSTEM_TNL TRUE)  # avoid further inclusion of libs/tnl from other libs
 endif()
-find_package(fmt REQUIRED)
-# clang 16 does not support __float128 for CUDA targets
-if(CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DFMT_USE_FLOAT128=0")
+if(SYSTEM_FMT)
+    find_package(fmt 10 REQUIRED)
+else()
+    add_subdirectory(libs/fmt)
+    set(SYSTEM_FMT TRUE)  # avoid further inclusion of libs/fmt from other libs
 endif()
 
 # Add project subdirectories
