@@ -72,6 +72,7 @@ struct Traits
 	using map_t = _map_t;
 	using point_t = TNL::Containers::StaticVector< 3, real >;
 	using idx3d = TNL::Containers::StaticVector< 3, idx >;
+	using idx2d = TNL::Containers::StaticVector< 2, idx >;	// this is just for convenience
 
 	using xyz_permutation = std::index_sequence< 0, 2, 1 >;		// x, z, y
 	using d4_permutation = std::index_sequence< 0, 1, 3, 2 >;		// id, x, z, y
