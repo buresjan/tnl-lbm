@@ -201,6 +201,9 @@ void LBM<CONFIG>::copyDFsToDevice()
 template< typename CONFIG >
 void LBM<CONFIG>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 {
+	TNL::Timer t;
+	t.start();
+
 	// stage 0: set inputs, allocate buffers
 	// stage 1: fill send buffers
 	for( auto& block : blocks ) {
@@ -234,6 +237,43 @@ void LBM<CONFIG>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 		if (MACRO::use_syncMacro)
 			for (int i = 0; i < MACRO::N; i++)
 				block.dreal_sync[CONFIG::Q + i].stage_4();
+	}
+
+	t.stop();
+
+	if (nproc > 1 && iterations % 100 == 0) {
+		// count the data volume
+		std::size_t total_sent_bytes = 0;
+		std::size_t total_recv_bytes = 0;
+		std::size_t total_sent_messages = 0;
+		std::size_t total_recv_messages = 0;
+		for( auto& block : blocks ) {
+			for (int i = 0; i < CONFIG::Q; i++) {
+				total_sent_bytes += block.dreal_sync[i].sent_bytes;
+				total_recv_bytes += block.dreal_sync[i].recv_bytes;
+				total_sent_messages += block.dreal_sync[i].sent_messages;
+				total_recv_messages += block.dreal_sync[i].recv_messages;
+			}
+			if (MACRO::use_syncMacro)
+				for (int i = 0; i < MACRO::N; i++) {
+					total_sent_bytes += block.dreal_sync[CONFIG::Q + i].sent_bytes;
+					total_recv_bytes += block.dreal_sync[CONFIG::Q + i].recv_bytes;
+					total_sent_messages += block.dreal_sync[CONFIG::Q + i].sent_messages;
+					total_recv_messages += block.dreal_sync[CONFIG::Q + i].recv_messages;
+				}
+		}
+
+		// print stats
+		const double sent_GB = total_sent_bytes * 1e-9;
+		const double recv_GB = total_recv_bytes * 1e-9;
+		const double sent_GBps = sent_GB / t.getRealTime();
+		const double recv_GBps = recv_GB / t.getRealTime();
+		const double total_GBps = sent_GBps + recv_GBps;
+		std::cout << "Rank " << rank << " MPI synchronization stats (last iteration):\n"
+					 "    sent " << sent_GB << " GB in " << total_sent_messages << " messages, "
+						"received " << recv_GB << " GB in " << total_recv_messages << " messages, "
+						"in " << t.getRealTime() << " seconds\n";
+		std::cout << "    bandwidth: unidirectional " << recv_GBps << " GB/s, bidirectional " << total_GBps << " GB/s\n";
 	}
 }
 
