@@ -52,17 +52,20 @@ endif()
 include_directories(include)
 
 # Add dependencies
+include(FetchContent)
+FetchContent_Declare(fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG master
+    FIND_PACKAGE_ARGS
+)
+FetchContent_MakeAvailable(fmt)
+
+# Add TNL modules
 if(SYSTEM_TNL)
     find_package(TNL REQUIRED)
 else()
     add_subdirectory(libs/tnl)
     set(SYSTEM_TNL TRUE)  # avoid further inclusion of libs/tnl from other libs
-endif()
-if(SYSTEM_FMT)
-    find_package(fmt 10 REQUIRED)
-else()
-    add_subdirectory(libs/fmt)
-    set(SYSTEM_FMT TRUE)  # avoid further inclusion of libs/fmt from other libs
 endif()
 
 # Add project subdirectories
