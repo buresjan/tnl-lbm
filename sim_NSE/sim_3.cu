@@ -184,7 +184,7 @@ struct StateLocal : State<NSE>
 		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 		real phys_cl_full = -nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-		log("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{phys} {:e} C_D{LB} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
+		log("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
 
 // not used for evaluation of the results
 //		// FIXME: MPI !!!
