@@ -755,6 +755,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 
 	// update the preconditioner
 	ws_tnl_hprecond->update(ws_tnl_hA);
+	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 
 	#ifdef USE_CUDA
 	// copy matrices from host to the GPU
@@ -765,6 +766,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 
 	// update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
+	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
 	#endif
 	fmt::print("tnl wushu lagrange_3D_end\n");
 	fmt::print("number of lagrangian points: {}\n", m);
@@ -1088,13 +1090,11 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir) : lbm(
 {
 	logfile = fmt::format("{}/ibm_solver.log", resultsDir);
 
-	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
 	ws_tnl_hprecond = std::make_shared< hPreconditioner >();
 //	ws_tnl_hsolver.setPreconditioner(ws_tnl_hprecond);
 	#ifdef USE_CUDA
-	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
 	ws_tnl_dsolver.setMaxIterations(10000);
 	ws_tnl_dsolver.setConvergenceResidue(3e-4);
 	ws_tnl_dprecond = std::make_shared< dPreconditioner >();
