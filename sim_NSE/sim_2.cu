@@ -56,11 +56,11 @@ struct StateLocal : State<NSE>
 	real* l1errors;
 	int error_idx = 0;
 
-	real raw_analytical_ux(int n, int ilbm_y, int ilbm_z)
+	real raw_analytical_ux(int n, idx lbm_y, idx lbm_z)
 	{
-		if (ilbm_y==0 || ilbm_y==nse.lat.global.y()-1 || ilbm_z==0 || ilbm_z==nse.lat.global.z()-1) return 0;
-		int lbm_y=ilbm_y;
-		int lbm_z=ilbm_z;
+		if (lbm_y==0 || lbm_y==nse.lat.global.y()-1 || lbm_z==0 || lbm_z==nse.lat.global.z()-1)
+			return 0;
+
 		real a = nse.lat.global.y()/2.0 - 1.0;
 		real b = nse.lat.global.z()/2.0 - 1.0;
 		real y = ((real)lbm_y + 0.5 - nse.lat.global.y()/2.)/a;
@@ -82,7 +82,7 @@ struct StateLocal : State<NSE>
 		return coef * 16.0*a*a/PI/PI/PI*sum/nse.lbmViscosity();
 	}
 
-	real analytical_ux(int lbm_y, int lbm_z)
+	real analytical_ux(idx lbm_y, idx lbm_z)
 	{
 		if (!an_cache) cache_analytical();
 		return an_cache[lbm_z][lbm_y];
@@ -105,8 +105,8 @@ struct StateLocal : State<NSE>
 		{
 			nse.setBoundaryX(0, BC::GEO_INFLOW); 		// left
 //			nse.setBoundaryX(0, BC::GEO_INFLOW_FREE_RHO); 		// left
-			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);		// right
-//			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);		// right
+//			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);		// right
+			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);		// right
 //			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT_INTERP);		// right
 		} else
 		{
@@ -191,14 +191,12 @@ struct StateLocal : State<NSE>
 		real local_l2sum=0;
 		//real local_la1sum=0;
 		//real local_la2sum=0;
-		real diff;
-		real an;
 		for (int i = nse.blocks.front().offset.x() + 1; i < nse.blocks.front().offset.x() + nse.blocks.front().local.x() - 1; i++)
 		for (int j = nse.blocks.front().offset.y() + 1; j < nse.blocks.front().offset.y() + nse.blocks.front().local.y() - 1; j++)
 		for (int k = nse.blocks.front().offset.z() + 1; k < nse.blocks.front().offset.z() + nse.blocks.front().local.z() - 1; k++)
 		{
-			an = analytical_ux(j,k);
-			diff = fabs(nse.blocks.front().hmacro(MACRO::e_vx,i,j,k) - an);
+			real an = analytical_ux(j,k);
+			real diff = fabs(nse.blocks.front().hmacro(MACRO::e_vx,i,j,k) - an);
 			//local_la1sum += an;
 			//local_la2sum += SQ(an);
 			local_l1sum += diff;
@@ -301,7 +299,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
-	state.setid("sim_2_{}_{}_{}_res_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES);
+	state.setid("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
 
 	if (state.isMark())
 		return 0;
@@ -384,7 +382,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	state.cnt[PRINT].period = 10.0;
 	state.cnt[PROBE1].period = 10.0;// / RES;
 //	state.nse.physFinalTime = PHYS_DT * 1e7;
-	state.nse.physFinalTime = 5000;
+	state.nse.physFinalTime = 100; //5000;
 //	state.cnt[VTK2D].period = 1.0;
 
 	if (scaling == WEAK_SCALING_3D) {
