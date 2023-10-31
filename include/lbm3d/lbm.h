@@ -74,7 +74,6 @@ struct LBM
 
 	void resetForces() { resetForces(0,0,0);}
 	void resetForces(real ifx, real ify, real ifz);
-	void copyForcesToDevice();
 
 	void copyMapToHost();
 	void copyMapToDevice();

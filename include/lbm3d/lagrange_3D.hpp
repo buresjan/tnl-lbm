@@ -1,4 +1,51 @@
 #include "lbm_common/timeutils.h"
+#include "lagrange_3D.h"
+
+template< typename LBM >
+auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
+{
+	if (macro_idx >= MACRO::N)
+		throw std::logic_error("macro_idx must be less than MACRO::N");
+
+	auto& block = lbm.blocks.front();
+
+	// local size of the distributed array
+	// FIXME: overlaps
+	const idx n = block.local.x() * block.local.y() * block.local.z();
+
+	// offset for the requested quantity
+	// FIXME: overlaps
+	const idx quantity_offset = block.hmacro.getStorageIndex(macro_idx, block.offset.x(), block.offset.y(), block.offset.z());
+
+	// pointer to the data
+	dreal* data = block.hmacro.getData() + quantity_offset;
+
+	TNL_ASSERT_EQ(data, &block.hmacro(macro_idx, block.offset.x(), block.offset.y(), block.offset.z()), "indexing bug");
+
+	return {data, n};
+}
+
+template< typename LBM >
+auto Lagrange3D<LBM>::dmacroVector(int macro_idx) -> dVectorView
+{
+	if (macro_idx >= MACRO::N)
+		throw std::logic_error("macro_idx must be less than MACRO::N");
+
+	auto& block = lbm.blocks.front();
+
+	// local size of the distributed array
+	// FIXME: overlaps
+	const idx n = block.local.x() * block.local.y() * block.local.z();
+
+	// offset for the requested quantity
+	// FIXME: overlaps
+	const idx quantity_offset = block.dmacro.getStorageIndex(macro_idx, block.offset.x(), block.offset.y(), block.offset.z());
+
+	// pointer to the data
+	dreal* data = block.dmacro.getData() + quantity_offset;
+
+	return {data, n};
+}
 
 template< typename LBM >
 typename LBM::TRAITS::real Lagrange3D<LBM>::computeMinDist()
@@ -822,8 +869,21 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 	int m=LL.size();
 	idx n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
 
-	using VectorView = TNL::Containers::VectorView< dreal, TNL::Devices::Cuda, idx >;
-	using ConstVectorView = TNL::Containers::VectorView< const dreal, TNL::Devices::Cuda, idx >;
+	const auto drho = dmacroVector(MACRO::e_rho);
+	const auto dvx = dmacroVector(MACRO::e_vx);
+	const auto dvy = dmacroVector(MACRO::e_vy);
+	const auto dvz = dmacroVector(MACRO::e_vz);
+	auto dfx = dmacroVector(MACRO::e_fx);
+	auto dfy = dmacroVector(MACRO::e_fy);
+	auto dfz = dmacroVector(MACRO::e_fz);
+
+	const auto hrho = hmacroVector(MACRO::e_rho);
+	const auto hvx = hmacroVector(MACRO::e_vx);
+	const auto hvy = hmacroVector(MACRO::e_vy);
+	const auto hvz = hmacroVector(MACRO::e_vz);
+	auto hfx = hmacroVector(MACRO::e_fx);
+	auto hfy = hmacroVector(MACRO::e_fy);
+	auto hfz = hmacroVector(MACRO::e_fz);
 
 	switch (ws_compute)
 	{
@@ -831,9 +891,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		case ws_computeGPU_TNL:
 		{
 			// no Device--Host copy is required
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_db[0], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_db[1], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_db[2], -1.0);
+			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
+			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
+			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -843,13 +903,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				real WT = int_ms * 1e-6;
 				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
 			}
-			ConstVectorView x1(ws_tnl_dx[0].getData(), ws_tnl_dx[0].getSize());
-			ConstVectorView x2(ws_tnl_dx[1].getData(), ws_tnl_dx[1].getSize());
-			ConstVectorView x3(ws_tnl_dx[2].getData(), ws_tnl_dx[2].getSize());
-			ConstVectorView rho(lbm.blocks.front().drho(), n);
-			VectorView fx(lbm.blocks.front().dfx(), n);
-			VectorView fy(lbm.blocks.front().dfy(), n);
-			VectorView fz(lbm.blocks.front().dfz(), n);
+			const auto x1 = ws_tnl_dx[0].getConstView();
+			const auto x2 = ws_tnl_dx[1].getConstView();
+			const auto x3 = ws_tnl_dx[2].getConstView();
 			//TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
 			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
 			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
@@ -857,9 +913,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			{
 				// skipping empty rows explicitly is much faster
 				if( MT->getRowCapacity(i) > 0 ) {
-					fx[i] += 2*rho[i]*rowVectorProduct(*MT, i, x1);
-					fy[i] += 2*rho[i]*rowVectorProduct(*MT, i, x2);
-					fz[i] += 2*rho[i]*rowVectorProduct(*MT, i, x3);
+					dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
+					dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
+					dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
@@ -868,9 +924,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 
 		case ws_computeHybrid_TNL:
 		{
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_db[0], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_db[1], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_db[2], -1.0);
+			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
+			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
+			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
 			// copy to Host
 			for (int k=0;k<3;k++) ws_tnl_hb[k] = ws_tnl_db[k];
 			// solve on CPU
@@ -885,13 +941,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			// copy to GPU
 			for (int k=0;k<3;k++) ws_tnl_dx[k] = ws_tnl_hx[k];
 			// continue on GPU
-			ConstVectorView x1(ws_tnl_dx[0].getData(), ws_tnl_dx[0].getSize());
-			ConstVectorView x2(ws_tnl_dx[1].getData(), ws_tnl_dx[1].getSize());
-			ConstVectorView x3(ws_tnl_dx[2].getData(), ws_tnl_dx[2].getSize());
-			ConstVectorView rho(lbm.blocks.front().drho(), n);
-			VectorView fx(lbm.blocks.front().dfx(), n);
-			VectorView fy(lbm.blocks.front().dfy(), n);
-			VectorView fz(lbm.blocks.front().dfz(), n);
+			const auto x1 = ws_tnl_dx[0].getConstView();
+			const auto x2 = ws_tnl_dx[1].getConstView();
+			const auto x3 = ws_tnl_dx[2].getConstView();
 //			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
 			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
 			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
@@ -899,9 +951,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			{
 				// skipping empty rows explicitly is much faster
 				if( MT->getRowCapacity(i) > 0 ) {
-					fx[i] += 2*rho[i]*rowVectorProduct(*MT, i, x1);
-					fy[i] += 2*rho[i]*rowVectorProduct(*MT, i, x2);
-					fz[i] += 2*rho[i]*rowVectorProduct(*MT, i, x3);
+					dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
+					dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
+					dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
@@ -910,9 +962,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 
 		case ws_computeHybrid_TNL_zerocopy:
 		{
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvx(), n), ws_tnl_hbz[0], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvy(), n), ws_tnl_hbz[1], -1.0);
-			ws_tnl_dM.vectorProduct(ConstVectorView(lbm.blocks.front().dvz(), n), ws_tnl_hbz[2], -1.0);
+			ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
+			ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);
+			ws_tnl_dM.vectorProduct(dvz, ws_tnl_hbz[2], -1.0);
 			// solve on CPU
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -923,13 +975,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// continue on GPU
-			ConstVectorView x1(ws_tnl_hxz[0].getData(), ws_tnl_hxz[0].getSize());
-			ConstVectorView x2(ws_tnl_hxz[1].getData(), ws_tnl_hxz[1].getSize());
-			ConstVectorView x3(ws_tnl_hxz[2].getData(), ws_tnl_hxz[2].getSize());
-			ConstVectorView rho(lbm.blocks.front().drho(), n);
-			VectorView fx(lbm.blocks.front().dfx(), n);
-			VectorView fy(lbm.blocks.front().dfy(), n);
-			VectorView fz(lbm.blocks.front().dfz(), n);
+			const auto x1 = ws_tnl_hxz[0].getConstView();
+			const auto x2 = ws_tnl_hxz[1].getConstView();
+			const auto x3 = ws_tnl_hxz[2].getConstView();
 //			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
 			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
 			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
@@ -937,9 +985,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			{
 				// skipping empty rows explicitly is much faster
 				if( MT->getRowCapacity(i) > 0 ) {
-					fx[i] += 2*rho[i]*rowVectorProduct(*MT, i, x1);
-					fy[i] += 2*rho[i]*rowVectorProduct(*MT, i, x2);
-					fz[i] += 2*rho[i]*rowVectorProduct(*MT, i, x3);
+					dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
+					dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
+					dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
@@ -1005,9 +1053,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		case ws_computeCPU_TNL:
 		{
 			// vx, vy, vz, rho must be copied from the device
-			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvx(), n), ws_tnl_hb[0], -1.0);
-			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvy(), n), ws_tnl_hb[1], -1.0);
-			ws_tnl_hM.vectorProduct(ConstVectorView(lbm.blocks.front().hvz(), n), ws_tnl_hb[2], -1.0);
+			ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
+			ws_tnl_hM.vectorProduct(hvy, ws_tnl_hb[1], -1.0);
+			ws_tnl_hM.vectorProduct(hvz, ws_tnl_hb[2], -1.0);
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -1021,12 +1069,18 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			{
 				// skipping empty rows explicitly is much faster
 				if( ws_tnl_hMT.getRowCapacity(i) > 0 ) {
-					lbm.blocks.front().hfx()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[0]);
-					lbm.blocks.front().hfy()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[1]);
-					lbm.blocks.front().hfz()[i] += 2 * lbm.blocks.front().hrho()[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
+					hfx[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[0]);
+					hfy[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[1]);
+					hfz[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
 				}
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, n, kernel);
+			// copy forces to the device
+			// FIXME: this is copied multiple times when there are multiple Lagrange3D objects
+			// (ideally there should be only one Lagrange3D object that comprises all immersed bodies)
+			dfx = hfx;
+			dfy = hfy;
+			dfz = hfz;
 			break;
 		}
 		case ws_computeCPU:
@@ -1040,9 +1094,9 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				for (std::size_t in1=0;in1<d_i[el].size();in1++)
 				{
 					int gi=d_i[el][in1];
-					ws_b[0][el] -= (real)lbm.blocks.front().hvx()[gi] * d_x[el][in1];
-					ws_b[1][el] -= (real)lbm.blocks.front().hvy()[gi] * d_x[el][in1];
-					ws_b[2][el] -= (real)lbm.blocks.front().hvz()[gi] * d_x[el][in1];
+					ws_b[0][el] -= hvx[gi] * d_x[el][in1];
+					ws_b[1][el] -= hvy[gi] * d_x[el][in1];
+					ws_b[2][el] -= hvz[gi] * d_x[el][in1];
 				}
 			}
 			//solver
@@ -1053,11 +1107,17 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				for (std::size_t in1=0;in1<d_i[el].size();in1++)
 				{
 					int gi=d_i[el][in1];
-					lbm.blocks.front().hfx()[gi] += (dreal)(ws_x[0][el]*d_x[el][in1] * 2.0 * lbm.blocks.front().hrho()[gi]);
-					lbm.blocks.front().hfy()[gi] += (dreal)(ws_x[1][el]*d_x[el][in1] * 2.0 * lbm.blocks.front().hrho()[gi]);
-					lbm.blocks.front().hfz()[gi] += (dreal)(ws_x[2][el]*d_x[el][in1] * 2.0 * lbm.blocks.front().hrho()[gi]);
+					hfx[gi] += 2 * hrho[gi] * ws_x[0][el]*d_x[el][in1];
+					hfy[gi] += 2 * hrho[gi] * ws_x[1][el]*d_x[el][in1];
+					hfz[gi] += 2 * hrho[gi] * ws_x[2][el]*d_x[el][in1];
 				}
 			}
+			// copy forces to the device
+			// FIXME: this is copied multiple times when there are multiple Lagrange3D objects
+			// (ideally there should be only one Lagrange3D object that comprises all immersed bodies)
+			dfx = hfx;
+			dfy = hfy;
+			dfz = hfz;
 			break;
 		}
 		default:

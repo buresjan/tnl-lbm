@@ -120,24 +120,6 @@ struct LBM_BLOCK
 
 	void resetForces() { resetForces(0,0,0);}
 	void resetForces(real ifx, real ify, real ifz);
-	void copyForcesToDevice();
-
-	// all this is needed for IBM only and forcing
-	dreal* hrho() { return &hmacro(MACRO::e_rho, offset.x(), offset.y(), offset.z()); }
-	dreal* hvx() { return &hmacro(MACRO::e_vx, offset.x(), offset.y(), offset.z()); }
-	dreal* hvy() { return &hmacro(MACRO::e_vy, offset.x(), offset.y(), offset.z()); }
-	dreal* hvz() { return &hmacro(MACRO::e_vz, offset.x(), offset.y(), offset.z()); }
-	dreal* hfx() { return &hmacro(MACRO::e_fx, offset.x(), offset.y(), offset.z()); }
-	dreal* hfy() { return &hmacro(MACRO::e_fy, offset.x(), offset.y(), offset.z()); }
-	dreal* hfz() { return &hmacro(MACRO::e_fz, offset.x(), offset.y(), offset.z()); }
-
-	dreal* drho() { return &dmacro(MACRO::e_rho, offset.x(), offset.y(), offset.z()); }
-	dreal* dvx() { return &dmacro(MACRO::e_vx, offset.x(), offset.y(), offset.z()); }
-	dreal* dvy() { return &dmacro(MACRO::e_vy, offset.x(), offset.y(), offset.z()); }
-	dreal* dvz() { return &dmacro(MACRO::e_vz, offset.x(), offset.y(), offset.z()); }
-	dreal* dfx() { return &dmacro(MACRO::e_fx, offset.x(), offset.y(), offset.z()); }
-	dreal* dfy() { return &dmacro(MACRO::e_fy, offset.x(), offset.y(), offset.z()); }
-	dreal* dfz() { return &dmacro(MACRO::e_fz, offset.x(), offset.y(), offset.z()); }
 
 	void copyMapToHost();
 	void copyMapToDevice();

@@ -80,6 +80,7 @@ template< typename LBM >
 struct Lagrange3D
 {
 	using TRAITS = typename LBM::TRAITS;
+	using MACRO = typename LBM::MACRO;
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
@@ -95,6 +96,9 @@ struct Lagrange3D
 	using dEllpack = SlicedEllpack< dreal, TNL::Devices::Cuda, idx >;
 	using hEllpackPtr = std::shared_ptr< hEllpack >;
 	using dEllpackPtr = std::shared_ptr< dEllpack >;
+
+	using hVectorView = TNL::Containers::VectorView< dreal, TNL::Devices::Host, idx >;
+	using dVectorView = TNL::Containers::VectorView< dreal, TNL::Devices::Cuda, idx >;
 
 	// ws_ using sparse matrices
 	hEllpackPtr ws_tnl_hA;
@@ -168,6 +172,10 @@ struct Lagrange3D
 	inline int N() { return LL.size(); }	// return the amount of points in the filament
 
 	CyclicVector<LagrangePoint3D<real>> LL;		// by this
+
+	// accessors for macroscopic quantities as a 1D vector
+	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
+	dVectorView dmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
 
 	real diracDelta(int i, real r);
 	real diracDelta(real r) { return diracDelta(diracDeltaType, r); }

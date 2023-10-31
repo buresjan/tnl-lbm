@@ -44,13 +44,6 @@ void LBM<CONFIG>::resetForces(real ifx, real ify, real ifz)
 		block.resetForces(ifx, ify, ifz);
 }
 
-template< typename CONFIG >
-void LBM<CONFIG>::copyForcesToDevice()
-{
-	for( auto& block : blocks )
-		block.copyForcesToDevice();
-}
-
 
 template< typename CONFIG >
 bool LBM<CONFIG>::isAnyLocalIndex(idx x, idx y, idx z)

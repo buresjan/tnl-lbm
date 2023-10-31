@@ -1358,7 +1358,6 @@ void State<NSE>::SimUpdate()
 	bool doZeroForceOnDevice=false;
 	bool doZeroForceOnHost=false;
 	bool doComputeLagrangePhysics=false;
-	bool doCopyForceToDevice=false;
 
 	// determine global flags
 	// NOTE: all Lagrangian points are assumed to be on the first GPU
@@ -1377,7 +1376,6 @@ void State<NSE>::SimUpdate()
 				case ws_computeCPU_TNL:
 					doCopyQuantitiesStarToHost=true;
 					doZeroForceOnHost=true;
-					doCopyForceToDevice=true;
 					break;
 				case ws_computeGPU_TNL:
 				case ws_computeHybrid_TNL:
@@ -1432,11 +1430,6 @@ void State<NSE>::SimUpdate()
 	if (doComputeLagrangePhysics)
 	{
 		computeAllLagrangeForces();
-	}
-
-	if (doCopyForceToDevice)
-	{
-		nse.copyForcesToDevice();
 	}
 
 
