@@ -355,7 +355,7 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 //	real sigma_min = state.FF[INDEX].computeMinDist();
 //	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
 
-	state.log("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min %e, sigma_max %e", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
+	state.log("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
 //	state.log("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
 //	state.log("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
 	state.log("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
