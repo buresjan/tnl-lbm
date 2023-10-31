@@ -315,40 +315,19 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	ws_A->Ax = new real[nz];
 	ws_A->m_nz = nz;
 	ws_A->m_n = m;
-	#ifdef USE_CUSPARSE
-	// create sprectmatrix ... for cuda
-	ws_dA = new SpRectMatrix<dreal>();
-	ws_dA->Ap = new int[m+1];
-	ws_dA->Ai = new int[nz];
-	ws_dA->Ax = new dreal[nz];
-	ws_dA->m_nz = nz;
-	ws_dA->m_nr = m;
-	ws_dA->m_nc = m;
-	#endif
 
 	ws_A->Ap[0]=0;
 	for (int i=0;i<nz;i++) ws_A->Ax[i] = 0; // empty
-
-	#ifdef USE_CUSPARSE
-	ws_dA->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_dA->Ax[i] = 0; // empty
-	#endif
 
 //	fmt::print("Ai construct\n");
 	int count=0;
 	for (int i=0;i<m;i++)
 	{
 		ws_A->Ap[i+1] = ws_A->Ap[i] + v[i].size();
-		#ifdef USE_CUSPARSE
-		ws_dA->Ap[i+1] = ws_dA->Ap[i] + v[i].size();
-		#endif
 //		fmt::print("Ap[{}]={} ({})\n", i+1, ws_A->Ap[i+1], nz);
 		for (std::size_t j=0;j<v[i].size();j++)
 		{
 			ws_A->Ai[count]=v[i][j];
-			#ifdef USE_CUSPARSE
-			ws_dA->Ai[count]=v[i][j];
-			#endif
 			count++;
 		}
 	}
@@ -421,9 +400,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 			if (ws_regularDirac)
 			{
 				ws_A->get(i,j) = ddd;
-				#ifdef USE_CUSPARSE
-				ws_dA->get(i,j) = ddd;
-				#endif
 			} else
 			{
 				if (ddd>0) // we have non-zero element at i,j
@@ -441,9 +417,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 						}
 					}
 					ws_A->get(i,j) = val;
-					#ifdef USE_CUSPARSE
-					ws_dA->get(i,j) = (dreal)val;
-					#endif
 				}
 			}
 		}
@@ -482,69 +455,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (int el=0;el<m;el++)
 	for (std::size_t in1=0;in1<d_i[el].size();in1++)
 		nz++;
-	#ifdef USE_CUSPARSE
-	ws_M = new SpRectMatrix<dreal>();
-	ws_M->Ap = new int[m+1];
-	ws_M->Ai = new int[nz];
-	ws_M->Ax = new dreal[nz];
-	ws_M->m_nz = nz;
-	ws_M->m_nr = m;
-	ws_M->m_nc = n;
-
-	ws_M->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_M->Ax[i] = 0; // empty
-
-//	fmt::print("Ai construct\n");
-	count=0;
-	for (int i=0;i<m;i++)
-	{
-		ws_M->Ap[i+1] = ws_M->Ap[i] + d_i[i].size();
-		for (std::size_t j=0;j<d_i[i].size();j++)
-		{
-			ws_M->Ai[count]=d_i[i][j];
-			ws_M->Ax[count]=(dreal)d_x[i][j];
-			count++;
-		}
-	}
-
-
-	// its transpose
-	ws_MT = new SpRectMatrix<dreal>();
-	ws_MT->Ap = new int[n+1];
-	ws_MT->Ai = new int[nz];
-	ws_MT->Ax = new dreal[nz];
-	ws_MT->m_nz = nz;
-	ws_MT->m_nr = n;
-	ws_MT->m_nc = m;
-
-	ws_MT->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_MT->Ax[i] = 0; // empty
-
-	// for each Euler node, assign
-	VEC *vn = new VEC[n];
-	VECR *vx = new VECR[n];
-	for (int i=0;i<m;i++)
-	for (std::size_t j=0;j<d_i[i].size();j++)
-	{
-		vn[ d_i[i][j] ].push_back( i );
-		vx[ d_i[i][j] ].push_back( d_x[i][j] );
-	}
-
-	count=0;
-	for (int i=0;i<n;i++)
-	{
-		ws_MT->Ap[i+1] = ws_MT->Ap[i] + vn[i].size();
-		for (std::size_t j=0;j<vn[i].size();j++)
-		{
-			ws_MT->Ai[count]=vn[i][j];
-			ws_MT->Ax[count]=vx[i][j];
-			count++;
-		}
-	}
-	delete [] vn;
-	delete [] vx;
-	fmt::print("wushu construct loop 4: end\n");
-	#endif
 }
 
 
@@ -830,8 +740,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	switch (ws_compute)
 	{
 		case ws_computeCPU:                    compute_desc = "ws_computeCPU"; break;
-		case ws_computeGPU_CUSPARSE:           compute_desc = "ws_computeGPU_CUSPARSE"; break;
-		case ws_computeHybrid_CUSPARSE:        compute_desc = "ws_computeHybrid_CUSPARSE"; break;
 		case ws_computeCPU_TNL:                compute_desc = "ws_computeCPU_TNL"; break;
 		case ws_computeGPU_TNL:                compute_desc = "ws_computeGPU_TNL"; break;
 		case ws_computeHybrid_TNL:             compute_desc = "ws_computeHybrid_TNL"; break;
@@ -1001,62 +909,6 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
 			break;
 		}
-
-		case ws_computeGPU_CUSPARSE:
-		{
-			#ifdef USE_CUSPARSE
-			// no Device--Host copy is required
-			// HOKUS POKUS
-			ws_M->dmultiply(lbm.blocks.front().dvx(), ws_db[0], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[1], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvz(), ws_db[2], -1.0);
-			// solver
-			for (int k=0;k<3;k++) ws_dA->dsolve(ws_db[k], ws_dx[k]);
-			// now compute delta u
-			ws_MT->dmultiply(ws_dx[0], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfx());
-			ws_MT->dmultiply(ws_dx[1], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfy());
-			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfz());
-			#else
-			fmt::print(stderr, "ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build.\n");
-			#endif
-			break;
-		}
-		case ws_computeHybrid_CUSPARSE:
-		{
-			#ifdef USE_CUSPARSE
-			ws_M->dmultiply(lbm.blocks.front().dvx(), ws_db[0], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[1], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[2], -1.0);
-			// copy to Host
-			for (int k=0;k<3;k++) cudaMemcpy(ws_hb[k],ws_db[k],m*sizeof(dreal), cudaMemcpyDeviceToHost);
-			// retype
-			for (int k=0;k<3;k++)
-			for (int i=0;i<m;i++)
-				ws_b[k][i]=(real)ws_hb[k][i];
-			// solve on CPU
-			for (int k=0;k<3;k++)
-				ws_A->solve(ws_b[k],ws_x[k]);
-			// retype and copy to GPU
-			for (int k=0;k<3;k++)
-			for (int i=0;i<m;i++)
-				ws_hx[k][i]=(dreal)ws_x[k][i];
-			for (int k=0;k<3;k++)
-				cudaMemcpy(ws_dx[k],ws_hx[k],m*sizeof(dreal), cudaMemcpyHostToDevice);
-			// continue on GPU
-			ws_MT->dmultiply(ws_dx[0], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfx());
-			ws_MT->dmultiply(ws_dx[1], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfy());
-			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfz());
-			#else
-			fmt::print(stderr, "ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build.\n");
-			#endif
-			break;
-		}
 		#endif // USE_CUDA
 		case ws_computeCPU_TNL:
 		{
@@ -1169,11 +1021,6 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir) : lbm(
 //	ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
 	#endif
 
-	#ifdef USE_CUSPARSE
-	ws_M=0;
-	ws_MT=0;
-	ws_dA=0;
-	#endif
 	ws_A=0;
 	for (int k=0;k<3;k++)
 	{
@@ -1211,17 +1058,6 @@ Lagrange3D<LBM>::~Lagrange3D()
 			if (ws_hx[k]) delete [] ws_hx[k];
 			if (ws_hb[k]) delete [] ws_hb[k];
 		}
-		#ifdef USE_CUSPARSE
-		if (ws_du) cudaFree(ws_du);
-		for (int k=0;k<3;k++)
-		{
-			if (ws_dx[k]) cudaFree(ws_dx[k]);
-			if (ws_db[k]) cudaFree(ws_db[k]);
-		}
-		if (ws_dA) delete ws_dA;
-		if (ws_M) delete ws_M;
-		if (ws_MT) delete ws_MT;
-		#endif
 		if (ws_A) delete ws_A;
 	}
 }

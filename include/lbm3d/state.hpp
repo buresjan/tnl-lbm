@@ -1372,8 +1372,6 @@ void State<NSE>::SimUpdate()
 				case ws_computeGPU_TNL:
 				case ws_computeHybrid_TNL:
 				case ws_computeHybrid_TNL_zerocopy:
-				case ws_computeGPU_CUSPARSE:
-				case ws_computeHybrid_CUSPARSE:
 					doZeroForceOnDevice=true;
 					break;
 			}

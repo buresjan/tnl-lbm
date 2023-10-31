@@ -31,14 +31,8 @@ using SlicedEllpack = TNL::Matrices::SparseMatrix< Real,
 													SlicedEllpackSegments
 													>;
 
-#ifdef USE_CUSPARSE
-	#include "lbm_common/sprectmatrix.h"
-#endif
-
 enum {
 	ws_computeCPU,		// use UMFPACK or PETSC ... TODO, FIXME
-	ws_computeGPU_CUSPARSE,
-	ws_computeHybrid_CUSPARSE,
 	ws_computeCPU_TNL,
 	ws_computeGPU_TNL,
 	ws_computeHybrid_TNL,
@@ -131,11 +125,6 @@ struct Lagrange3D
 
 	// WuShu using sparse matrices
 	SpMatrix<real> *ws_A;
-	#ifdef USE_CUSPARSE
-	SpRectMatrix<dreal> *ws_dA; // square matrix ws_A
-	SpRectMatrix<dreal> *ws_M; // matrix realizing projection of u* to lagrange desc.
-	SpRectMatrix<dreal> *ws_MT; // matrix realizing projection of uB from lagrange desc. to Euler desc. .... basially transpose of M
-	#endif
 	real *ws_x[3], *ws_b[3];
 	dreal *ws_hx[3], *ws_hb[3];
 	dreal *ws_dx[3], *ws_db[3], *ws_du;

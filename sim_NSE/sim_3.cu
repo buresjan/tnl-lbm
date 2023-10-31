@@ -304,7 +304,7 @@ struct StateLocal : State<NSE>
 
 // ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
 template < typename STATE >
-int setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_CUSPARSE)
+int setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_TNL)
 {
 	using real = typename STATE::TRAITS::real;
 
@@ -426,8 +426,6 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	switch (compute)
 	{
 		case 1: ws_compute = ws_computeCPU; break;
-		case 2: ws_compute = ws_computeGPU_CUSPARSE; break;
-		case 3: ws_compute = ws_computeHybrid_CUSPARSE; break;
 		case 4: ws_compute = ws_computeCPU_TNL; break;
 		case 5: ws_compute = ws_computeGPU_TNL; break;
 		case 6: ws_compute = ws_computeHybrid_TNL; break;
