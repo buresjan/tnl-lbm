@@ -228,7 +228,7 @@ struct StateLocal : State<NSE>
 		// output
 		FILE* f;
 		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
-		const std::string dir = fmt::format("results_%s/probes", id);
+		const std::string dir = fmt::format("results_{}/probes", id);
 		mkdir_p(dir.c_str(), 0755);
 
 		std::string str = fmt::format("{}/probe_cd_full", dir);
