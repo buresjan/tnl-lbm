@@ -20,6 +20,7 @@
 #include <TNL/Solvers/Linear/Preconditioners/Diagonal.h>
 #include <TNL/Solvers/Linear/Preconditioners/ILU0.h>
 #include <TNL/Allocators/CudaHost.h>
+#include <TNL/Containers/Vector.h>
 
 template< typename Device, typename Index, typename IndexAlocator >
 using SlicedEllpackSegments = TNL::Algorithms::Segments::SlicedEllpack< Device, Index, IndexAlocator >;
@@ -145,7 +146,7 @@ struct Lagrange3D
 	int ws_compute=ws_computeCPU;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
 	bool ws_speedUpAllocation=false;	// choose neighbors based on lag_x and lag_y proximity !!! experimental
 	int ws_speedUpAllocationSupport=1000000; // very big
-
+	real calculate3Dirac(int rDirac, int colIndex, int rowIndex, float divisionModifier=1.0f); // this function calculates ddd for use in WuShu matrix construction
 	void constructWuShuMatricesSparse();
 	void constructWuShuMatricesSparse_TNL();
 	void computeWuShuForcesSparse(real time);

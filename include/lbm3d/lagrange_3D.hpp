@@ -4,6 +4,8 @@
 
 #include "lbm_common/timeutils.h"
 #include "lagrange_3D.h"
+#include <TNL/Containers/Vector.h>
+#include <complex>
 
 template< typename LBM >
 auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
@@ -220,7 +222,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	typedef std::vector<DD_struct> VECDD;
 	typedef std::vector<int> VEC;
 	//typedef std::vector<real> VECR;
-	VEC *v = new VEC[m];
+	VEC *v = new VEC[m]; //TODO: delete
 	VECDD *vr = new VECDD[m];
 
 
@@ -456,7 +458,37 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	for (std::size_t in1=0;in1<d_i[el].size();in1++)
 		nz++;
 }
-
+template< typename LBM >
+typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int colIndex, int rowIndex, float divisionModifier)
+{
+	//ka = colIndex
+	//el = rowIndex
+	//TODO: Remove debug output
+	///fmt::print("Dirac calc: {} ka: {} el: {} divi: {}  \n", rDirac,colIndex,rowIndex,divisionModifier);
+	real d1; //dirac 1
+	real d2; //dirac 2
+	real d3; //dirac 3
+	real ddd;
+	
+				d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl/divisionModifier);
+				if (d1>0)
+				{
+					d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl/divisionModifier);
+					if (d2>0)
+					{
+						d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl/divisionModifier);
+						if (d3>0)
+						{
+							ddd = d1*d2*d3;
+							//fmt::print("Dirac result: {}  \n", ddd);
+							return ddd;
+						}
+						
+					}
+					
+				}
+				return 0;
+}
 
 template< typename LBM >
 void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
@@ -471,12 +503,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	struct DD_struct
 	{
 		real DD;
-		int ka;
+		int ka; //col index
 	};
+	//typedef std::vector<DD_struct> VECDD;
+	//typedef std::vector<int> VEC;
+	//typedef std::vector<real> VECR;
 	typedef std::vector<DD_struct> VECDD;
 	typedef std::vector<int> VEC;
 	typedef std::vector<real> VECR;
-	VEC *v = new VEC[m];
+	//VEC *v = new VEC[m];
 	VECDD *vr = new VECDD[m];
 
 	fmt::print("tnl wushu construct loop 1: start\n");
@@ -485,6 +520,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	real *LLy = new real[m];
 	real *LLz = new real[m];
 	int *LLlagx = new int[m];
+	//TODO: Throw out LLX, LLY, LLZ
+	//Only realocates existing stuff
 	for (int i=0;i<m;i++)
 	{
 		LLx[i]=LL[i].x;
@@ -494,58 +531,37 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	}
 
 	fmt::print("tnl wushu construct loop 1: cont\n");
+	//TODO: look into OMP parallelization to avoid issues
 	#pragma omp parallel for schedule(dynamic)
+	//This could cause issues ^^
+	//Test for CPU 
+	//TODO: Rename index
+	//EL = Row index
+	//KA = Column index
+	//ddd = matrix value  
 	for (int el=0;el<m;el++)
 	{
 		if (el%100==0)
 			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
 		for (int ka=0;ka<m;ka++)
 		{
-			bool proceed=true;
-			real d1,d2,ddd;
-			if (ws_speedUpAllocation)
-			{
-				if (abs(LLlagx[el] - LLlagx[ka]) > ws_speedUpAllocationSupport) proceed=false;
-			}
-			if (!proceed) continue;
+			real ddd;
 			if (ws_regularDirac)
 			{
-				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.lat.physDl);
-				if (d1>0)
-				{
-					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.lat.physDl);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.lat.physDl);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
+				//calculate dirac with selected dirac type
+				ddd = calculate3Dirac(rDirac, ka, el);
+				
 			} else
 			{
-				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.lat.physDl/2.0);
-				if (d1>0)
+				//calculate ddd with default dirac type
+				ddd = calculate3Dirac(diracDeltaType, ka, el, 2.0);
+			}
+			if(ddd>0)
 				{
-					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.lat.physDl/2.0);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.lat.physDl/2.0);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
+					DD_struct sdd;
+					sdd.DD = ddd;
+					sdd.ka = ka;
+					vr[el].push_back(sdd);
 			}
 		}
 	}
@@ -568,13 +584,16 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
 	ws_tnl_hA->setRowCapacities(hA_row_lengths);
 
-	for (int i=0;i<m;i++)
+	//TODO: Possible waste of time on allocation
+	//TODO: Delete when deleting V
+	/*for (int i=0;i<m;i++)
 	{
 		auto row = ws_tnl_hA->getRow(i);
 		for (std::size_t j=0;j<v[i].size();j++)
 			row.setElement(j, v[i][j], 1);
 	}
 	delete [] v;
+	*/
 
 	// fill vectors delta_el
 	// sparse vector of deltas
