@@ -469,7 +469,7 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 	real d2; //dirac 2
 	real d3; //dirac 3
 	real ddd;
-	
+
 				d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl/divisionModifier);
 				if (d1>0)
 				{
@@ -483,9 +483,9 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 							//fmt::print("Dirac result: {}  \n", ddd);
 							return ddd;
 						}
-						
+
 					}
-					
+
 				}
 				return 0;
 }
@@ -515,8 +515,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	VECDD *vr = new VECDD[m];
 
 	fmt::print("tnl wushu construct loop 1: start\n");
+	//TODO: Delete this
 //	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
-	real *LLx = new real[m];
+	/*real *LLx = new real[m];
 	real *LLy = new real[m];
 	real *LLz = new real[m];
 	int *LLlagx = new int[m];
@@ -529,16 +530,16 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		LLz[i]=LL[i].z;
 		LLlagx[i]=LL[i].lag_x;
 	}
-
+*/
 	fmt::print("tnl wushu construct loop 1: cont\n");
 	//TODO: look into OMP parallelization to avoid issues
 	#pragma omp parallel for schedule(dynamic)
 	//This could cause issues ^^
-	//Test for CPU 
+	//Test for CPU
 	//TODO: Rename index
 	//EL = Row index
 	//KA = Column index
-	//ddd = matrix value  
+	//ddd = matrix value
 	for (int el=0;el<m;el++)
 	{
 		if (el%100==0)
@@ -550,7 +551,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			{
 				//calculate dirac with selected dirac type
 				ddd = calculate3Dirac(rDirac, ka, el);
-				
+
 			} else
 			{
 				//calculate ddd with default dirac type
@@ -565,10 +566,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
+	//TODO: Delete this
+	/*
 	delete [] LLx;
 	delete [] LLy;
 	delete [] LLz;
 	delete [] LLlagx;
+	*/
 
 	fmt::print("tnl wushu construct loop 1: end\n");
 
