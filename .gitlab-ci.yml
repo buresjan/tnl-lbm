@@ -28,6 +28,11 @@ build_Release:
             -DCMAKE_BUILD_TYPE=Release
             -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
     - cmake --build build
+#    - ./build/sim_NSE/sim_3 ...
+#    - diff ...
+#  tags:
+#    - docker
+#    - nvidia
 
 build_Debug:
   stage: build
