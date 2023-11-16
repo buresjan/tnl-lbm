@@ -153,7 +153,66 @@ int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
 	}
 	return imin;
 }
-
+template< typename LBM >
+bool Lagrange3D<LBM>::isDDNonZero(int i, real r)
+{
+	switch (i)
+	{
+		case 1: // VU: phi3
+			if(fabs(r) < 1.0)
+				return true;
+			else
+				return false;
+		case 2: // VU: phi2
+			if(fabs(r) < 2.0)
+				return true;
+			else
+				return false;;
+		case 3: // VU: phi1
+			if (fabs(r)>2.0)
+				return false;
+			else
+				return true;
+		case 4: // VU: phi4
+			if (fabs(r)>1.5)
+				return false;
+			else
+				return true;
+	}
+}
+template< typename LBM >
+typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAITS::real r)
+{
+	if(!isDDNonZero(i, r))
+	{
+		fmt::print("warning: zero Dirac delta: type={}\n", i);
+		return 0;
+	}
+	else{
+		switch (i)
+		{
+			case 1: // VU: phi3
+				return (1.0 - fabs(r));
+			case 2: // VU: phi2
+				return 0.25*((1.0+cos((PI*r)/2.0)));
+			case 3: // VU: phi1
+				if (fabs(r)>1.0)
+					return (5.0 - 2.0*fabs(r) - sqrt(-7.0 + 12.0*fabs(r) - 4.0*r*r))/8.0;
+				else
+					return (3.0 - 2.0*fabs(r) + sqrt(1.0 + 4.0*fabs(r) - 4.0*r*r))/8.0;
+			case 4: // VU: phi4
+				if (fabs(r)>0.5)
+					return (5.0 - 3.0*fabs(r) - sqrt(-2.0+6.0*fabs(r)-3.0*r*r))/6.0;
+				else
+					return (1.0 + sqrt(1.0 - 3.0*r*r))/3.0;
+		}
+	}
+	//Just a backup return if something doesn't return 0
+	fmt::print("warning: zero Dirac delta: type={}\n", i);
+	return 0;
+}
+/*
+//Commented old Dirac
 template< typename LBM >
 typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAITS::real r)
 {
@@ -176,7 +235,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAI
 				return (5.0 - 2.0*fabs(r) - sqrt(-7.0 + 12.0*fabs(r) - 4.0*r*r))/8.0;
 			else
 				return (3.0 - 2.0*fabs(r) + sqrt(1.0 + 4.0*fabs(r) - 4.0*r*r))/8.0;
-/*
+/\*
 			if(r > -2.0 && r <= -1.0 )
 				result = (5.0 + 2.0*r - sqrt(-7.0 - 12.0*r - 4.0*r*r))/8.0;
 			else if(r > -1.0 && r<= 0)
@@ -186,7 +245,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAI
 			else if(r > 1.0 && r <2.0)
 				result = (5.0 - 2.0*r - sqrt(-7.0 + 12.0*r - 4.0*r*r))/8.0;
 			else result = 0;
-*/
+*\/
 		case 4: // VU: phi4
 			if (fabs(r)>1.5)
 				return 0;
@@ -198,7 +257,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAI
 	fmt::print("warning: zero Dirac delta: type={}\n", i);
 	return 0;
 }
-
+*/
 
 template< typename LBM >
 void Lagrange3D<LBM>::constructWuShuMatricesSparse()
@@ -223,7 +282,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	typedef std::vector<DD_struct> VECDD;
 	typedef std::vector<int> VEC;
 	//typedef std::vector<real> VECR;
-	VEC *v = new VEC[m]; //TODO: delete
+	VEC *v = new VEC[m];
 	VECDD *vr = new VECDD[m];
 
 
@@ -464,8 +523,6 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 {
 	//ka = colIndex
 	//el = rowIndex
-	//TODO: Remove debug output
-	///fmt::print("Dirac calc: {} ka: {} el: {} divi: {}  \n", rDirac,colIndex,rowIndex,divisionModifier);
 	real d1; //dirac 1
 	real d2; //dirac 2
 	real d3; //dirac 3
@@ -492,6 +549,31 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 }
 
 template< typename LBM >
+bool Lagrange3D<LBM>::is3DiracNonZero(int rDirac, int colIndex, int rowIndex, float divisionModifier)
+{
+	//ka = colIndex
+	//el = rowIndex
+	bool d1; //dirac 1
+	bool d2; //dirac 2
+	bool d3; //dirac 3
+
+	d1 = isDDNonZero(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl/divisionModifier);
+	if (d1)
+	{
+		d2 = isDDNonZero(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl/divisionModifier);
+		if (d2)
+		{
+			d3=isDDNonZero(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl/divisionModifier);
+			if (d3)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+template< typename LBM >
 void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 {
 	if (ws_tnl_constructed) return;
@@ -506,33 +588,18 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		real DD;
 		int ka; //col index
 	};
-	//typedef std::vector<DD_struct> VECDD;
-	//typedef std::vector<int> VEC;
-	//typedef std::vector<real> VECR;
 	typedef std::vector<DD_struct> VECDD;
 	typedef std::vector<int> VEC;
 	typedef std::vector<real> VECR;
+
 	//VEC *v = new VEC[m];
 	VECDD *vr = new VECDD[m];
+	int *elementCounts = new int[m];
 
 	fmt::print("tnl wushu construct loop 1: start\n");
-	//TODO: Delete this
-//	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
-	/*real *LLx = new real[m];
-	real *LLy = new real[m];
-	real *LLz = new real[m];
-	int *LLlagx = new int[m];
-	//TODO: Throw out LLX, LLY, LLZ
-	//Only realocates existing stuff
-	for (int i=0;i<m;i++)
-	{
-		LLx[i]=LL[i].x;
-		LLy[i]=LL[i].y;
-		LLz[i]=LL[i].z;
-		LLlagx[i]=LL[i].lag_x;
-	}
-*/
+
 	fmt::print("tnl wushu construct loop 1: cont\n");
+
 	//TODO: look into OMP parallelization to avoid issues
 	#pragma omp parallel for schedule(dynamic)
 	//This could cause issues ^^
@@ -541,39 +608,45 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	//EL = Row index
 	//KA = Column index
 	//ddd = matrix value
+
 	for (int el=0;el<m;el++)
 	{
+		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
 		if (el%100==0)
 			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
 		for (int ka=0;ka<m;ka++)
 		{
 			real ddd;
+
 			if (ws_regularDirac)
 			{
 				//calculate dirac with selected dirac type
 				ddd = calculate3Dirac(rDirac, ka, el);
+				if(is3DiracNonZero(rDirac, ka, el))
+				{
+					rowCapacity++;
+				}
 
 			} else
 			{
 				//calculate ddd with default dirac type
 				ddd = calculate3Dirac(diracDeltaType, ka, el, 2.0);
+				if(is3DiracNonZero(rDirac, ka, el, 2.0))
+				{
+					rowCapacity++;
+				}
 			}
 			if(ddd>0)
-				{
+			{
 					DD_struct sdd;
 					sdd.DD = ddd;
 					sdd.ka = ka;
 					vr[el].push_back(sdd);
 			}
 		}
+		elementCounts[el] = rowCapacity;
 	}
-	//TODO: Delete this
-	/*
-	delete [] LLx;
-	delete [] LLy;
-	delete [] LLz;
-	delete [] LLlagx;
-	*/
+
 
 	fmt::print("tnl wushu construct loop 1: end\n");
 
@@ -585,23 +658,18 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 //		max_nz_per_row = TNL::max(max_nz_per_row, vr[el].size());
 //	}
 //	ws_tnl_hA->setConstantCompressedRowLengths(max_nz_per_row);
+//	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
+//	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
+//	ws_tnl_hA->setRowCapacities(hA_row_lengths);
 	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
-	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
+	for (int el=0; el<m; el++) hA_row_lengths[el] = elementCounts[el];
 	ws_tnl_hA->setRowCapacities(hA_row_lengths);
 
-	//TODO: Possible waste of time on allocation
-	//TODO: Delete when deleting V
-	/*for (int i=0;i<m;i++)
-	{
-		auto row = ws_tnl_hA->getRow(i);
-		for (std::size_t j=0;j<v[i].size();j++)
-			row.setElement(j, v[i][j], 1);
-	}
-	delete [] v;
-	*/
+
 
 	// fill vectors delta_el
 	// sparse vector of deltas
+	//TODO: This could be rewritten with DDStruct
 	d_i = new std::vector<idx>[m];
 	d_x = new  std::vector<real>[m];
 	// fill only non zero elements-relevant
@@ -637,7 +705,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	{
 		if (i%100==0)
 			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
-		for (std::size_t ka=0;ka<vr[i].size();ka++)
+		for (std::size_t ka=0;ka<elementCounts[i];ka++)
 		{
 			int j=vr[i][ka].ka;
 			real ddd = vr[i][ka].DD;
@@ -646,22 +714,19 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				ws_tnl_hA->setElement(i,j, ddd);
 			} else
 			{
-				if (ddd>0) // we have non-zero element at i,j
+				real val=0;
+				for (std::size_t in1=0;in1<d_i[i].size();in1++)
 				{
-					real val=0;
-					for (std::size_t in1=0;in1<d_i[i].size();in1++)
+					for (std::size_t in2=0;in2<d_i[j].size();in2++)
 					{
-						for (std::size_t in2=0;in2<d_i[j].size();in2++)
+						if (d_i[i][in1]==d_i[j][in2])
 						{
-							if (d_i[i][in1]==d_i[j][in2])
-							{
-								val += d_x[i][in1]*d_x[j][in2];
-								break;
-							}
+							val += d_x[i][in1]*d_x[j][in2];
+							break;
 						}
 					}
-					ws_tnl_hA->setElement(i,j, val);
 				}
+				ws_tnl_hA->setElement(i,j, val);
 			}
 		}
 	}
