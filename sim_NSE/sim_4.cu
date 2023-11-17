@@ -1,4 +1,5 @@
 #include "lbm3d/core.h"
+#include "lbm3d/lagrange_3D.h"
 
 // ball in 3D
 // IBM-LBM
@@ -292,8 +293,8 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 		}
 	}
 	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
-	state.FF[INDEX].diracDeltaType = dirac_delta;
-	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
+	state.FF[INDEX].diracDeltaTypeEL = dirac_delta;
+	state.FF[INDEX].methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
 	state.FIL_INDEX=INDEX;
 	spdlog::info("added {} lagrangian points", points);
 

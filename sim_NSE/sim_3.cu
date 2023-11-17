@@ -1,4 +1,5 @@
 #include "lbm3d/core.h"
+#include "lbm3d/lagrange_3D.h"
 
 // cylinder in 3D - Schafer-Turek problem
 // IBM-LBM
@@ -340,8 +341,8 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 	state.FF[INDEX].lag_X = N1;
 	state.FF[INDEX].lag_Y = N2;
 	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
-	state.FF[INDEX].diracDeltaType = dirac_delta;
-	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
+	state.FF[INDEX].diracDeltaTypeEL = dirac_delta;
+	state.FF[INDEX].methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
 	state.FIL_INDEX=INDEX;
 	spdlog::info("added {} lagrangian points", points);
 

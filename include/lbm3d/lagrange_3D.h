@@ -70,6 +70,11 @@ struct LagrangePoint3D
 	int lag_x, lag_y;
 };
 
+enum class DiracMethod //Enum for deciding which method is used for calculation
+	{
+		ORIGINAL = 0,
+		MODIFIED = 1
+	};
 
 template< typename LBM >
 struct Lagrange3D
@@ -142,7 +147,9 @@ struct Lagrange3D
 	int lag_X=-1; // size
 	int lag_Y=-1; // size
 
-	bool ws_regularDirac=true;		// use continuous ws_ trick with 2 dirac functions
+
+
+	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeCPU;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
 	bool ws_speedUpAllocation=false;	// choose neighbors based on lag_x and lag_y proximity !!! experimental
 	int ws_speedUpAllocationSupport=1000000; // very big
@@ -158,7 +165,8 @@ struct Lagrange3D
 
 	real maxDist;			// maximal distance between points
 	real minDist;			// minimal distance between points
-	int diracDeltaType=2;
+	int diracDeltaTypeEL=2;
+	int diracDeltaTypeLL=1;
 
 	inline int N() { return LL.size(); }	// return the amount of points in the filament
 
@@ -170,7 +178,7 @@ struct Lagrange3D
 
 	bool isDDNonZero(int i, real r);
 	real diracDelta(int i, real r);
-	real diracDelta(real r) { return diracDelta(diracDeltaType, r); }
+	real diracDelta(real r) { return diracDelta(diracDeltaTypeEL, r); }
 
 	real dist(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x - B.x, A.y - B.y, A.z - B.z ); }
 	real dist_ref(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x_ref - B.x_ref, A.y_ref - B.y_ref, A.z_ref - B.z_ref ); }

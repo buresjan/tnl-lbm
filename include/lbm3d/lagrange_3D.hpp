@@ -153,6 +153,7 @@ int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
 	}
 	return imin;
 }
+//TODO: Missing default case
 template< typename LBM >
 bool Lagrange3D<LBM>::isDDNonZero(int i, real r)
 {
@@ -167,7 +168,7 @@ bool Lagrange3D<LBM>::isDDNonZero(int i, real r)
 			if(fabs(r) < 2.0)
 				return true;
 			else
-				return false;;
+				return false;
 		case 3: // VU: phi1
 			if (fabs(r)>2.0)
 				return false;
@@ -179,13 +180,14 @@ bool Lagrange3D<LBM>::isDDNonZero(int i, real r)
 			else
 				return true;
 	}
+	return false;
 }
 template< typename LBM >
 typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAITS::real r)
 {
 	if(!isDDNonZero(i, r))
 	{
-		fmt::print("warning: zero Dirac delta: type={}\n", i);
+		//fmt::print("A / warning: zero Dirac delta: type={}\n", i);
 		return 0;
 	}
 	else{
@@ -266,8 +268,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 	if (ws_constructed) return;
 	ws_constructed=true;
 
-
-	int rDirac=1;
 	// count non zero elements in matrix ws_A
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
@@ -315,15 +315,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 				if (abs(LLlagx[el] - LLlagx[ka]) > ws_speedUpAllocationSupport) proceed=false;
 			}
 			if (!proceed) continue;
-			if (ws_regularDirac)
+			if (methodVariant==DiracMethod::MODIFIED)
 			{
-				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.lat.physDl);
+				d1 = diracDelta(diracDeltaTypeLL,(LLx[el] - LLx[ka])/lbm.lat.physDl);
 				if (d1>0)
 				{
-					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.lat.physDl);
+					d2 = diracDelta(diracDeltaTypeLL, (LLy[el] - LLy[ka])/lbm.lat.physDl);
 					if (d2>0)
 					{
-						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.lat.physDl);
+						ddd=d1*d2*diracDelta(diracDeltaTypeLL, (LLz[el] - LLz[ka])/lbm.lat.physDl);
 						if (ddd>0)
 						{
 							v[el].push_back(ka);
@@ -459,7 +459,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		{
 			int j=vr[i][ka].ka;
 			real ddd = vr[i][ka].DD;
-			if (ws_regularDirac)
+			if (methodVariant==DiracMethod::MODIFIED)
 			{
 				ws_A->get(i,j) = ddd;
 			} else
@@ -578,7 +578,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 {
 	if (ws_tnl_constructed) return;
 	ws_tnl_constructed=true;
-	int rDirac=1;
 	// count non zero elements in matrix A
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
@@ -618,11 +617,11 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		{
 			real ddd;
 
-			if (ws_regularDirac)
+			if (methodVariant==DiracMethod::MODIFIED)
 			{
 				//calculate dirac with selected dirac type
-				ddd = calculate3Dirac(rDirac, ka, el);
-				if(is3DiracNonZero(rDirac, ka, el))
+				ddd = calculate3Dirac(diracDeltaTypeLL, ka, el);
+				if(is3DiracNonZero(diracDeltaTypeLL, ka, el))
 				{
 					rowCapacity++;
 				}
@@ -630,8 +629,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			} else
 			{
 				//calculate ddd with default dirac type
-				ddd = calculate3Dirac(diracDeltaType, ka, el, 2.0);
-				if(is3DiracNonZero(rDirac, ka, el, 2.0))
+				ddd = calculate3Dirac(diracDeltaTypeEL, ka, el, 2.0);
+				if(is3DiracNonZero(diracDeltaTypeEL, ka, el, 2.0))
 				{
 					rowCapacity++;
 				}
@@ -709,7 +708,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		{
 			int j=vr[i][ka].ka;
 			real ddd = vr[i][ka].DD;
-			if (ws_regularDirac)
+			if (methodVariant == DiracMethod::MODIFIED)
 			{
 				ws_tnl_hA->setElement(i,j, ddd);
 			} else
