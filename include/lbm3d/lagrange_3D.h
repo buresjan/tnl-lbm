@@ -153,8 +153,8 @@ struct Lagrange3D
 	int ws_compute=ws_computeCPU;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
 	bool ws_speedUpAllocation=false;	// choose neighbors based on lag_x and lag_y proximity !!! experimental
 	int ws_speedUpAllocationSupport=1000000; // very big
-	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex, float divisionModifier=1.0f);
-	real calculate3Dirac(int rDirac, int colIndex, int rowIndex, float divisionModifier=1.0f); // this function calculates ddd for use in WuShu matrix construction
+	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex);
+	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction
 	void constructWuShuMatricesSparse();
 	void constructWuShuMatricesSparse_TNL();
 	void computeWuShuForcesSparse(real time);

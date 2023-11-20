@@ -520,7 +520,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		nz++;
 }
 template< typename LBM >
-typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int colIndex, int rowIndex, float divisionModifier)
+typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int colIndex, int rowIndex)
 {
 	//ka = colIndex
 	//el = rowIndex
@@ -529,13 +529,13 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 	real d3; //dirac 3
 	real ddd;
 
-				d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl/divisionModifier);
+				d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl);
 				if (d1>0)
 				{
-					d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl/divisionModifier);
+					d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl);
 					if (d2>0)
 					{
-						d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl/divisionModifier);
+						d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl);
 						if (d3>0)
 						{
 							ddd = d1*d2*d3;
@@ -550,7 +550,7 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 }
 
 template< typename LBM >
-bool Lagrange3D<LBM>::is3DiracNonZero(int rDirac, int colIndex, int rowIndex, float divisionModifier)
+bool Lagrange3D<LBM>::is3DiracNonZero(int rDirac, int colIndex, int rowIndex)
 {
 	//ka = colIndex
 	//el = rowIndex
@@ -558,13 +558,13 @@ bool Lagrange3D<LBM>::is3DiracNonZero(int rDirac, int colIndex, int rowIndex, fl
 	bool d2; //dirac 2
 	bool d3; //dirac 3
 
-	d1 = isDDNonZero(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl/divisionModifier);
+	d1 = isDDNonZero(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl);
 	if (d1)
 	{
-		d2 = isDDNonZero(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl/divisionModifier);
+		d2 = isDDNonZero(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl);
 		if (d2)
 		{
-			d3=isDDNonZero(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl/divisionModifier);
+			d3=isDDNonZero(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl);
 			if (d3)
 			{
 				return true;
@@ -587,42 +587,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
 	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
-
-
-	fmt::print("tnl wushu construct loop 1: start\n");
-
-	//This could cause issues ^^
-	//Test for CPU
-	//TODO: Rename index
-	//EL = Row index
-	//KA = Column index
-
-	//TODO: look into OMP parallelization to avoid issues
-	#pragma omp parallel for schedule(dynamic)
-	for (int el=0;el<m;el++)
-	{
-		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
-		for (int ka=0;ka<m;ka++)
-		{
-			if (methodVariant==DiracMethod::MODIFIED)
-			{
-				if(is3DiracNonZero(diracDeltaTypeLL, ka, el))
-				{
-					rowCapacity++;
-				}
-			} else
-			{
-				if(is3DiracNonZero(diracDeltaTypeEL, ka, el, 2.0))
-				{
-					rowCapacity++;
-				}
-			}
-		}
-		hA_row_capacities[el] = rowCapacity;
-	}
-	fmt::print("tnl wushu construct loop 1: end\n");
-
-	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
 	// fill vectors delta_el
 	// sparse vector of deltas
@@ -657,6 +621,52 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	fmt::print("tnl wushu construct loop 2: end\n");
 
 
+	fmt::print("tnl wushu construct loop 1: start\n");
+
+	//This could cause issues ^^
+	//Test for CPU
+	//TODO: Rename index
+	//EL = Row index
+	//KA = Column index
+
+	//TODO: look into OMP parallelization to avoid issues
+	#pragma omp parallel for schedule(dynamic)
+	for (int el=0;el<m;el++)
+	{
+		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
+		for (int ka=0;ka<m;ka++)
+		{
+			if (methodVariant==DiracMethod::MODIFIED)
+			{
+				if(is3DiracNonZero(diracDeltaTypeLL, ka, el))
+				{
+					rowCapacity++;
+				}
+			} else
+			{
+				real val=0;
+				for (std::size_t in1=0;in1<d_i[el].size();in1++)
+				{
+					for (std::size_t in2=0;in2<d_i[ka].size();in2++)
+					{
+						if (d_i[el][in1]==d_i[ka][in2])
+						{
+							val += d_x[el][in1]*d_x[ka][in2];
+							break;
+						}
+					}
+				}
+				if (val > 0)
+					rowCapacity++;
+			}
+		}
+		hA_row_capacities[el] = rowCapacity;
+	}
+	fmt::print("tnl wushu construct loop 1: end\n");
+
+	ws_tnl_hA->setRowCapacities(hA_row_capacities);
+
+
 	fmt::print("tnl wushu construct loop 3: start\n");
 	// TODO: rename variables el, ka
 	for (int el=0;el<m;el++)
@@ -673,22 +683,20 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				}
 			} else
 			{
-				if(is3DiracNonZero(diracDeltaTypeEL, ka, el, 2.0))
+				real val=0;
+				for (std::size_t in1=0;in1<d_i[el].size();in1++)
 				{
-					real val=0;
-					for (std::size_t in1=0;in1<d_i[el].size();in1++)
+					for (std::size_t in2=0;in2<d_i[ka].size();in2++)
 					{
-						for (std::size_t in2=0;in2<d_i[ka].size();in2++)
+						if (d_i[el][in1]==d_i[ka][in2])
 						{
-							if (d_i[el][in1]==d_i[ka][in2])
-							{
-								val += d_x[el][in1]*d_x[ka][in2];
-								break;
-							}
+							val += d_x[el][in1]*d_x[ka][in2];
+							break;
 						}
 					}
-					ws_tnl_hA->setElement(el,ka, val);
 				}
+				if (val > 0)
+					ws_tnl_hA->setElement(el,ka, val);
 			}
 		}
 	}
