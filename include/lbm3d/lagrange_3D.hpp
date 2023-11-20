@@ -484,6 +484,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 		}
 	}
 	delete [] vr; // free
+
 	fmt::print("wushu construct loop 3: end\n");
 
 	fmt::print("wushu construct loop 4: start\n");
@@ -593,11 +594,23 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 
 	//VEC *v = new VEC[m];
 	VECDD *vr = new VECDD[m];
-	int *elementCounts = new int[m];
+
+
+	// allocate matrix A
+	ws_tnl_hA = std::make_shared< hEllpack >();
+	ws_tnl_hA->setDimensions(m, m);
+//	int max_nz_per_row=0;
+//	for (int el=0;el<m;el++) {
+//		max_nz_per_row = TNL::max(max_nz_per_row, vr[el].size());
+//	}
+//	ws_tnl_hA->setConstantCompressedRowLengths(max_nz_per_row);
+//	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
+//	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
+//	ws_tnl_hA->setRowCapacities(hA_row_lengths);
+	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
+
 
 	fmt::print("tnl wushu construct loop 1: start\n");
-
-	fmt::print("tnl wushu construct loop 1: cont\n");
 
 	//TODO: look into OMP parallelization to avoid issues
 	#pragma omp parallel for schedule(dynamic)
@@ -643,28 +656,11 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					vr[el].push_back(sdd);
 			}
 		}
-		elementCounts[el] = rowCapacity;
+		hA_row_capacities[el] = rowCapacity;
 	}
-
-
 	fmt::print("tnl wushu construct loop 1: end\n");
 
-	// allocate matrix A
-	ws_tnl_hA = std::make_shared< hEllpack >();
-	ws_tnl_hA->setDimensions(m, m);
-//	int max_nz_per_row=0;
-//	for (int el=0;el<m;el++) {
-//		max_nz_per_row = TNL::max(max_nz_per_row, vr[el].size());
-//	}
-//	ws_tnl_hA->setConstantCompressedRowLengths(max_nz_per_row);
-//	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
-//	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
-//	ws_tnl_hA->setRowCapacities(hA_row_lengths);
-	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
-	for (int el=0; el<m; el++) hA_row_lengths[el] = elementCounts[el];
-	ws_tnl_hA->setRowCapacities(hA_row_lengths);
-
-
+	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
 	// fill vectors delta_el
 	// sparse vector of deltas
@@ -704,7 +700,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	{
 		if (i%100==0)
 			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
-		for (std::size_t ka=0;ka<elementCounts[i];ka++)
+		for (int ka=0;ka<hA_row_capacities[i];ka++)
 		{
 			int j=vr[i][ka].ka;
 			real ddd = vr[i][ka].DD;
