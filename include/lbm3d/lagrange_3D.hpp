@@ -582,78 +582,40 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// count non zero elements in matrix A
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
-	// projdi veskery filament a najdi sousedni body (ve vzdaelenosti mensi nez je prekryv delta funkci)
-	struct DD_struct
-	{
-		real DD;
-		int ka; //col index
-	};
-	typedef std::vector<DD_struct> VECDD;
-	typedef std::vector<int> VEC;
-	typedef std::vector<real> VECR;
-
-	//VEC *v = new VEC[m];
-	VECDD *vr = new VECDD[m];
-
 
 	// allocate matrix A
 	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
-//	int max_nz_per_row=0;
-//	for (int el=0;el<m;el++) {
-//		max_nz_per_row = TNL::max(max_nz_per_row, vr[el].size());
-//	}
-//	ws_tnl_hA->setConstantCompressedRowLengths(max_nz_per_row);
-//	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
-//	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
-//	ws_tnl_hA->setRowCapacities(hA_row_lengths);
 	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
 
 
 	fmt::print("tnl wushu construct loop 1: start\n");
 
-	//TODO: look into OMP parallelization to avoid issues
-	#pragma omp parallel for schedule(dynamic)
 	//This could cause issues ^^
 	//Test for CPU
 	//TODO: Rename index
 	//EL = Row index
 	//KA = Column index
-	//ddd = matrix value
 
+	//TODO: look into OMP parallelization to avoid issues
+	#pragma omp parallel for schedule(dynamic)
 	for (int el=0;el<m;el++)
 	{
 		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
-		if (el%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
 		for (int ka=0;ka<m;ka++)
 		{
-			real ddd;
-
 			if (methodVariant==DiracMethod::MODIFIED)
 			{
-				//calculate dirac with selected dirac type
-				ddd = calculate3Dirac(diracDeltaTypeLL, ka, el);
 				if(is3DiracNonZero(diracDeltaTypeLL, ka, el))
 				{
 					rowCapacity++;
 				}
-
 			} else
 			{
-				//calculate ddd with default dirac type
-				ddd = calculate3Dirac(diracDeltaTypeEL, ka, el, 2.0);
 				if(is3DiracNonZero(diracDeltaTypeEL, ka, el, 2.0))
 				{
 					rowCapacity++;
 				}
-			}
-			if(ddd>0)
-			{
-					DD_struct sdd;
-					sdd.DD = ddd;
-					sdd.ka = ka;
-					vr[el].push_back(sdd);
 			}
 		}
 		hA_row_capacities[el] = rowCapacity;
@@ -694,38 +656,42 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	}
 	fmt::print("tnl wushu construct loop 2: end\n");
 
+
 	fmt::print("tnl wushu construct loop 3: start\n");
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
+	// TODO: rename variables el, ka
+	for (int el=0;el<m;el++)
 	{
-		if (i%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
-		for (int ka=0;ka<hA_row_capacities[i];ka++)
+		for (int ka=0;ka<m;ka++)
 		{
-			int j=vr[i][ka].ka;
-			real ddd = vr[i][ka].DD;
-			if (methodVariant == DiracMethod::MODIFIED)
+			if (methodVariant==DiracMethod::MODIFIED)
 			{
-				ws_tnl_hA->setElement(i,j, ddd);
+				if(is3DiracNonZero(diracDeltaTypeLL, ka, el))
+				{
+					//calculate dirac with selected dirac type
+					real ddd = calculate3Dirac(diracDeltaTypeLL, ka, el);
+					ws_tnl_hA->setElement(el,ka, ddd);
+				}
 			} else
 			{
-				real val=0;
-				for (std::size_t in1=0;in1<d_i[i].size();in1++)
+				if(is3DiracNonZero(diracDeltaTypeEL, ka, el, 2.0))
 				{
-					for (std::size_t in2=0;in2<d_i[j].size();in2++)
+					real val=0;
+					for (std::size_t in1=0;in1<d_i[el].size();in1++)
 					{
-						if (d_i[i][in1]==d_i[j][in2])
+						for (std::size_t in2=0;in2<d_i[ka].size();in2++)
 						{
-							val += d_x[i][in1]*d_x[j][in2];
-							break;
+							if (d_i[el][in1]==d_i[ka][in2])
+							{
+								val += d_x[el][in1]*d_x[ka][in2];
+								break;
+							}
 						}
 					}
+					ws_tnl_hA->setElement(el,ka, val);
 				}
-				ws_tnl_hA->setElement(i,j, val);
 			}
 		}
 	}
-	delete [] vr; // free
 	fmt::print("tnl wushu construct loop 3: end\n");
 
 	// create vectors for the solution of the linear system
@@ -771,6 +737,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hMT.setDimensions(n, m);
 
 	// for each Euler node, assign
+	typedef std::vector<int> VEC;
+	typedef std::vector<real> VECR;
 	VEC *vn = new VEC[n];
 	VECR *vx = new VECR[n];
 	for (int i=0;i<m;i++)
