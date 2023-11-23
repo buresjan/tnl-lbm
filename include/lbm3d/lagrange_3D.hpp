@@ -7,6 +7,7 @@
 #include <TNL/Containers/Vector.h>
 #include <complex>
 #include <TNL/Matrices/MatrixWriter.h>
+#include <string>
 
 template< typename LBM >
 auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
@@ -775,7 +776,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	#endif
 
 	// output to files
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA.mtx", *ws_tnl_hA );
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
 
 	// update the preconditioner
 	ws_tnl_hprecond->update(ws_tnl_hA);

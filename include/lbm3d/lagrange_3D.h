@@ -72,8 +72,9 @@ struct LagrangePoint3D
 
 enum class DiracMethod //Enum for deciding which method is used for calculation
 	{
-		ORIGINAL = 0,
-		MODIFIED = 1
+
+		MODIFIED = 0,
+		ORIGINAL = 1,
 	};
 
 template< typename LBM >

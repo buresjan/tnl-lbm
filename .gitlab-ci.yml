@@ -28,11 +28,18 @@ build_Release:
             -DCMAKE_BUILD_TYPE=Release
             -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
     - cmake --build build
-#    - ./build/sim_NSE/sim_3 ...
-#    - diff ...
-#  tags:
-#    - docker
-#    - nvidia
+    # matrix checking
+    - ./build/sim_NSE/sim_5 0 1 100 0 2 5
+    - diff ws_tnl_hA_method-0_dirac-1.mtx original_matrices/ws_tnl_hA_original_method-0_dirac-1.mtx
+    - ./build/sim_NSE/sim_5 0 2 100 0 2 5
+    - diff ws_tnl_hA_method-0_dirac-2.mtx original_matrices/ws_tnl_hA_original_method-0_dirac-2.mtx
+    - ./build/sim_NSE/sim_5 0 3 100 0 2 5
+    - diff ws_tnl_hA_method-0_dirac-3.mtx original_matrices/ws_tnl_hA_original_method-0_dirac-3.mtx
+    - ./build/sim_NSE/sim_5 0 4 100 0 2 5
+    - diff ws_tnl_hA_method-0_dirac-4.mtx original_matrices/ws_tnl_hA_original_method-0_dirac-4.mtx
+  tags:
+    - docker
+    - nvidia
 
 build_Debug:
   stage: build
