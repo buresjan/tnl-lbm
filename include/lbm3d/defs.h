@@ -82,11 +82,11 @@ struct Traits
 	using d4_permutation = std::index_sequence< 0, 1, 3, 2 >;		// id, x, z, y
 
 #ifdef HAVE_MPI
-	using xyz_overlaps = std::index_sequence< _overlap_width, _overlap_width, _overlap_width >;	// x, y, z
-	using d4_overlaps = std::index_sequence< 0, _overlap_width, _overlap_width, _overlap_width >;	// id, x, y, z
+	using xyz_overlaps = TNL::Containers::StaticSizesHolder< idx, _overlap_width, _overlap_width, _overlap_width >;	// x, y, z
+	using d4_overlaps = TNL::Containers::StaticSizesHolder< idx, 0, _overlap_width, _overlap_width, _overlap_width >;	// id, x, y, z
 #else
-	using xyz_overlaps = std::index_sequence< 0, 0, 0 >;	// x, y, z
-	using d4_overlaps = std::index_sequence< 0, 0, 0, 0 >;	// id, x, y, z
+	using xyz_overlaps = TNL::Containers::ConstStaticSizesHolder< idx, 3, 0 >;
+	using d4_overlaps = TNL::Containers::ConstStaticSizesHolder< idx, 4, 0 >;
 #endif
 
 	template< typename Value, typename Device >
