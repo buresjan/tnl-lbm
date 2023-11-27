@@ -584,11 +584,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
 
-	// allocate matrix A
-	ws_tnl_hA = std::make_shared< hEllpack >();
-	ws_tnl_hA->setDimensions(m, m);
-	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
-
 	// fill vectors delta_el
 	// sparse vector of deltas
 	//TODO: This could be rewritten with DDStruct
@@ -621,6 +616,38 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	}
 	fmt::print("tnl wushu construct loop 2: end\n");
 
+	// create Matrix M: matrix realizing projection of u* to lagrange desc.
+	ws_tnl_hM.setDimensions(m, n);
+//	max_nz_per_row = 0;
+//	for (int el=0;el<m;el++)
+//		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
+//	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
+	typename hEllpack::RowCapacitiesType hM_row_lengths( m );
+	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
+	ws_tnl_hM.setRowCapacities(hM_row_lengths);
+
+//	fmt::print("Ai construct\n");
+	for (int i=0;i<m;i++)
+	{
+		auto row = ws_tnl_hM.getRow(i);
+		for (std::size_t j=0;j<d_i[i].size();j++)
+			row.setElement(j, d_i[i][j], (dreal)d_x[i][j]);
+	}
+
+	// output to files
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
+
+	// its transpose
+    ws_tnl_hMT.getTransposition(ws_tnl_hM);
+
+	// output to files
+	//TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hMT_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hMT );
+
+
+	// allocate matrix A
+	ws_tnl_hA = std::make_shared< hEllpack >();
+	ws_tnl_hA->setDimensions(m, m);
+	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
 
 	fmt::print("tnl wushu construct loop 1: start\n");
 
@@ -703,6 +730,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	}
 	fmt::print("tnl wushu construct loop 3: end\n");
 
+	// output to files
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
+
+
 	// create vectors for the solution of the linear system
 	for (int k=0;k<3;k++)
 	{
@@ -722,61 +753,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	for (int k=0;k<3;k++) ws_tnl_dx[k].setValue(0);
 	for (int k=0;k<3;k++) ws_tnl_hxz[k].setValue(0);
 	#endif
-
-	#ifdef USE_CUDA
-	// create Matrix M: matrix realizing projection of u* to lagrange desc.
-	ws_tnl_hM.setDimensions(m, n);
-//	max_nz_per_row = 0;
-//	for (int el=0;el<m;el++)
-//		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
-//	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::RowCapacitiesType hM_row_lengths( m );
-	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
-	ws_tnl_hM.setRowCapacities(hM_row_lengths);
-
-//	fmt::print("Ai construct\n");
-	for (int i=0;i<m;i++)
-	{
-		auto row = ws_tnl_hM.getRow(i);
-		for (std::size_t j=0;j<d_i[i].size();j++)
-			row.setElement(j, d_i[i][j], (dreal)d_x[i][j]);
-	}
-
-	// its transpose
-	ws_tnl_hMT.setDimensions(n, m);
-
-	// for each Euler node, assign
-	typedef std::vector<int> VEC;
-	typedef std::vector<real> VECR;
-	VEC *vn = new VEC[n];
-	VECR *vx = new VECR[n];
-	for (int i=0;i<m;i++)
-	for (std::size_t j=0;j<d_i[i].size();j++)
-	{
-		vn[ d_i[i][j] ].push_back( i );
-		vx[ d_i[i][j] ].push_back( d_x[i][j] );
-	}
-
-//	max_nz_per_row = 0;
-//	for (int el=0;el<n;el++)
-//		max_nz_per_row = TNL::max(max_nz_per_row, vn[el].size());
-//	ws_tnl_hMT.setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::RowCapacitiesType hMT_row_lengths( n );
-	for (int el=0; el<n; el++) hMT_row_lengths[el] = vn[el].size();
-	ws_tnl_hMT.setRowCapacities(hMT_row_lengths);
-
-	for (int i=0;i<n;i++)
-	{
-		auto row = ws_tnl_hMT.getRow(i);
-		for (std::size_t j=0;j<vn[i].size();j++)
-			row.setElement(j, vn[i][j], vx[i][j]);
-	}
-	delete [] vn;
-	delete [] vx;
-	#endif
-
-	// output to files
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
 
 	// update the preconditioner
 	ws_tnl_hprecond->update(ws_tnl_hA);
