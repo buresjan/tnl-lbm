@@ -64,7 +64,7 @@ FetchContent_MakeAvailable(fmt)
 if(SYSTEM_TNL)
     find_package(TNL REQUIRED)
 else()
-    add_subdirectory(libs/tnl)
+    add_subdirectory(libs/tnl EXCLUDE_FROM_ALL)
     set(SYSTEM_TNL TRUE)  # avoid further inclusion of libs/tnl from other libs
 endif()
 
