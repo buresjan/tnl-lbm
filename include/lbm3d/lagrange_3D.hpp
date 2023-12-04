@@ -8,6 +8,7 @@
 #include <complex>
 #include <TNL/Matrices/MatrixWriter.h>
 #include <string>
+#include <TNL/Timer.h>
 
 template< typename LBM >
 auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
@@ -580,6 +581,12 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 {
 	if (ws_tnl_constructed) return;
 	ws_tnl_constructed=true;
+
+	//Start timer to measure WuShu construction time
+	TNL::Timer timer;
+	fmt::print("started timer for wushu construction\n");
+	timer.start();
+
 	// count non zero elements in matrix A
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
@@ -590,8 +597,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	d_i = new std::vector<idx>[m];
 	d_x = new  std::vector<real>[m];
 	// fill only non zero elements-relevant
-
-	fmt::print("tnl wushu construct loop 2: start\n");
+	timer.stop();
+	fmt::print("------- timer time: {}\n",timer.getRealTime());
+	timer.start();
+	fmt::print("tnl wushu construct loop hM: start\n");
 	idx support=5; // search in this support
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
@@ -614,8 +623,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
-	fmt::print("tnl wushu construct loop 2: end\n");
-
+	fmt::print("tnl wushu construct loop hM: end\n");
+	timer.stop();
+	fmt::print("------- timer time: {}\n",timer.getRealTime());
+	timer.start();
 	// create Matrix M: matrix realizing projection of u* to lagrange desc.
 	ws_tnl_hM.setDimensions(m, n);
 //	max_nz_per_row = 0;
@@ -649,8 +660,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hA->setDimensions(m, m);
 	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
 
-	fmt::print("tnl wushu construct loop 1: start\n");
-
+	fmt::print("tnl wushu construct loop rowCapacity hA: start\n");
+	timer.stop();
+	fmt::print("------- timer time: {}\n",timer.getRealTime());
+	timer.start();
 	//This could cause issues ^^
 	//Test for CPU
 	//TODO: Rename index
@@ -658,6 +671,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	//KA = Column index
 
 	//TODO: look into OMP parallelization to avoid issues
+	//TODO: Measure time with and without (USE TNL TIMER)
+	//TODO: Check dynamic planning time vs static
+	//TODO: Replace outer loop with ParallelFor (TNL), Inner loop into lambda (SKIP FOR NOW)
+	//TODO: Look into Open MP Critical and Atomic
+	//TODO: Paralelise both loops (row and col)
+	//TODO: parallel for ... collapse(n)
+
 	#pragma omp parallel for schedule(dynamic)
 	for (int index_row=0;index_row<m;index_row++)
 	{
@@ -690,12 +710,17 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		}
 		hA_row_capacities[index_row] = rowCapacity;
 	}
-	fmt::print("tnl wushu construct loop 1: end\n");
-
+	fmt::print("tnl wushu construct loop rowCapacity hA: end\n");
+	timer.stop();
+	fmt::print("------- timer time: {}\n",timer.getRealTime());
+	timer.start();
 	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
 
-	fmt::print("tnl wushu construct loop 3: start\n");
+	fmt::print("tnl wushu construct loop hA: start\n");
+	timer.stop();
+	fmt::print("------- timer time: {}\n",timer.getRealTime());
+	timer.start();
 	// TODO: rename variables el, ka
 	for (int index_row=0;index_row<m;index_row++)
 	{
@@ -728,8 +753,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
-	fmt::print("tnl wushu construct loop 3: end\n");
-
+	fmt::print("tnl wushu construct loop hA: end\n");
+	timer.stop();
+	fmt::print("------- timer time: {}\n",timer.getRealTime());
+	timer.start();
 	// output to files
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
 
@@ -786,6 +813,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		case ws_computeHybrid_TNL_zerocopy:    compute_desc = "ws_computeHybrid_TNL_zerocopy"; break;
 	}
 	log("constructed WuShu matrices for ws_compute={}", compute_desc);
+	timer.stop();
+	fmt::print("-------wuShuTnl final timer time: {}\n",timer.getRealTime());
+
 }
 
 template< typename Matrix, typename Vector >
