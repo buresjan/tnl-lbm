@@ -584,6 +584,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 
 	//Start timer to measure WuShu construction time
 	TNL::Timer timer;
+	TNL::Timer loopTimer;
+
+	double time_loop_Hm, time_loop_Ha_Capacities, time_loop_Ha, time_total;
+
 	fmt::print("started timer for wushu construction\n");
 	timer.start();
 
@@ -600,6 +604,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	timer.stop();
 	fmt::print("------- timer time: {}\n",timer.getRealTime());
 	timer.start();
+	loopTimer.start();
 	fmt::print("tnl wushu construct loop hM: start\n");
 	idx support=5; // search in this support
 	#pragma omp parallel for schedule(static)
@@ -624,9 +629,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		}
 	}
 	fmt::print("tnl wushu construct loop hM: end\n");
-	timer.stop();
-	fmt::print("------- timer time: {}\n",timer.getRealTime());
-	timer.start();
+	loopTimer.stop();
+	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
+	time_loop_Hm = loopTimer.getRealTime();
 	// create Matrix M: matrix realizing projection of u* to lagrange desc.
 	ws_tnl_hM.setDimensions(m, n);
 //	max_nz_per_row = 0;
@@ -661,9 +666,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
 
 	fmt::print("tnl wushu construct loop rowCapacity hA: start\n");
-	timer.stop();
-	fmt::print("------- timer time: {}\n",timer.getRealTime());
-	timer.start();
+	loopTimer.reset();
+	loopTimer.start();
 	//This could cause issues ^^
 	//Test for CPU
 	//TODO: Rename index
@@ -711,16 +715,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		hA_row_capacities[index_row] = rowCapacity;
 	}
 	fmt::print("tnl wushu construct loop rowCapacity hA: end\n");
-	timer.stop();
-	fmt::print("------- timer time: {}\n",timer.getRealTime());
-	timer.start();
+	loopTimer.stop();
+	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
+	time_loop_Ha_Capacities = loopTimer.getRealTime();
 	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
 
 	fmt::print("tnl wushu construct loop hA: start\n");
-	timer.stop();
-	fmt::print("------- timer time: {}\n",timer.getRealTime());
-	timer.start();
+	loopTimer.reset();
+	loopTimer.start();
 	// TODO: rename variables el, ka
 	for (int index_row=0;index_row<m;index_row++)
 	{
@@ -754,9 +757,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		}
 	}
 	fmt::print("tnl wushu construct loop hA: end\n");
-	timer.stop();
-	fmt::print("------- timer time: {}\n",timer.getRealTime());
-	timer.start();
+	loopTimer.stop();
+	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
+	time_loop_Ha = loopTimer.getRealTime();
 	// output to files
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
 
@@ -815,6 +818,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	log("constructed WuShu matrices for ws_compute={}", compute_desc);
 	timer.stop();
 	fmt::print("-------wuShuTnl final timer time: {}\n",timer.getRealTime());
+	time_total = timer.getRealTime();
+	fmt::print("--timeTuple;{}, {}, {}, {}\n",time_total,time_loop_Hm,time_loop_Ha,time_loop_Ha_Capacities);
 
 }
 
