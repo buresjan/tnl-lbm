@@ -7,6 +7,7 @@
 #include <TNL/Containers/Vector.h>
 #include <complex>
 #include <TNL/Matrices/MatrixWriter.h>
+#include <omp.h>
 #include <string>
 #include <TNL/Timer.h>
 
@@ -682,7 +683,17 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	//TODO: Paralelise both loops (row and col)
 	//TODO: parallel for ... collapse(n)
 
-	#pragma omp parallel for schedule(dynamic)
+	int threads = omp_get_max_threads();
+	// TODO: find the correct threshold for this condition
+	//if( m < 1000 )
+	//	threads = 1;
+
+	// TODO: set hA_row_capacities to 0, define rowCapacity before the loop,
+	// TODO: use firstprivate(rowCapacity) in the pragma, use #pragma omp atomic at the end,
+	// TODO: use collapse(2) in the pragma
+	// TODO: maybe use if(threads > 1) in the pragma?
+
+	//#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	for (int index_row=0;index_row<m;index_row++)
 	{
 		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
@@ -725,6 +736,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	loopTimer.reset();
 	loopTimer.start();
 	// TODO: rename variables el, ka
+	#pragma omp parallel for schedule(dynamic) collapse(2) num_threads(threads)
 	for (int index_row=0;index_row<m;index_row++)
 	{
 		for (int index_col=0;index_col<m;index_col++)
@@ -735,7 +747,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				{
 					//calculate dirac with selected dirac type
 					real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row);
-					ws_tnl_hA->setElement(index_row,index_col, ddd);
+					#pragma omp critical
+					{
+						ws_tnl_hA->setElement(index_row,index_col, ddd);
+					}
 				}
 			} else
 			{
@@ -751,8 +766,12 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 						}
 					}
 				}
-				if (val > 0)
-					ws_tnl_hA->setElement(index_row,index_col, val);
+				if (val > 0) {
+					#pragma omp critical
+					{
+						ws_tnl_hA->setElement(index_row,index_col, val);
+					}
+				}
 			}
 		}
 	}
