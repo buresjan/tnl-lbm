@@ -779,9 +779,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	loopTimer.stop();
 	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
 	time_loop_Ha = loopTimer.getRealTime();
-	// output to files
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
-
 
 	// create vectors for the solution of the linear system
 	for (int k=0;k<3;k++)
@@ -818,8 +815,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
 
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "original_matrices/ws_tnl_hM_original_method-"+std::to_string(!ws_regularDirac)+"_dirac-"+std::to_string(diracDeltaType)+".mtx", ws_tnl_hM );
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "original_matrices/ws_tnl_hA_original_method-"+std::to_string(!ws_regularDirac)+"_dirac-"+std::to_string(diracDeltaType)+".mtx", *ws_tnl_hA );
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
 
 	#endif
 	fmt::print("tnl wushu lagrange_3D_end\n");
