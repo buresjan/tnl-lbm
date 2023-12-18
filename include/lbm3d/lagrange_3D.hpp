@@ -7,9 +7,13 @@
 #include <TNL/Containers/Vector.h>
 #include <complex>
 #include <TNL/Matrices/MatrixWriter.h>
+#include <fmt/core.h>
+#include <nlohmann/json_fwd.hpp>
 #include <omp.h>
 #include <string>
 #include <TNL/Timer.h>
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 template< typename LBM >
 auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
@@ -835,8 +839,14 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	timer.stop();
 	fmt::print("-------wuShuTnl final timer time: {}\n",timer.getRealTime());
 	time_total = timer.getRealTime();
-	fmt::print("--timeTuple;{}, {}, {}, {}\n",time_total,time_loop_Hm,time_loop_Ha,time_loop_Ha_Capacities);
-
+	//fmt::print("--timeTuple;{}, {}, {}, {}\n",time_total,time_loop_Hm,time_loop_Ha,time_loop_Ha_Capacities);
+	json j;
+	j["time_total"] = time_total;
+	j["time_loop_Hm"] = time_loop_Hm;
+	j["time_loop_Ha"] = time_loop_Ha;
+	j["time_loop_Ha_capacities"] = time_loop_Ha_Capacities;
+	std::string jsonOutput = j.dump();
+	fmt::print("--outputJSON;{}\n",jsonOutput);
 }
 
 template< typename Matrix, typename Vector >
