@@ -1,3 +1,7 @@
+#pragma once
+
+#include <TNL/Matrices/MatrixWriter.h>
+
 #include "lbm_common/timeutils.h"
 #include "lagrange_3D.h"
 
@@ -814,6 +818,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
+
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "original_matrices/ws_tnl_hM_original_method-"+std::to_string(!ws_regularDirac)+"_dirac-"+std::to_string(diracDeltaType)+".mtx", ws_tnl_hM );
+	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "original_matrices/ws_tnl_hA_original_method-"+std::to_string(!ws_regularDirac)+"_dirac-"+std::to_string(diracDeltaType)+".mtx", *ws_tnl_hA );
+
 	#endif
 	fmt::print("tnl wushu lagrange_3D_end\n");
 	fmt::print("number of lagrangian points: {}\n", m);
