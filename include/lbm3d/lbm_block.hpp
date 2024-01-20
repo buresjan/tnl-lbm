@@ -114,53 +114,53 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	auto direction = TNL::Containers::SyncDirection::Left;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
 		computeData.at(direction).offset = idx3d{0, 0, 0};
-		computeData.at(direction).size = idx3d{df_overlap_X(), local.y(), local.z()};
+		computeData.at(direction).size = idx3d{overlap_width, local.y(), local.z()};
 		interior_offset.x()++;
 		interior_size.x() -= computeData.at(direction).size.x();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, df_overlap_X());
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, overlap_width);
 	}
 	direction = TNL::Containers::SyncDirection::Right;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
-		computeData.at(direction).offset = idx3d{local.x() - df_overlap_X(), 0, 0};
-		computeData.at(direction).size = idx3d{df_overlap_X(), local.y(), local.z()};
+		computeData.at(direction).offset = idx3d{local.x() - overlap_width, 0, 0};
+		computeData.at(direction).size = idx3d{overlap_width, local.y(), local.z()};
 		interior_size.x() -= computeData.at(direction).size.x();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, df_overlap_X());
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, overlap_width);
 	}
 	direction = TNL::Containers::SyncDirection::Bottom;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
 		computeData.at(direction).offset = idx3d{interior_offset.x(), 0, 0};
-		computeData.at(direction).size = idx3d{interior_size.x(), df_overlap_Y(), local.z()};
+		computeData.at(direction).size = idx3d{interior_size.x(), overlap_width, local.z()};
 		interior_offset.y()++;
 		interior_size.y() -= computeData.at(direction).size.y();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, df_overlap_Y());
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, overlap_width);
 	}
 	direction = TNL::Containers::SyncDirection::Top;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
-		computeData.at(direction).offset = idx3d{interior_offset.x(), local.y() - df_overlap_Y(), 0};
-		computeData.at(direction).size = idx3d{interior_size.x(), df_overlap_Y(), local.z()};
+		computeData.at(direction).offset = idx3d{interior_offset.x(), local.y() - overlap_width, 0};
+		computeData.at(direction).size = idx3d{interior_size.x(), overlap_width, local.z()};
 		interior_size.y() -= computeData.at(direction).size.y();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, df_overlap_Y());
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, overlap_width);
 	}
 	direction = TNL::Containers::SyncDirection::Back;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
 		computeData.at(direction).offset = idx3d{interior_offset.x(), interior_offset.y(), 0};
-		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), df_overlap_Z()};
+		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), overlap_width};
 		interior_offset.z()++;
 		interior_size.z() -= computeData.at(direction).size.z();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, df_overlap_Z());
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, overlap_width);
 	}
 	direction = TNL::Containers::SyncDirection::Front;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
-		computeData.at(direction).offset = idx3d{interior_offset.x(), interior_offset.y(), local.z() - df_overlap_Z()};
-		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), df_overlap_Z()};
+		computeData.at(direction).offset = idx3d{interior_offset.x(), interior_offset.y(), local.z() - overlap_width};
+		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), overlap_width};
 		interior_size.z() -= computeData.at(direction).size.z();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, df_overlap_Z());
+		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, overlap_width);
 	}
 
 	// for compute on interior lattice sites
@@ -492,6 +492,12 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	{
 		hfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
+		if (local.x() != global.x())
+			hfs[dfty].getOverlaps().template setSize< 1 >( 1 );
+		if (local.y() != global.y())
+			hfs[dfty].getOverlaps().template setSize< 2 >( 1 );
+		if (local.z() != global.z())
+			hfs[dfty].getOverlaps().template setSize< 3 >( 1 );
 		hfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 		hfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 		hfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -501,6 +507,12 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 
 	hmap.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
+	if (local.x() != global.x())
+		hmap.getOverlaps().template setSize< 0 >( 1 );
+	if (local.y() != global.y())
+		hmap.getOverlaps().template setSize< 1 >( 1 );
+	if (local.z() != global.z())
+		hmap.getOverlaps().template setSize< 2 >( 1 );
 	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	hmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
 	hmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
@@ -510,10 +522,22 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	hmacro.setSizes(0, global.x(), global.y(), global.z());
 	cpumacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
+	if (local.x() != global.x())
+		hmacro.getOverlaps().template setSize< 1 >( 1 );
+	if (local.y() != global.y())
+		hmacro.getOverlaps().template setSize< 2 >( 1 );
+	if (local.z() != global.z())
+		hmacro.getOverlaps().template setSize< 3 >( 1 );
 	hmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	hmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	hmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	hmacro.allocate();
+	if (local.x() != global.x())
+		cpumacro.getOverlaps().template setSize< 1 >( 1 );
+	if (local.y() != global.y())
+		cpumacro.getOverlaps().template setSize< 2 >( 1 );
+	if (local.z() != global.z())
+		cpumacro.getOverlaps().template setSize< 3 >( 1 );
 	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	cpumacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	cpumacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -532,6 +556,12 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 #if 1
 	dmap.setSizes(global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
+	if (local.x() != global.x())
+		dmap.getOverlaps().template setSize< 0 >( 1 );
+	if (local.y() != global.y())
+		dmap.getOverlaps().template setSize< 1 >( 1 );
+	if (local.z() != global.z())
+		dmap.getOverlaps().template setSize< 2 >( 1 );
 	dmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	dmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
 	dmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
@@ -542,6 +572,12 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	{
 		dfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
+		if (local.x() != global.x())
+			dfs[dfty].getOverlaps().template setSize< 1 >( 1 );
+		if (local.y() != global.y())
+			dfs[dfty].getOverlaps().template setSize< 2 >( 1 );
+		if (local.z() != global.z())
+			dfs[dfty].getOverlaps().template setSize< 3 >( 1 );
 		dfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 		dfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 		dfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -551,6 +587,12 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 
 	dmacro.setSizes(0, global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
+	if (local.x() != global.x())
+		dmacro.getOverlaps().template setSize< 1 >( 1 );
+	if (local.y() != global.y())
+		dmacro.getOverlaps().template setSize< 2 >( 1 );
+	if (local.z() != global.z())
+		dmacro.getOverlaps().template setSize< 3 >( 1 );
 	dmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	dmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	dmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -594,15 +636,9 @@ template< typename CONFIG >
 	template< typename F >
 void LBM_BLOCK<CONFIG>::forAllLatticeSites(F f)
 {
-#ifdef HAVE_MPI
-	const int overlap_x = hmap.getLocalView().getIndexer().template getOverlap< 0 >();
-	const int overlap_y = hmap.getLocalView().getIndexer().template getOverlap< 1 >();
-	const int overlap_z = hmap.getLocalView().getIndexer().template getOverlap< 2 >();
-#else
-	const int overlap_x = hmap.getIndexer().template getOverlap< 0 >();
-	const int overlap_y = hmap.getIndexer().template getOverlap< 1 >();
-	const int overlap_z = hmap.getIndexer().template getOverlap< 2 >();
-#endif
+	const int overlap_x = hmap.template getOverlap< 0 >();
+	const int overlap_y = hmap.template getOverlap< 1 >();
+	const int overlap_z = hmap.template getOverlap< 2 >();
 
 	#pragma omp parallel for schedule(static) collapse(2)
 	for (idx x = offset.x() - overlap_x; x < offset.x() + local.x() + overlap_x; x++)

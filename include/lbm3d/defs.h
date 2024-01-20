@@ -65,8 +65,7 @@ template <
 	typename _dreal = float,	// real number representation on GPU
 	typename _real = double,	// real number representation on CPU
 	typename _idx = long int,	// array index on CPU and GPU (can be very large)
-	typename _map_t = short int,
-	unsigned _overlap_width = 1
+	typename _map_t = short int
 >
 struct Traits
 {
@@ -82,9 +81,11 @@ struct Traits
 	using d4_permutation = std::index_sequence< 0, 1, 3, 2 >;		// id, x, z, y
 
 #ifdef HAVE_MPI
-	using xyz_overlaps = TNL::Containers::StaticSizesHolder< idx, _overlap_width, _overlap_width, _overlap_width >;	// x, y, z
-	using d4_overlaps = TNL::Containers::StaticSizesHolder< idx, 0, _overlap_width, _overlap_width, _overlap_width >;	// id, x, y, z
+	// all overlaps are set at run-time
+	using xyz_overlaps = TNL::Containers::SizesHolder< idx, 0, 0, 0 >;	// x, y, z
+	using d4_overlaps = TNL::Containers::SizesHolder< idx, 0, 0, 0, 0 >;	// id, x, y, z
 #else
+	// all overlaps are zero
 	using xyz_overlaps = TNL::Containers::ConstStaticSizesHolder< idx, 3, 0 >;
 	using d4_overlaps = TNL::Containers::ConstStaticSizesHolder< idx, 4, 0 >;
 #endif

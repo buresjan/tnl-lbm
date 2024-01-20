@@ -96,6 +96,13 @@ struct LBM_BLOCK
 	dim3 getCudaBlockSize(const idx3d& local_size);
 	dim3 getCudaGridSize(const idx3d& local_size, const dim3& block_size, idx x = 0, idx y = 0, idx z = 0);
 
+	// TODO: parametrize
+	#ifdef HAVE_MPI
+	static constexpr int overlap_width = 1;
+	#else
+	static constexpr int overlap_width = 0;
+	#endif
+
 	int df_overlap_X() { return data.indexer.template getOverlap< 0 >(); }
 	int df_overlap_Y() { return data.indexer.template getOverlap< 1 >(); }
 	int df_overlap_Z() { return data.indexer.template getOverlap< 2 >(); }
