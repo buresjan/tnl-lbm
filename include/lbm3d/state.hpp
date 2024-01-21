@@ -1372,9 +1372,12 @@ void State<NSE>::SimInit()
 	copyAllToDevice();
 
 #ifdef HAVE_MPI
-	// synchronize overlaps with MPI (initial synchronization can be synchronous)
-	nse.synchronizeMapDevice();
-	nse.synchronizeDFsAndMacroDevice(df_cur);
+	if (nse.nproc > 1)
+	{
+		// synchronize overlaps with MPI (initial synchronization can be synchronous)
+		nse.synchronizeMapDevice();
+		nse.synchronizeDFsAndMacroDevice(df_cur);
+	}
 #endif
 
 	timer_SimInit.stop();

@@ -27,7 +27,7 @@ __cuda_callable__ void kernelInitIndices(
 		zp = (nproc == 1 && z == SD.Z()-1) ? 0 : (z+1);
 		zm = (nproc == 1 && z == 0) ? (SD.Z()-1) : (z-1);
 	} else {
-		#ifdef HAVE_MPI
+		#ifdef AA_PATTERN
 		// NOTE: ghost layers of lattice sites are assumed in all directions, so these expressions always work
 		xp = x+1;
 		xm = x-1;
@@ -35,6 +35,16 @@ __cuda_callable__ void kernelInitIndices(
 		ym = y-1;
 		zp = z+1;
 		zm = z-1;
+		#elif defined(HAVE_MPI)
+		const typename NSE::TRAITS::idx& overlap_x = SD.indexer.template getOverlap< 0 >();
+		const typename NSE::TRAITS::idx& overlap_y = SD.indexer.template getOverlap< 1 >();
+		const typename NSE::TRAITS::idx& overlap_z = SD.indexer.template getOverlap< 2 >();
+		xp = TNL::min(x+1, SD.X()-1+overlap_x);
+		xm = TNL::max(x-1, -overlap_x);
+		yp = TNL::min(y+1, SD.Y()-1+overlap_y);
+		ym = TNL::max(y-1, -overlap_y);
+		zp = TNL::min(z+1, SD.Z()-1+overlap_z);
+		zm = TNL::max(z-1, -overlap_z);
 		#else
 		xp = TNL::min(x+1, SD.X()-1);
 		xm = TNL::max(x-1, 0);
