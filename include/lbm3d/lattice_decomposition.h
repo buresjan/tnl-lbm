@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 
 #include <fmt/core.h>
@@ -79,7 +80,7 @@ decomposeBlockOptimalWithPermutation( const TNL::Containers::Block< 3, Index >& 
 	// last dimension
 	int k = TNL::Containers::detail::get< 0 >( Permutation{} );
 
-	// decompose a permuted global block
+	// permute the global block
 	auto permuted_global = global;
 	permuted_global.begin[0] = global.begin[i];
 	permuted_global.begin[1] = global.begin[j];
@@ -87,9 +88,16 @@ decomposeBlockOptimalWithPermutation( const TNL::Containers::Block< 3, Index >& 
 	permuted_global.end[0] = global.end[i];
 	permuted_global.end[1] = global.end[j];
 	permuted_global.end[2] = global.end[k];
-	const std::vector< TNL::Containers::Block< 3, Index > > permuted_result = TNL::Containers::decomposeBlockOptimal(permuted_global, num_blocks);
 
-	// upermute the blocks in the result
+	// set axes-weights for the objective function used in the optimization
+	const std::array< Index, 3 >& axes_weights = { 64, 8, 1 };
+	using FunctionType = std::function< Index(const std::vector< TNL::Containers::Block< 3, Index > >&) >;
+	const FunctionType objective = std::bind(TNL::Containers::getInterfaceArea<Index>, std::placeholders::_1, axes_weights);
+
+	// decompose the permuted global block
+	const std::vector< TNL::Containers::Block< 3, Index > > permuted_result = TNL::Containers::decomposeBlockOptimal(permuted_global, num_blocks, objective);
+
+	// unpermute the blocks in the result
 	std::vector< TNL::Containers::Block< 3, Index > > result;
 	for( const auto& permuted_block : permuted_result ) {
 		auto& block = result.emplace_back( permuted_block );
