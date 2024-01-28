@@ -79,7 +79,7 @@ struct LBM_BLOCK
 	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
 
 	// CUDA streams for the block itself and each neighbor
-	std::map< int, TNL::Cuda::Stream > streams;
+	std::map< int, TNL::Backend::Stream > streams;
 
 	// synchronization methods
 	template< typename Array >

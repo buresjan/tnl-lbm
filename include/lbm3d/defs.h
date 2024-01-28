@@ -20,7 +20,7 @@
 #include <TNL/Containers/DistributedNDArraySynchronizer.h>
 #include <TNL/Containers/BlockPartitioning.h>
 #include <TNL/MPI.h>
-#include <TNL/Cuda/Stream.h>
+#include <TNL/Backend/Stream.h>
 
 #include "../lbm_common/ciselnik.h"
 

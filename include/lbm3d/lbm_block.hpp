@@ -277,10 +277,10 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 			int priority_high, priority_low;
 			cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
 			// low-priority stream for the interior
-			streams.emplace( id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_low) );
+			streams.emplace( id, TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_low) );
 			// high-priority streams for boundaries
-			streams.emplace( left_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
-			streams.emplace( right_id, TNL::Cuda::Stream::create(cudaStreamNonBlocking, priority_high) );
+			streams.emplace( left_id, TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high) );
+			streams.emplace( right_id, TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high) );
 		}
 		// set the CUDA stream
 		dreal_sync[i + sync_offset].setCudaStream(TNL::Containers::SyncDirection::Left, streams.at(left_id));
