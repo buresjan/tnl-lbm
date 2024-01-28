@@ -184,12 +184,13 @@ struct State_NSE_ADE : State<NSE>
 				// TODO: check that block_nse and block_ade have the same sizes
 
 				const auto direction = TNL::Containers::SyncDirection::None;
-				const dim3 blockSize = block_nse.computeData.at(direction).blockSize;
-				const dim3 gridSize = block_nse.computeData.at(direction).gridSize;
-				cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize>>>(block_nse.data, block_ade.data, nse.total_blocks, {0, 0, 0}, block_nse.local);
+				TNL::Backend::LaunchConfiguration launch_config;
+				launch_config.blockSize = block_nse.computeData.at(direction).blockSize;
+				launch_config.gridSize = block_nse.computeData.at(direction).gridSize;
+				TNL::Backend::launchKernelAsync(cudaLBMKernel<NSE, ADE>, launch_config, block_nse.data, block_ade.data, nse.total_blocks, idx3d{0, 0, 0}, block_nse.local);
 			}
-			cudaDeviceSynchronize();
-			checkCudaDevice;
+			// synchronize the null-stream after all grids
+			TNL::Backend::streamSynchronize(0);
 			// copying of overlaps is not necessary for nproc == 1 (nproc is checked in streaming as well)
 		#ifdef HAVE_MPI
 		}
@@ -213,12 +214,13 @@ struct State_NSE_ADE : State<NSE>
 
 				for (auto direction : boundary_directions)
 					if (auto search = block_nse.neighborIDs.find(direction); search != block_nse.neighborIDs.end() && search->second >= 0) {
-						const dim3 blockSize = block_nse.computeData.at(direction).blockSize;
-						const dim3 gridSize = block_nse.computeData.at(direction).gridSize;
-						const cudaStream_t stream = block_nse.computeData.at(direction).stream;
+						TNL::Backend::LaunchConfiguration launch_config;
+						launch_config.blockSize = block_nse.computeData.at(direction).blockSize;
+						launch_config.gridSize = block_nse.computeData.at(direction).gridSize;
+						launch_config.stream = block_nse.computeData.at(direction).stream;
 						const idx3d offset = block_nse.computeData.at(direction).offset;
 						const idx3d size = block_nse.computeData.at(direction).size;
-						cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize, 0, stream>>>(block_nse.data, block_ade.data, nse.total_blocks, offset, offset + size);
+						TNL::Backend::launchKernelAsync(cudaLBMKernel<NSE, ADE>, launch_config, block_nse.data, block_ade.data, nse.total_blocks, offset, offset + size);
 					}
 			}
 
@@ -228,18 +230,22 @@ struct State_NSE_ADE : State<NSE>
 				auto& block_nse = nse.blocks[b];
 				auto& block_ade = ade.blocks[b];
 				const auto direction = TNL::Containers::SyncDirection::None;
-				const dim3 blockSize = block_nse.computeData.at(direction).blockSize;
-				const dim3 gridSize = block_nse.computeData.at(direction).gridSize;
-				const cudaStream_t stream = block_nse.computeData.at(direction).stream;
+				TNL::Backend::LaunchConfiguration launch_config;
+				launch_config.blockSize = block_nse.computeData.at(direction).blockSize;
+				launch_config.gridSize = block_nse.computeData.at(direction).gridSize;
+				launch_config.stream = block_nse.computeData.at(direction).stream;
 				const idx3d offset = block_nse.computeData.at(direction).offset;
 				const idx3d size = block_nse.computeData.at(direction).size;
-				cudaLBMKernel< NSE, ADE ><<<gridSize, blockSize, 0, stream>>>(block_nse.data, block_ade.data, nse.total_blocks, offset, offset + size);
+				TNL::Backend::launchKernelAsync(cudaLBMKernel<NSE, ADE>, launch_config, block_nse.data, block_ade.data, nse.total_blocks, offset, offset + size);
 			}
 
 			// wait for the computations on boundaries to finish
 			for (auto& block : nse.blocks)
 				for (auto direction : boundary_directions)
-					cudaStreamSynchronize(block.computeData.at(direction).stream);
+					if (auto search = block.neighborIDs.find(direction); search != block.neighborIDs.end() && search->second >= 0) {
+						const auto& stream = block.computeData.at(direction).stream;
+						TNL::Backend::streamSynchronize(stream);
+					}
 
 			// exchange the latest DFs and dmacro on overlaps between blocks
 			// (it is important to wait for the communication before waiting for the computation, otherwise MPI won't progress)
@@ -250,13 +256,9 @@ struct State_NSE_ADE : State<NSE>
 			// wait for the computation on the interior to finish
 			for (auto& block : nse.blocks)
 			{
-				const cudaStream_t stream = block.computeData.at(TNL::Containers::SyncDirection::None).stream;
-				cudaStreamSynchronize(stream);
+				const auto& stream = block.computeData.at(TNL::Containers::SyncDirection::None).stream;
+				TNL::Backend::streamSynchronize(stream);
 			}
-
-			// synchronize the whole GPU and check errors
-			cudaDeviceSynchronize();
-			checkCudaDevice;
 		}
 		#endif
 #else
