@@ -78,37 +78,37 @@ struct D3Q27_STREAMING
 		if (SD.even_iter) {
 			// read from the same lattice site, same DF direction
 			for (int i=0; i<27; i++)
-				KS.f[i] = SD.df(df_cur,i,x,y,z);
+				KS.f[i] = TNL::Backend::ldg(SD.df(df_cur,i,x,y,z));
 		}
 		else {
 			// read from the neighboring lattice sites, but the opposite DF direction
-			KS.f[mmm] = SD.df(df_cur,ppp,xp,yp,zp);
-			KS.f[mmz] = SD.df(df_cur,ppz,xp,yp, z);
-			KS.f[mmp] = SD.df(df_cur,ppm,xp,yp,zm);
-			KS.f[mzm] = SD.df(df_cur,pzp,xp, y,zp);
-			KS.f[mzz] = SD.df(df_cur,pzz,xp, y, z);
-			KS.f[mzp] = SD.df(df_cur,pzm,xp, y,zm);
-			KS.f[mpm] = SD.df(df_cur,pmp,xp,ym,zp);
-			KS.f[mpz] = SD.df(df_cur,pmz,xp,ym, z);
-			KS.f[mpp] = SD.df(df_cur,pmm,xp,ym,zm);
-			KS.f[zmm] = SD.df(df_cur,zpp, x,yp,zp);
-			KS.f[zmz] = SD.df(df_cur,zpz, x,yp, z);
-			KS.f[zmp] = SD.df(df_cur,zpm, x,yp,zm);
-			KS.f[zzm] = SD.df(df_cur,zzp, x, y,zp);
-			KS.f[zzz] = SD.df(df_cur,zzz, x, y, z);
-			KS.f[zzp] = SD.df(df_cur,zzm, x, y,zm);
-			KS.f[zpm] = SD.df(df_cur,zmp, x,ym,zp);
-			KS.f[zpz] = SD.df(df_cur,zmz, x,ym, z);
-			KS.f[zpp] = SD.df(df_cur,zmm, x,ym,zm);
-			KS.f[pmm] = SD.df(df_cur,mpp,xm,yp,zp);
-			KS.f[pmz] = SD.df(df_cur,mpz,xm,yp, z);
-			KS.f[pmp] = SD.df(df_cur,mpm,xm,yp,zm);
-			KS.f[pzm] = SD.df(df_cur,mzp,xm, y,zp);
-			KS.f[pzz] = SD.df(df_cur,mzz,xm, y, z);
-			KS.f[pzp] = SD.df(df_cur,mzm,xm, y,zm);
-			KS.f[ppm] = SD.df(df_cur,mmp,xm,ym,zp);
-			KS.f[ppz] = SD.df(df_cur,mmz,xm,ym, z);
-			KS.f[ppp] = SD.df(df_cur,mmm,xm,ym,zm);
+			KS.f[mmm] = TNL::Backend::ldg(SD.df(df_cur,ppp,xp,yp,zp));
+			KS.f[mmz] = TNL::Backend::ldg(SD.df(df_cur,ppz,xp,yp, z));
+			KS.f[mmp] = TNL::Backend::ldg(SD.df(df_cur,ppm,xp,yp,zm));
+			KS.f[mzm] = TNL::Backend::ldg(SD.df(df_cur,pzp,xp, y,zp));
+			KS.f[mzz] = TNL::Backend::ldg(SD.df(df_cur,pzz,xp, y, z));
+			KS.f[mzp] = TNL::Backend::ldg(SD.df(df_cur,pzm,xp, y,zm));
+			KS.f[mpm] = TNL::Backend::ldg(SD.df(df_cur,pmp,xp,ym,zp));
+			KS.f[mpz] = TNL::Backend::ldg(SD.df(df_cur,pmz,xp,ym, z));
+			KS.f[mpp] = TNL::Backend::ldg(SD.df(df_cur,pmm,xp,ym,zm));
+			KS.f[zmm] = TNL::Backend::ldg(SD.df(df_cur,zpp, x,yp,zp));
+			KS.f[zmz] = TNL::Backend::ldg(SD.df(df_cur,zpz, x,yp, z));
+			KS.f[zmp] = TNL::Backend::ldg(SD.df(df_cur,zpm, x,yp,zm));
+			KS.f[zzm] = TNL::Backend::ldg(SD.df(df_cur,zzp, x, y,zp));
+			KS.f[zzz] = TNL::Backend::ldg(SD.df(df_cur,zzz, x, y, z));
+			KS.f[zzp] = TNL::Backend::ldg(SD.df(df_cur,zzm, x, y,zm));
+			KS.f[zpm] = TNL::Backend::ldg(SD.df(df_cur,zmp, x,ym,zp));
+			KS.f[zpz] = TNL::Backend::ldg(SD.df(df_cur,zmz, x,ym, z));
+			KS.f[zpp] = TNL::Backend::ldg(SD.df(df_cur,zmm, x,ym,zm));
+			KS.f[pmm] = TNL::Backend::ldg(SD.df(df_cur,mpp,xm,yp,zp));
+			KS.f[pmz] = TNL::Backend::ldg(SD.df(df_cur,mpz,xm,yp, z));
+			KS.f[pmp] = TNL::Backend::ldg(SD.df(df_cur,mpm,xm,yp,zm));
+			KS.f[pzm] = TNL::Backend::ldg(SD.df(df_cur,mzp,xm, y,zp));
+			KS.f[pzz] = TNL::Backend::ldg(SD.df(df_cur,mzz,xm, y, z));
+			KS.f[pzp] = TNL::Backend::ldg(SD.df(df_cur,mzm,xm, y,zm));
+			KS.f[ppm] = TNL::Backend::ldg(SD.df(df_cur,mmp,xm,ym,zp));
+			KS.f[ppz] = TNL::Backend::ldg(SD.df(df_cur,mmz,xm,ym, z));
+			KS.f[ppp] = TNL::Backend::ldg(SD.df(df_cur,mmm,xm,ym,zm));
 		}
 	}
 
