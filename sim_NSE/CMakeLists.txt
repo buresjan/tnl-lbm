@@ -5,6 +5,7 @@ set(TARGETS
         sim_4
 )
 
+find_package(PNG REQUIRED)
 find_package(OpenMP COMPONENTS CXX)
 find_package(MPI COMPONENTS CXX)
 
@@ -16,7 +17,7 @@ foreach(target IN ITEMS ${TARGETS})
     target_compile_definitions(${target} PUBLIC "-DUSE_CUDA")
 
     # add dependencies to the target
-    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA fmt::fmt)
+    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA PNG::PNG fmt::fmt)
 
     # enable OpenMP for the target
     if(OPENMP_FOUND)
