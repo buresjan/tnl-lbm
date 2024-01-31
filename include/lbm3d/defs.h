@@ -33,10 +33,8 @@ using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 
 #ifdef __CUDACC__
 	#define CUDA_HOSTDEV __host__ __device__
-	#define CUDA_HOSTDEV_NOINLINE CUDA_HOSTDEV __noinline__
 #else
 	#define CUDA_HOSTDEV
-	#define CUDA_HOSTDEV_NOINLINE
 #endif
 
 #ifdef USE_CUDA

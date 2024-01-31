@@ -7,7 +7,7 @@ struct D3Q27_EQ_WELL
 {
 	using dreal = typename TRAITS::dreal;
 
-	CUDA_HOSTDEV_NOINLINE static dreal feq(int qx, int qy, int qz, dreal vx, dreal vy, dreal vz)
+	CUDA_HOSTDEV static dreal feq(int qx, int qy, int qz, dreal vx, dreal vy, dreal vz)
 	{
 		return (dreal)1.0 - (dreal)1.5 * (vx*vx + vy*vy + vz*vz) + (dreal)3.0*(qx*vx + qy*vy + qz*vz) + (dreal)4.5*(qx*vx + qy*vy + qz*vz)*(qx*vx + qy*vy + qz*vz);
 	}

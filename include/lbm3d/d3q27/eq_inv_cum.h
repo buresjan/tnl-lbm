@@ -10,7 +10,7 @@ struct D3Q27_EQ_INV_CUM
 {
 	using dreal = typename TRAITS::dreal;
 
-	CUDA_HOSTDEV_NOINLINE static dreal feq(int qx, int qy, int qz, dreal vx, dreal vy, dreal vz)
+	CUDA_HOSTDEV static dreal feq(int qx, int qy, int qz, dreal vx, dreal vy, dreal vz)
 	{
 		return no1 - n3o2 * (vx*vx + vy*vy + vz*vz) + no3*(qx*vx + qy*vy + qz*vz) + n9o2*(qx*vx + qy*vy + qz*vz)*(qx*vx + qy*vy + qz*vz);
 	}

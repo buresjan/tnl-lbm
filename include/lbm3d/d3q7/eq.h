@@ -12,7 +12,7 @@ struct D3Q7_EQ
 	static constexpr dreal w_0 = n1o4;  // central
 	static constexpr dreal w_1 = n1o8;  // non-central
 
-	CUDA_HOSTDEV_NOINLINE static dreal feq(int qx, int qy, int qz, dreal vx, dreal vy, dreal vz)
+	CUDA_HOSTDEV static dreal feq(int qx, int qy, int qz, dreal vx, dreal vy, dreal vz)
 	{
 		// general second order Maxwell-Boltzmann Equilibrium
 		return no1 - n1o2*iCs2 * (vx*vx + vy*vy + vz*vz) + iCs2 * (qx*vx + qy*vy + qz*vz) + n1o2*iCs2*iCs2 * (qx*vx + qy*vy + qz*vz)*(qx*vx + qy*vy + qz*vz);
