@@ -1,6 +1,7 @@
 #pragma once
 
 #include <png.h>
+#include <TNL/Timer.h>
 
 #include "state.h"
 
@@ -438,6 +439,7 @@ void State<NSE>::write1Dcut_Z(idx x, idx y, const std::string& fname)
 template< typename NSE >
 void State<NSE>::writeVTKs_3D()
 {
+	TNL::Timer timer;
 	for (const auto& block : nse.blocks)
 	{
 		const std::string fname = fmt::format("results_{}/vtk3D/block{:03d}_{:d}.vtk", id, block.id, cnt[VTK3D].count);
@@ -446,7 +448,11 @@ void State<NSE>::writeVTKs_3D()
 		{
 			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 		};
+		timer.start();
 		block.writeVTK_3D(nse.lat, outputData, fname, nse.physTime(), cnt[VTK3D].count);
+		timer.stop();
+		std::cout << "write3D saved in: " << timer.getRealTime() << std::endl;
+		timer.reset();
 		spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), cnt[VTK3D].count);
 	}
 }

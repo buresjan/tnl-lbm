@@ -13,6 +13,7 @@ struct LBM_BLOCK
 	using dreal = typename TRAITS::dreal;
 	using real = typename TRAITS::real;
 	using map_t = typename TRAITS::map_t;
+	using point_t = typename TRAITS::point_t;
 	using idx3d = typename TRAITS::idx3d;
 	using lat_t = Lattice<3, real, idx>;
 
