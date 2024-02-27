@@ -1,30 +1,24 @@
 #pragma once
 
 #include "lbm.h"
+#include "lattice_decomposition.h"
 
 template< typename CONFIG >
-LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
+LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice)
 : communicator(communicator), lat(ilat)
 {
 	// initialize MPI info
 	rank = communicator.rank();
 	nproc = communicator.size();
 
-	// uniform decomposition by default
-	auto local_range = TNL::Containers::splitRange<idx>(lat.global.x(), communicator);
-	idx3d local, offset;
-	local.x() = local_range.getEnd() - local_range.getBegin();
-	local.y() = lat.global.y();
-	local.z() = lat.global.z();
-	offset.x() = local_range.getBegin();
-	offset.y() = offset.z() = 0;
-	int neighbour_left = (rank - 1 + nproc) % nproc;
-	int neighbour_right = (rank + 1 + nproc) % nproc;
-	blocks.emplace_back(communicator, lat.global, local, offset, neighbour_left, neighbour_right, neighbour_left, rank, neighbour_right);
+	// default lattice decomposition
+	//BLOCK block = decomposeLattice_D1Q3<CONFIG>(communicator, lat.global, periodic_lattice);
+	BLOCK block = decomposeLattice_D3Q27<CONFIG>(communicator, lat.global, periodic_lattice);
+	blocks.push_back(std::move(block));
 	total_blocks = nproc;
 
 	physDt = iphysDt;
-	physCharLength = lat.physDl * (real)lat.global.y();
+	physCharLength = lat.physDl * lat.global.y();
 	physViscosity = iphysViscosity;
 }
 

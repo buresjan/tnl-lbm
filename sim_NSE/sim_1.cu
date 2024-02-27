@@ -211,16 +211,6 @@ int sim01_test(int RESOLUTION = 2)
 	StateLocal< NSE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
 	state.setid("sim_1_res{:02d}_np{:03d}", RESOLUTION, state.nse.nproc);
 
-	#ifdef HAVE_MPI
-	// disable MPI communication over the periodic boundary
-	for (auto& block : state.nse.blocks) {
-		if (block.id == 0)
-			block.left_id = -1;
-		if (block.id == block.nproc - 1)
-			block.right_id = -1;
-	}
-	#endif
-
 //	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;
 	state.cnt[PRINT].period = 0.001;

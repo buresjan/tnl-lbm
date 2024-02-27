@@ -358,16 +358,6 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.setid("sim_4_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
 	if (state.isMark()) return 0;
 
-	#ifdef HAVE_MPI
-	// disable MPI communication over the periodic boundary
-	for (auto& block : state.nse.blocks) {
-		if (block.id == 0)
-			block.left_id = -1;
-		if (block.id == block.nproc - 1)
-			block.right_id = -1;
-	}
-	#endif
-
 	state.lbm_input_velocity = i_LBM_VELOCITY;
 	state.nse.physCharLength = BALL_DIAMETER; // [m]
 	state.ball_diameter = BALL_DIAMETER; // [m]

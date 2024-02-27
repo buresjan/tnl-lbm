@@ -49,7 +49,11 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	real **an_cache=0;
+#ifdef HAVE_MPI
+	TNL::Containers::DistributedNDArray< typename TRAITS::template array3d<real, TNL::Devices::Host> > an_cache;
+#else
+	typename TRAITS::template array3d<real, TNL::Devices::Host> an_cache;
+#endif
 	int an_n=50;
 
 	int errors_count;
@@ -84,18 +88,27 @@ struct StateLocal : State<NSE>
 
 	real analytical_ux(idx lbm_y, idx lbm_z)
 	{
-		if (!an_cache) cache_analytical();
-		return an_cache[lbm_z][lbm_y];
+		if (an_cache.getData() == nullptr) {
+			cache_analytical();
+		}
+
+		return an_cache(0, lbm_y, lbm_z);
 	}
 
 	void cache_analytical()
 	{
-		an_cache = new real*[nse.blocks.front().local.z()];
-		for (int i=0;i<nse.blocks.front().local.z();i++) an_cache[i] = new real[nse.blocks.front().local.y()];
+		const auto& block = nse.blocks.front();
+		an_cache.setSizes(1, block.global.y(), block.global.z());
+		#ifdef HAVE_MPI
+		an_cache.template setDistribution< 1 >(block.offset.y(), block.offset.y() + block.local.y(), block.communicator);
+		an_cache.template setDistribution< 2 >(block.offset.z(), block.offset.z() + block.local.z(), block.communicator);
+		an_cache.allocate();
+		#endif
+
 		#pragma omp parallel for schedule(static) collapse(2)
-		for (int z=0;z<nse.blocks.front().local.z();z++)
-		for (int y=0;y<nse.blocks.front().local.y();y++)
-			an_cache[z][y] = raw_analytical_ux(an_n, nse.blocks.front().offset.y() + y, nse.blocks.front().offset.z() + z);
+		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++)
+		for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++)
+			an_cache(0, y, z) = raw_analytical_ux(an_n, y, z);
 	}
 
 	virtual void setupBoundaries()
@@ -238,8 +251,8 @@ struct StateLocal : State<NSE>
 	}
 
 
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, int RES)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice, int RES)
+		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt, periodic_lattice)
 	{
 		errors_count = 10;
 		l1errors = new real[errors_count];
@@ -248,12 +261,6 @@ struct StateLocal : State<NSE>
 
 	~StateLocal()
 	{
-		if (an_cache)
-		{
-			for (int i=0;i<nse.blocks.front().local.z();i++) delete [] an_cache[i];
-			delete [] an_cache;
-		}
-
 		delete[] l1errors;
 	}
 };
@@ -296,7 +303,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, RES);
+	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, use_forcing, RES);
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
 	state.setid("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
@@ -358,25 +365,15 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 			std::unique_ptr< dreal[] > analytical{ new dreal[ state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z() ] };
 			for (int j = 0; j < state.nse.blocks.front().local.y(); j++)
 			for (int k = 0; k < state.nse.blocks.front().local.z(); k++)
-				analytical[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
+				analytical[k*state.nse.blocks.front().local.y()+j] = state.analytical_ux(state.nse.blocks.front().offset.y() + j, state.nse.blocks.front().offset.z() + k);
 			// copy the analytical profile to the GPU
 			cudaMemcpy(state.nse.blocks.front().data.vx_profile, analytical.get(), state.nse.blocks.front().local.y()*state.nse.blocks.front().local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
 		#else
 			for (int j = 0; j < state.nse.blocks.front().local.y(); j++)
 			for (int k = 0; k < state.nse.blocks.front().local.z(); k++)
-				state.nse.blocks.front().data.vx_profile[k*state.nse.blocks.front().local.y()+j] = state.an_cache[k][j];
+				state.nse.blocks.front().data.vx_profile[k*state.nse.blocks.front().local.y()+j] = state.analytical_ux(state.nse.blocks.front().offset.y() + j, state.nse.blocks.front().offset.z() + k);
 		#endif
 		state.nse.blocks.front().data.size_y = state.nse.blocks.front().local.y();
-
-		#ifdef HAVE_MPI
-		// disable MPI communication over the periodic boundary
-		for (auto& block : state.nse.blocks) {
-			if (block.id == 0)
-				block.left_id = -1;
-			if (block.id == block.nproc - 1)
-				block.right_id = -1;
-		}
-		#endif
 	}
 
 	state.cnt[PRINT].period = 10.0;

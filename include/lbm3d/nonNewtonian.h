@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defs.h"
+#include "kernels.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
@@ -217,9 +218,9 @@ template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMKernelVelocity(
 	typename NSE::DATA SD,
-	short int rank,
 	short int nproc,
-	typename NSE::TRAITS::idx offset_x
+	typename NSE::TRAITS::idx3d offset,
+	typename NSE::TRAITS::idx3d end
 )
 #else
 CUDA_HOSTDEV
@@ -228,7 +229,6 @@ void LBMKernelVelocity(
 	typename NSE::TRAITS::idx x,
 	typename NSE::TRAITS::idx y,
 	typename NSE::TRAITS::idx z,
-	short int rank,
 	short int nproc
 )
 #endif
@@ -238,10 +238,14 @@ void LBMKernelVelocity(
 	using map_t = typename NSE::TRAITS::map_t;
 
 	#ifdef USE_CUDA
-	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
-	idx y = threadIdx.y + blockIdx.y * blockDim.y;
-	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset.x();
+	idx y = threadIdx.y + blockIdx.y * blockDim.y + offset.y();
+	idx z = threadIdx.z + blockIdx.z * blockDim.z + offset.z();
+
+	if (x >= end.x() || y >= end.y() || z >= end.z())
+		return;
 	#endif
+
 	map_t gi_map = SD.map(x, y, z);
 
 	typename NSE::template KernelStruct<dreal> KS;
@@ -250,28 +254,7 @@ void LBMKernelVelocity(
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
-	if (NSE::BC::isPeriodic(gi_map))
-	{
-		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
-		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
-		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
-		yp = (y == SD.Y()-1) ? 0 : (y+1);
-		ym = (y == 0) ? (SD.Y()-1) : (y-1);
-		zp = (z == SD.Z()-1) ? 0 : (z+1);
-		zm = (z == 0) ? (SD.Z()-1) : (z-1);
-	} else {
-		// handle overlaps between GPUs
-//		xp = (SD.overlap_right) ? x+1 : MIN(x+1, SD.X-1);
-//		xm = (SD.overlap_left) ? x-1 : MAX(x-1,0);
-		xp = (rank != nproc-1) ? x+1 : MIN(x+1, SD.X()-1);
-		xm = (rank != 0) ? x-1 : MAX(x-1,0);
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
-	}
+	kernelInitIndices<NSE>(SD,gi_map,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
 
 	NSE::MACRO::getForce(SD, KS, x, y, z);
 
@@ -307,9 +290,9 @@ template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMKernelStress(
 	typename NSE::DATA SD,
-	short int rank,
 	short int nproc,
-	typename NSE::TRAITS::idx offset_x
+	typename NSE::TRAITS::idx3d offset,
+	typename NSE::TRAITS::idx3d end
 )
 #else
 CUDA_HOSTDEV
@@ -318,7 +301,6 @@ void LBMKernelStress(
 	typename NSE::TRAITS::idx x,
 	typename NSE::TRAITS::idx y,
 	typename NSE::TRAITS::idx z,
-	short int rank,
 	short int nproc
 )
 #endif
@@ -328,10 +310,14 @@ void LBMKernelStress(
 	using map_t = typename NSE::TRAITS::map_t;
 
 	#ifdef USE_CUDA
-	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset_x;
-	idx y = threadIdx.y + blockIdx.y * blockDim.y;
-	idx z = threadIdx.z + blockIdx.z * blockDim.z;
+	idx x = threadIdx.x + blockIdx.x * blockDim.x + offset.x();
+	idx y = threadIdx.y + blockIdx.y * blockDim.y + offset.y();
+	idx z = threadIdx.z + blockIdx.z * blockDim.z + offset.z();
+
+	if (x >= end.x() || y >= end.y() || z >= end.z())
+		return;
 	#endif
+
 	map_t gi_map = SD.map(x, y, z);
 
 	typename NSE::template KernelStruct<dreal> KS;
@@ -342,28 +328,7 @@ void LBMKernelStress(
 	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
 
 	idx xp,xm,yp,ym,zp,zm;
-	if (NSE::BC::isPeriodic(gi_map))
-	{
-		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
-		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
-		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
-		yp = (y == SD.Y()-1) ? 0 : (y+1);
-		ym = (y == 0) ? (SD.Y()-1) : (y-1);
-		zp = (z == SD.Z()-1) ? 0 : (z+1);
-		zm = (z == 0) ? (SD.Z()-1) : (z-1);
-	} else {
-		// handle overlaps between GPUs
-//		xp = (SD.overlap_right) ? x+1 : MIN(x+1, SD.X-1);
-//		xm = (SD.overlap_left) ? x-1 : MAX(x-1,0);
-		xp = (rank != nproc-1) ? x+1 : MIN(x+1, SD.X()-1);
-		xm = (rank != 0) ? x-1 : MAX(x-1,0);
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
-	}
+	kernelInitIndices<NSE>(SD,gi_map,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
 
 	NSE::MACRO::getMacro(SD, KSxp, xp, y, z);
 	NSE::MACRO::getMacro(SD, KSxm, xm, y, z);
@@ -477,48 +442,57 @@ void computeNonNewtonianKernels(STATE& state)
 	using TRAITS = typename NSE::TRAITS;
 
 	using idx = typename TRAITS::idx;
+	using idx3d = typename TRAITS::idx3d;
 	using dreal = typename TRAITS::dreal;
 
 	auto& nse = state.nse;
 
-	for (auto& block : nse.blocks)
-	{
-		const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
-		const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
-		const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+	const auto boundary_directions = {
+		TNL::Containers::SyncDirection::Bottom,
+		TNL::Containers::SyncDirection::Top,
+		TNL::Containers::SyncDirection::Back,
+		TNL::Containers::SyncDirection::Front,
+		TNL::Containers::SyncDirection::Left,
+		TNL::Containers::SyncDirection::Right,
+	};
 
-		// get CUDA streams
-		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+	// compute on boundaries
+	for (auto& block : nse.blocks) {
+		for (auto direction : boundary_directions)
+			if (auto search = block.neighborIDs.find(direction); search != block.neighborIDs.end() && search->second >= 0) {
+				const dim3 blockSize = block.computeData.at(direction).blockSize;
+				const dim3 gridSize = block.computeData.at(direction).gridSize;
+				const cudaStream_t stream = block.computeData.at(direction).stream;
+				const idx3d offset = block.computeData.at(direction).offset;
+				const idx3d size = block.computeData.at(direction).size;
+				cudaLBMKernelVelocity< NSE ><<<gridSize, blockSize, 0, stream>>>(block.data, nse.total_blocks, offset, offset + size);
+			}
+	}
 
-		// compute on boundaries (NOTE: 1D distribution is assumed)
-		cudaLBMKernelVelocity< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block.data, block.id, nse.total_blocks, (idx) 0);
-		cudaLBMKernelVelocity< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
-
-		// compute on internal lattice sites
-		cudaLBMKernelVelocity< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+	// compute on interior lattice sites
+	for (auto& block : nse.blocks) {
+		const auto direction = TNL::Containers::SyncDirection::None;
+		const dim3 blockSize = block.computeData.at(direction).blockSize;
+		const dim3 gridSize = block.computeData.at(direction).gridSize;
+		const cudaStream_t stream = block.computeData.at(direction).stream;
+		const idx3d offset = block.computeData.at(direction).offset;
+		const idx3d size = block.computeData.at(direction).size;
+		cudaLBMKernelVelocity< NSE ><<<gridSize, blockSize, 0, stream>>>(block.data, nse.total_blocks, offset, offset + size);
 	}
 
 	// wait for the computations on boundaries to finish
 	for (auto& block : nse.blocks)
-	{
-		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-		cudaStreamSynchronize(cuda_stream_left);
-		cudaStreamSynchronize(cuda_stream_right);
-	}
+		for (auto direction : boundary_directions)
+			cudaStreamSynchronize(block.computeData.at(direction).stream);
 
 	// exchange macroscopic quantities on overlaps between blocks
 	// TODO: avoid communication of DFs here
 	nse.synchronizeDFsAndMacroDevice(df_out);
 
 	// wait for the computation on the interior to finish
-	for (auto& block : nse.blocks)
-	{
-		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
-		cudaStreamSynchronize(cuda_stream_main);
+	for (auto& block : nse.blocks) {
+		const cudaStream_t stream = block.computeData.at(TNL::Containers::SyncDirection::None).stream;
+		cudaStreamSynchronize(stream);
 	}
 
 	// synchronize the whole GPU and check errors
@@ -544,44 +518,43 @@ void computeNonNewtonianKernels(STATE& state)
 #endif
 
 
-	for (auto& block : nse.blocks)
-	{
-		const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
-		const dim3 gridSizeForBoundary(block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
-		const dim3 gridSizeForInternal(block.local.x() - 2*block.df_overlap_X(), block.local.y()/block.block_size.y(), block.local.z()/block.block_size.z());
+	// compute on boundaries
+	for (auto& block : nse.blocks) {
+		for (auto direction : boundary_directions)
+			if (auto search = block.neighborIDs.find(direction); search != block.neighborIDs.end() && search->second >= 0) {
+				const dim3 blockSize = block.computeData.at(direction).blockSize;
+				const dim3 gridSize = block.computeData.at(direction).gridSize;
+				const cudaStream_t stream = block.computeData.at(direction).stream;
+				const idx3d offset = block.computeData.at(direction).offset;
+				const idx3d size = block.computeData.at(direction).size;
+				cudaLBMKernelStress< NSE ><<<gridSize, blockSize, 0, stream>>>(block.data, nse.total_blocks, offset, offset + size);
+			}
+	}
 
-		// get CUDA streams
-		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
-
-		// compute on boundaries (NOTE: 1D distribution is assumed)
-		cudaLBMKernelStress< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block.data, block.id, nse.total_blocks, (idx) 0);
-		cudaLBMKernelStress< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
-
-		// compute on internal lattice sites
-		cudaLBMKernelStress< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+	// compute on interior lattice sites
+	for (auto& block : nse.blocks) {
+		const auto direction = TNL::Containers::SyncDirection::None;
+		const dim3 blockSize = block.computeData.at(direction).blockSize;
+		const dim3 gridSize = block.computeData.at(direction).gridSize;
+		const cudaStream_t stream = block.computeData.at(direction).stream;
+		const idx3d offset = block.computeData.at(direction).offset;
+		const idx3d size = block.computeData.at(direction).size;
+		cudaLBMKernelStress< NSE ><<<gridSize, blockSize, 0, stream>>>(block.data, nse.total_blocks, offset, offset + size);
 	}
 
 	// wait for the computations on boundaries to finish
 	for (auto& block : nse.blocks)
-	{
-		const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-		const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-		cudaStreamSynchronize(cuda_stream_left);
-		cudaStreamSynchronize(cuda_stream_right);
-	}
+		for (auto direction : boundary_directions)
+			cudaStreamSynchronize(block.computeData.at(direction).stream);
 
 	// exchange macroscopic quantities on overlaps between blocks
 	// TODO: avoid communication of DFs here
 	nse.synchronizeDFsAndMacroDevice(df_out);
 
 	// wait for the computation on the interior to finish
-	for (auto& block : nse.blocks)
-	{
-		const cudaStream_t cuda_stream_main = block.streams.at(block.id);
-		cudaStreamSynchronize(cuda_stream_main);
+	for (auto& block : nse.blocks) {
+		const cudaStream_t stream = block.computeData.at(TNL::Containers::SyncDirection::None).stream;
+		cudaStreamSynchronize(stream);
 	}
 
 	// synchronize the whole GPU and check errors

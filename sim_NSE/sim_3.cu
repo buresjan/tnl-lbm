@@ -404,16 +404,6 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.setid("sim_3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
 	if (state.isMark()) return 0;
 
-	#ifdef HAVE_MPI
-	// disable MPI communication over the periodic boundary
-	for (auto& block : state.nse.blocks) {
-		if (block.id == 0)
-			block.left_id = -1;
-		if (block.id == block.nproc - 1)
-			block.right_id = -1;
-	}
-	#endif
-
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
 	state.nse.physCharLength = cylinder_diameter; // [m]

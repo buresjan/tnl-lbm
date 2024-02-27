@@ -1,7 +1,11 @@
 #pragma once
 
 #if !defined(AB_PATTERN) && !defined(AA_PATTERN)
-	#define AA_PATTERN
+	// TODO: update multidimensional MPI synchronization for AA pattern
+	// (for the even time step which is similar to a "push scheme", we need to
+	// avoid race conditions on the corners - set smaller buffer size and adjust the offsets)
+	//#define AA_PATTERN
+	#define AB_PATTERN
 #endif
 
 #include <cstdio>
@@ -29,10 +33,8 @@ using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 
 #ifdef __CUDACC__
 	#define CUDA_HOSTDEV __host__ __device__
-	#define CUDA_HOSTDEV_NOINLINE CUDA_HOSTDEV __noinline__
 #else
 	#define CUDA_HOSTDEV
-	#define CUDA_HOSTDEV_NOINLINE
 #endif
 
 #ifdef USE_CUDA
@@ -61,8 +63,7 @@ template <
 	typename _dreal = float,	// real number representation on GPU
 	typename _real = double,	// real number representation on CPU
 	typename _idx = long int,	// array index on CPU and GPU (can be very large)
-	typename _map_t = short int,
-	unsigned _overlap_width = 1
+	typename _map_t = short int
 >
 struct Traits
 {
@@ -78,11 +79,13 @@ struct Traits
 	using d4_permutation = std::index_sequence< 0, 1, 3, 2 >;		// id, x, z, y
 
 #ifdef HAVE_MPI
-	using xyz_overlaps = std::index_sequence< _overlap_width, 0, 0 >;	// x, y, z
-	using d4_overlaps = std::index_sequence< 0, _overlap_width, 0, 0 >;	// id, x, y, z
+	// all overlaps are set at run-time
+	using xyz_overlaps = TNL::Containers::SizesHolder< idx, 0, 0, 0 >;	// x, y, z
+	using d4_overlaps = TNL::Containers::SizesHolder< idx, 0, 0, 0, 0 >;	// id, x, y, z
 #else
-	using xyz_overlaps = std::index_sequence< 0, 0, 0 >;	// x, y, z
-	using d4_overlaps = std::index_sequence< 0, 0, 0, 0 >;	// id, x, y, z
+	// all overlaps are zero
+	using xyz_overlaps = TNL::Containers::ConstStaticSizesHolder< idx, 3, 0 >;
+	using d4_overlaps = TNL::Containers::ConstStaticSizesHolder< idx, 4, 0 >;
 #endif
 
 	template< typename Value, typename Device >
@@ -274,32 +277,32 @@ static TNL::Containers::SyncDirection df_sync_directions[27] = {
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::Right,
 	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
+	TNL::Containers::SyncDirection::Top,
+	TNL::Containers::SyncDirection::Bottom,
+	TNL::Containers::SyncDirection::Front,
+	TNL::Containers::SyncDirection::Back,
 	// +Q19
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
-	TNL::Containers::SyncDirection::None,
+	TNL::Containers::SyncDirection::TopRight,
+	TNL::Containers::SyncDirection::BottomLeft,
+	TNL::Containers::SyncDirection::BottomRight,
+	TNL::Containers::SyncDirection::TopLeft,
+	TNL::Containers::SyncDirection::FrontRight,
+	TNL::Containers::SyncDirection::BackLeft,
+	TNL::Containers::SyncDirection::BackRight,
+	TNL::Containers::SyncDirection::FrontLeft,
+	TNL::Containers::SyncDirection::FrontTop,
+	TNL::Containers::SyncDirection::BackBottom,
+	TNL::Containers::SyncDirection::BackTop,
+	TNL::Containers::SyncDirection::FrontBottom,
 	// +Q27
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
-	TNL::Containers::SyncDirection::Right,
-	TNL::Containers::SyncDirection::Left,
+	TNL::Containers::SyncDirection::FrontTopRight,
+	TNL::Containers::SyncDirection::BackBottomLeft,
+	TNL::Containers::SyncDirection::BackTopRight,
+	TNL::Containers::SyncDirection::FrontBottomLeft,
+	TNL::Containers::SyncDirection::FrontBottomRight,
+	TNL::Containers::SyncDirection::BackTopLeft,
+	TNL::Containers::SyncDirection::BackBottomRight,
+	TNL::Containers::SyncDirection::FrontTopLeft,
 };
 
 

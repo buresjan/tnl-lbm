@@ -1372,9 +1372,12 @@ void State<NSE>::SimInit()
 	copyAllToDevice();
 
 #ifdef HAVE_MPI
-	// synchronize overlaps with MPI (initial synchronization can be synchronous)
-	nse.synchronizeMapDevice();
-	nse.synchronizeDFsAndMacroDevice(df_cur);
+	if (nse.nproc > 1)
+	{
+		// synchronize overlaps with MPI (initial synchronization can be synchronous)
+		nse.synchronizeMapDevice();
+		nse.synchronizeDFsAndMacroDevice(df_cur);
+	}
 #endif
 
 	timer_SimInit.stop();
@@ -1431,50 +1434,32 @@ void State<NSE>::SimUpdate()
 		}
 	}
 
-	#ifdef USE_CUDA
-	auto get_grid_size = [] (const auto& block, idx x = 0, idx y = 0, idx z = 0) -> dim3
-	{
-		dim3 gridSize;
-		if (x > 0)
-			gridSize.x = x;
-		else
-			gridSize.x = TNL::roundUpDivision(block.local.x(), block.block_size.x());
-		if (y > 0)
-			gridSize.y = y;
-		else
-			gridSize.y = TNL::roundUpDivision(block.local.y(), block.block_size.y());
-		if (z > 0)
-			gridSize.z = z;
-		else
-			gridSize.z = TNL::roundUpDivision(block.local.z(), block.block_size.z());
-
-		return gridSize;
-	};
-	#endif
-
 	if (doComputeVelocitiesStar)
 	{
 		for (auto& block : nse.blocks)
 		{
 		#ifdef USE_CUDA
-			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
-			const dim3 gridSize = get_grid_size(block);
+			TNL::Backend::LaunchConfiguration launch_config;
+			launch_config.blockSize = block.getCudaBlockSize(block.local);
+			launch_config.gridSize = block.getCudaGridSize(block.local, launch_config.blockSize);
 			if (doZeroForceOnDevice)
-				cudaLBMComputeVelocitiesStarAndZeroForce< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc);
+				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
 			else
-				cudaLBMComputeVelocitiesStar< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc);
-			checkCudaDevice;
+				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStar<NSE>, launch_config, block.data, nse.total_blocks);
 		#else
 			#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
 			for (idx z = 0; z < block.local.z(); z++)
 			for (idx y = 0; y < block.local.y(); y++)
 			if (doZeroForceOnDevice)
-				LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.rank, nse.nproc, x, y, z);
+				LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.total_blocks, x, y, z);
 			else
-				LBMComputeVelocitiesStar< NSE >(block.data, nse.rank, nse.nproc, x, y, z);
+				LBMComputeVelocitiesStar< NSE >(block.data, nse.total_blocks, x, y, z);
 		#endif
 		}
+		// synchronize the null-stream after all grids
+		TNL::Backend::streamSynchronize(0);
+
 		if (doCopyQuantitiesStarToHost)
 		{
 			nse.copyMacroToHost();
@@ -1518,12 +1503,14 @@ void State<NSE>::SimUpdate()
 		timer_compute.start();
 		for (auto& block : nse.blocks)
 		{
-			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
-			const dim3 gridSize = get_grid_size(block);
-			cudaLBMKernel< NSE ><<<gridSize, blockSize>>>(block.data, nse.rank, nse.nproc, (idx) 0);
+			const auto direction = TNL::Containers::SyncDirection::None;
+			TNL::Backend::LaunchConfiguration launch_config;
+			launch_config.blockSize = block.computeData.at(direction).blockSize;
+			launch_config.gridSize = block.computeData.at(direction).gridSize;
+			TNL::Backend::launchKernelAsync(cudaLBMKernel<NSE>, launch_config, block.data, nse.total_blocks, idx3d{0, 0, 0}, block.local);
 		}
-		cudaDeviceSynchronize();
-		checkCudaDevice;
+		// synchronize the null-stream after all grids
+		TNL::Backend::streamSynchronize(0);
 		// copying of overlaps is not necessary for nproc == 1 (nproc is checked in streaming as well)
 		timer_compute.stop();
 	#ifdef HAVE_MPI
@@ -1533,35 +1520,49 @@ void State<NSE>::SimUpdate()
 		timer_compute.start();
 		timer_compute_overlaps.start();
 
-		for (auto& block : nse.blocks)
-		{
-			const dim3 blockSize = {unsigned(block.block_size.x()), unsigned(block.block_size.y()), unsigned(block.block_size.z())};
-			const dim3 gridSizeForBoundary = get_grid_size(block, block.df_overlap_X());
-			const dim3 gridSizeForInternal = get_grid_size(block, block.local.x() - 2*block.df_overlap_X());
+		const auto boundary_directions = {
+			TNL::Containers::SyncDirection::Bottom,
+			TNL::Containers::SyncDirection::Top,
+			TNL::Containers::SyncDirection::Back,
+			TNL::Containers::SyncDirection::Front,
+			TNL::Containers::SyncDirection::Left,
+			TNL::Containers::SyncDirection::Right,
+		};
 
-			// get CUDA streams
-			const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-			const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-			const cudaStream_t cuda_stream_main = block.streams.at(block.id);
+		// compute on boundaries
+		for (auto& block : nse.blocks) {
+			for (auto direction : boundary_directions)
+				if (auto search = block.neighborIDs.find(direction); search != block.neighborIDs.end() && search->second >= 0) {
+					TNL::Backend::LaunchConfiguration launch_config;
+					launch_config.blockSize = block.computeData.at(direction).blockSize;
+					launch_config.gridSize = block.computeData.at(direction).gridSize;
+					launch_config.stream = block.computeData.at(direction).stream;
+					const idx3d offset = block.computeData.at(direction).offset;
+					const idx3d size = block.computeData.at(direction).size;
+					TNL::Backend::launchKernelAsync(cudaLBMKernel<NSE>, launch_config, block.data, nse.total_blocks, offset, offset + size);
+				}
+		}
 
-			// compute on boundaries (NOTE: 1D distribution is assumed)
-			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_left>>>(block.data, block.id, nse.total_blocks, (idx) 0);
-			cudaLBMKernel< NSE ><<<gridSizeForBoundary, blockSize, 0, cuda_stream_right>>>(block.data, block.id, nse.total_blocks, block.local.x() - block.df_overlap_X());
-
-			// compute on internal lattice sites
-			cudaLBMKernel< NSE ><<<gridSizeForInternal, blockSize, 0, cuda_stream_main>>>(block.data, block.id, nse.total_blocks, block.df_overlap_X());
+		// compute on interior lattice sites
+		for (auto& block : nse.blocks) {
+			const auto direction = TNL::Containers::SyncDirection::None;
+			TNL::Backend::LaunchConfiguration launch_config;
+			launch_config.blockSize = block.computeData.at(direction).blockSize;
+			launch_config.gridSize = block.computeData.at(direction).gridSize;
+			launch_config.stream = block.computeData.at(direction).stream;
+			const idx3d offset = block.computeData.at(direction).offset;
+			const idx3d size = block.computeData.at(direction).size;
+			TNL::Backend::launchKernelAsync(cudaLBMKernel<NSE>, launch_config, block.data, nse.total_blocks, offset, offset + size);
 		}
 
 		// wait for the computations on boundaries to finish
 		// TODO: pipeline the stream synchronization with the MPI synchronizer (wait using CUDA stream events in the DistributedNDArraySynchronizer)
 		for (auto& block : nse.blocks)
-		{
-			const cudaStream_t cuda_stream_left = block.streams.at(block.left_id);
-			const cudaStream_t cuda_stream_right = block.streams.at(block.right_id);
-
-			cudaStreamSynchronize(cuda_stream_left);
-			cudaStreamSynchronize(cuda_stream_right);
-		}
+			for (auto direction : boundary_directions)
+				if (auto search = block.neighborIDs.find(direction); search != block.neighborIDs.end() && search->second >= 0) {
+					const auto& stream = block.computeData.at(direction).stream;
+					TNL::Backend::streamSynchronize(stream);
+				}
 		timer_compute_overlaps.stop();
 
 		// exchange the latest DFs and dmacro on overlaps between blocks
@@ -1572,15 +1573,10 @@ void State<NSE>::SimUpdate()
 
 		// wait for the computation on the interior to finish
 		timer_wait_computation.start();
-		for (auto& block : nse.blocks)
-		{
-			const cudaStream_t cuda_stream_main = block.streams.at(block.id);
-			cudaStreamSynchronize(cuda_stream_main);
+		for (auto& block : nse.blocks) {
+			const auto& stream = block.computeData.at(TNL::Containers::SyncDirection::None).stream;
+			TNL::Backend::streamSynchronize(stream);
 		}
-
-		// synchronize the whole GPU and check errors
-		cudaDeviceSynchronize();
-		checkCudaDevice;
 		timer_wait_computation.stop();
 
 		timer_compute.stop();
@@ -1595,7 +1591,7 @@ void State<NSE>::SimUpdate()
 		for (idx z=0; z<block.local.z(); z++)
 		for (idx y=0; y<block.local.y(); y++)
 		{
-			LBMKernel< NSE >(block.data, x, y, z, nse.rank, nse.nproc);
+			LBMKernel< NSE >(block.data, x, y, z, nse.total_blocks);
 		}
 	}
 	timer_compute.stop();
