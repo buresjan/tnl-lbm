@@ -12,7 +12,7 @@ template< typename NSE >
 int State<NSE>::addLagrange3D()
 {
 	const std::string dir = fmt::format("results_{}", id);
-	FF.emplace_back(nse, std::move(dir));
+	FF.emplace_back(nse, std::move(dir),FF.size());
 	return FF.size()-1;
 }
 

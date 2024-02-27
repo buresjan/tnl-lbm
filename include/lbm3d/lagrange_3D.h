@@ -148,7 +148,7 @@ struct Lagrange3D
 	int lag_X=-1; // size
 	int lag_Y=-1; // size
 
-
+	int obj_id = 0;
 
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeCPU;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
@@ -206,7 +206,7 @@ struct Lagrange3D
 	void log(const char* fmt, ARGS... args);
 
 	// constructors
-	Lagrange3D(LBM &inputLBM, const std::string& resultsDir);
+	Lagrange3D(LBM &inputLBM, const std::string& resultsDir, int obj_id);
 	~Lagrange3D();
 
 	// disable copy-constructor and copy-assignment, leave only move-constructor and move-assignment

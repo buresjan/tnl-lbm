@@ -591,7 +591,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm, time_loop_Ha_Capacities, time_loop_Ha, time_total;
+	double time_loop_Hm, time_loop_Ha_Capacities, time_loop_Ha, time_total, cpu_time_total;
 
 	fmt::print("started timer for wushu construction\n");
 	timer.start();
@@ -839,9 +839,11 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	timer.stop();
 	fmt::print("-------wuShuTnl final timer time: {}\n",timer.getRealTime());
 	time_total = timer.getRealTime();
+	cpu_time_total = timer.getCPUTime();
 	//fmt::print("--timeTuple;{}, {}, {}, {}\n",time_total,time_loop_Hm,time_loop_Ha,time_loop_Ha_Capacities);
 	json j;
 	j["time_total"] = time_total;
+	j["cpu_time_total"] = cpu_time_total;
 	j["time_loop_Hm"] = time_loop_Hm;
 	j["time_loop_Ha"] = time_loop_Ha;
 	j["time_loop_Ha_capacities"] = time_loop_Ha_Capacities;
@@ -870,6 +872,7 @@ rowVectorProduct( const Matrix& matrix, typename Matrix::IndexType i, const Vect
 template< typename LBM >
 void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 {
+	TNL::Timer timer;
 	switch (ws_compute)
 	{
 		case ws_computeCPU_TNL:
@@ -882,7 +885,8 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			constructWuShuMatricesSparse();
 			break;
 	}
-
+	timer.reset();
+	timer.start();
 	int m=LL.size();
 	idx n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
 
@@ -1085,6 +1089,17 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			fmt::print(stderr, "lagrange_3D: Wu Shu compute flag {} unrecognized.\n", ws_compute);
 			break;
 	}
+	timer.stop();
+	double time_total = timer.getRealTime();
+	double cpu_time_total = timer.getCPUTime();
+
+	json j;
+	j["time_total"] = time_total;
+	j["cpu_time_total"] = cpu_time_total;
+	j["object_id"]=obj_id+1;
+
+	std::string jsonOutput = j.dump();
+	fmt::print("--outputCalculationJSON;{}\n",jsonOutput);
 }
 
 template< typename LBM >
@@ -1107,10 +1122,10 @@ void Lagrange3D<LBM>::log(const char* fmts, ARGS... args)
 }
 
 template< typename LBM >
-Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir) : lbm(inputLBM)
+Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir,int obj_id) : lbm(inputLBM)
 {
 	logfile = fmt::format("{}/ibm_solver.log", resultsDir);
-
+	this->obj_id = obj_id;
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
 	ws_tnl_hprecond = std::make_shared< hPreconditioner >();
