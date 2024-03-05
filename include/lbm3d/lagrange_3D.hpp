@@ -612,6 +612,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	loopTimer.start();
 	fmt::print("tnl wushu construct loop hM: start\n");
 	idx support=5; // search in this support
+	// TODO: STATIC VS DYNAMIC
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
@@ -693,20 +694,31 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	//	threads = 1;
 
 	// TODO: set hA_row_capacities to 0, define rowCapacity before the loop,
-	// TODO: use firstprivate(rowCapacity) in the pragma, use #pragma omp atomic at the end,
+
 	// TODO: use collapse(2) in the pragma
 	// TODO: maybe use if(threads > 1) in the pragma?
+	// TODO: use static schedule
 
 	//#pragma omp parallel for schedule(dynamic) num_threads(threads)
+	//int rowCapacity = 0;
+	#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	for (int index_row=0;index_row<m;index_row++)
 	{
 		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
 		for (int index_col=0;index_col<m;index_col++)
 		{
+			//If index col = 0 then zero the array on this index
+			/*if(index_col == 0)
+			{
+				hA_row_capacities[index_row]=0;
+			}
+			*/
 			if (methodVariant==DiracMethod::MODIFIED)
 			{
 				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row))
 				{
+					//#pragma omp atomic
+					//hA_row_capacities[index_row]++;
 					rowCapacity++;
 				}
 			} else
@@ -724,9 +736,14 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					}
 				}
 				if (val > 0)
+					//#pragma omp atomic
+					//hA_row_capacities[index_row]++;
 					rowCapacity++;
 			}
 		}
+		//TODO: Replace rowcapacity++ with this
+		//TODO: Set row capacity to 0
+		#pragma omp critical
 		hA_row_capacities[index_row] = rowCapacity;
 	}
 	fmt::print("tnl wushu construct loop rowCapacity hA: end\n");
@@ -734,12 +751,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
 	time_loop_Ha_Capacities = loopTimer.getRealTime();
 	ws_tnl_hA->setRowCapacities(hA_row_capacities);
+	std::cout << hA_row_capacities << std::endl;
 
 
 	fmt::print("tnl wushu construct loop hA: start\n");
 	loopTimer.reset();
 	loopTimer.start();
-	// TODO: rename variables el, ka
+	//TODO: Parallelisation doesn't work, single thread is 10x faster than 32 threads
 	#pragma omp parallel for schedule(dynamic) collapse(2) num_threads(threads)
 	for (int index_row=0;index_row<m;index_row++)
 	{
@@ -842,6 +860,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	cpu_time_total = timer.getCPUTime();
 	//fmt::print("--timeTuple;{}, {}, {}, {}\n",time_total,time_loop_Hm,time_loop_Ha,time_loop_Ha_Capacities);
 	json j;
+	j["threads"]= omp_get_max_threads();
 	j["time_total"] = time_total;
 	j["cpu_time_total"] = cpu_time_total;
 	j["time_loop_Hm"] = time_loop_Hm;
@@ -1094,6 +1113,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 	double cpu_time_total = timer.getCPUTime();
 
 	json j;
+	j["threads"]= omp_get_max_threads();
 	j["time_total"] = time_total;
 	j["cpu_time_total"] = cpu_time_total;
 	j["object_id"]=obj_id+1;
