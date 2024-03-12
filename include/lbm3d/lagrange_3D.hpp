@@ -432,7 +432,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 
 	fmt::print("wushu construct loop 2: start\n");
 	idx support=5; // search in this support
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
 		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
@@ -457,7 +457,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse()
 
 
 	fmt::print("wushu construct loop 3: start\n");
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
 		if (i%100==0)
@@ -602,7 +602,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 
 	// fill vectors delta_el
 	// sparse vector of deltas
-	//TODO: This could be rewritten with DDStruct
 	d_i = new std::vector<idx>[m];
 	d_x = new  std::vector<real>[m];
 	// fill only non zero elements-relevant
@@ -613,7 +612,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	fmt::print("tnl wushu construct loop hM: start\n");
 	idx support=5; // search in this support
 	// TODO: STATIC VS DYNAMIC
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
 		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
@@ -644,11 +643,16 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 //	for (int el=0;el<m;el++)
 //		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
 //	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
+
+//TODO: Add metric + measurement
+//TODO: Add parallelisation
 	typename hEllpack::RowCapacitiesType hM_row_lengths( m );
 	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
 	ws_tnl_hM.setRowCapacities(hM_row_lengths);
 
 //	fmt::print("Ai construct\n");
+//TODO: Add Metric + measurement
+//TODO: Add parallelisation
 	for (int i=0;i<m;i++)
 	{
 		auto row = ws_tnl_hM.getRow(i);
@@ -660,6 +664,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
 
 	// its transpose
+    //TODO: Add transposition time measurement
     ws_tnl_hMT.getTransposition(ws_tnl_hM);
 
 	// output to files
@@ -699,14 +704,19 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// TODO: maybe use if(threads > 1) in the pragma?
 	// TODO: use static schedule
 
+	//Initialise rowCapacities
+	hA_row_capacities.setValue(0);
 	//#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	//int rowCapacity = 0;
 	#pragma omp parallel for schedule(dynamic) num_threads(threads)
-	for (int index_row=0;index_row<m;index_row++)
+	//for (int index_row=0;index_row<m;index_row++)
+	for (int index_col=0;index_col<m;index_col++)
 	{
-		int rowCapacity = 0;  //Number of elements where DiracDelta > 0
-		for (int index_col=0;index_col<m;index_col++)
+		//int rowCapacity = 0;  //Number of elements where DiracDelta > 0
+		//for (int index_col=0;index_col<m;index_col++)
+		for (int index_row=0;index_row<m;index_row++)
 		{
+			//int rowCapacity = 0;
 			//If index col = 0 then zero the array on this index
 			/*if(index_col == 0)
 			{
@@ -717,9 +727,9 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			{
 				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row))
 				{
-					//#pragma omp atomic
-					//hA_row_capacities[index_row]++;
-					rowCapacity++;
+					#pragma omp atomic
+					hA_row_capacities[index_row]++;
+					//rowCapacity++;
 				}
 			} else
 			{
@@ -736,15 +746,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					}
 				}
 				if (val > 0)
-					//#pragma omp atomic
-					//hA_row_capacities[index_row]++;
-					rowCapacity++;
+					#pragma omp atomic
+					hA_row_capacities[index_row]++;
+					//rowCapacity++;
 			}
 		}
 		//TODO: Replace rowcapacity++ with this
 		//TODO: Set row capacity to 0
-		#pragma omp critical
-		hA_row_capacities[index_row] = rowCapacity;
+		//#pragma omp critical
+		//hA_row_capacities[index_row] = rowCapacity;
 	}
 	fmt::print("tnl wushu construct loop rowCapacity hA: end\n");
 	loopTimer.stop();
@@ -758,7 +768,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	loopTimer.reset();
 	loopTimer.start();
 	//TODO: Parallelisation doesn't work, single thread is 10x faster than 32 threads
-	#pragma omp parallel for schedule(dynamic) collapse(2) num_threads(threads)
+	#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	for (int index_row=0;index_row<m;index_row++)
 	{
 		for (int index_col=0;index_col<m;index_col++)
@@ -769,7 +779,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				{
 					//calculate dirac with selected dirac type
 					real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row);
-					#pragma omp critical
+					//#pragma omp critical
 					{
 						ws_tnl_hA->setElement(index_row,index_col, ddd);
 					}
@@ -789,7 +799,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					}
 				}
 				if (val > 0) {
-					#pragma omp critical
+					//#pragma omp critical
 					{
 						ws_tnl_hA->setElement(index_row,index_col, val);
 					}
@@ -827,6 +837,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 
 	#ifdef USE_CUDA
+    //TODO: Add time measurement
 	// copy matrices from host to the GPU
 	ws_tnl_dA = std::make_shared< dEllpack >();
 	*ws_tnl_dA = *ws_tnl_hA;
@@ -836,7 +847,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
-
+    //TODO: Add time measurement
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
 
