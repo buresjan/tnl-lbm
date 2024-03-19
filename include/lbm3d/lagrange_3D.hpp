@@ -591,7 +591,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm, time_loop_Ha_Capacities, time_loop_Ha, time_total, cpu_time_total;
+	double time_loop_Hm, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_Hm_capacities=0, time_hm_setElement=0, time_hm_transpose=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0;
 
 	fmt::print("started timer for wushu construction\n");
 	timer.start();
@@ -612,6 +612,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	fmt::print("tnl wushu construct loop hM: start\n");
 	idx support=5; // search in this support
 	// TODO: STATIC VS DYNAMIC
+	//TODO: Rewrite so it is the same as hA (split into row capacities and calculation)
+	//TODO:
 	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
@@ -644,29 +646,41 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 //		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
 //	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
 
-//TODO: Add metric + measurement
 //TODO: Add parallelisation
+//Measurement hm_setRowCapacities
+	loopTimer.reset();
+	loopTimer.start();
 	typename hEllpack::RowCapacitiesType hM_row_lengths( m );
+	#pragma omp parallel for schedule(dynamic)
 	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
 	ws_tnl_hM.setRowCapacities(hM_row_lengths);
+	loopTimer.stop();
+	time_Hm_capacities = loopTimer.getRealTime();
 
 //	fmt::print("Ai construct\n");
 //TODO: Add Metric + measurement
 //TODO: Add parallelisation
+	loopTimer.reset();
+	loopTimer.start();
+	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
 		auto row = ws_tnl_hM.getRow(i);
 		for (std::size_t j=0;j<d_i[i].size();j++)
 			row.setElement(j, d_i[i][j], (dreal)d_x[i][j]);
 	}
-
+	loopTimer.stop();
+	time_hm_setElement = loopTimer.getRealTime();
 	// output to files
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
+	//TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
 
 	// its transpose
     //TODO: Add transposition time measurement
+	loopTimer.reset();
+	loopTimer.start();
     ws_tnl_hMT.getTransposition(ws_tnl_hM);
-
+	loopTimer.stop();
+	time_hm_transpose = loopTimer.getRealTime();
 	// output to files
 	//TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hMT_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hMT );
 
@@ -685,11 +699,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	//EL = Row index
 	//KA = Column index
 
-	//TODO: look into OMP parallelization to avoid issues
-	//TODO: Measure time with and without (USE TNL TIMER)
-	//TODO: Check dynamic planning time vs static
-	//TODO: Replace outer loop with ParallelFor (TNL), Inner loop into lambda (SKIP FOR NOW)
-	//TODO: Look into Open MP Critical and Atomic
+
 	//TODO: Paralelise both loops (row and col)
 	//TODO: parallel for ... collapse(n)
 
@@ -839,18 +849,25 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	#ifdef USE_CUDA
     //TODO: Add time measurement
 	// copy matrices from host to the GPU
+	loopTimer.reset();
+	loopTimer.start();
 	ws_tnl_dA = std::make_shared< dEllpack >();
 	*ws_tnl_dA = *ws_tnl_hA;
 	ws_tnl_dM = ws_tnl_hM;
 	ws_tnl_dMT = ws_tnl_hMT;
+	loopTimer.stop();
+	time_matrixCopy = loopTimer.getRealTime();
 
 	// update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
     //TODO: Add time measurement
+	loopTimer.reset();
+	loopTimer.start();
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
 	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
-
+	loopTimer.stop();
+	time_write1 = loopTimer.getRealTime();
 	#endif
 	fmt::print("tnl wushu lagrange_3D_end\n");
 	fmt::print("number of lagrangian points: {}\n", m);
@@ -877,6 +894,11 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	j["time_loop_Hm"] = time_loop_Hm;
 	j["time_loop_Ha"] = time_loop_Ha;
 	j["time_loop_Ha_capacities"] = time_loop_Ha_Capacities;
+	j["time_Hm_capacities"] = time_Hm_capacities;
+	j["time_Hm_setElement"] = time_hm_setElement;
+	j["time_Hm_transpose"]=time_hm_transpose;
+	j["time_write1"] = time_write1;
+	j["time_matrixCopy"] = time_matrixCopy;
 	std::string jsonOutput = j.dump();
 	fmt::print("--outputJSON;{}\n",jsonOutput);
 }
