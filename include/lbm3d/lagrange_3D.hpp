@@ -178,12 +178,12 @@ bool Lagrange3D<LBM>::isDDNonZero(int i, real r)
 			else
 				return false;
 		case 3: // VU: phi1
-			if (fabs(r)>2.0)
+			if (fabs(r)>=2.0)
 				return false;
 			else
 				return true;
 		case 4: // VU: phi4
-			if (fabs(r)>1.5)
+			if (fabs(r)>=1.5)
 				return false;
 			else
 				return true;
@@ -621,6 +621,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hM.setDimensions(m, n);
 
 	hM_row_capacities.setValue(0);
+	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
 		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
@@ -646,6 +647,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hM.setRowCapacities(hM_row_capacities);
 
 	//Construct matrix hM
+	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
 		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
