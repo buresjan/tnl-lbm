@@ -818,13 +818,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			} else
 			{
 				real val=0;
-				for (std::size_t in1=0;in1<d_i[index_row].size();in1++)
+				auto row1 = ws_tnl_hM.getRow(index_row);
+				auto row2 = ws_tnl_hM.getRow(index_col);
+				for (idx in1=0; in1 < row1.getSize(); in1++)
 				{
-					for (std::size_t in2=0;in2<d_i[index_col].size();in2++)
+					for (idx in2=0; in2 < row2.getSize(); in2++)
 					{
-						if (d_i[index_row][in1]==d_i[index_col][in2])
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
 						{
-							val += d_x[index_row][in1]*d_x[index_col][in2];
+							val += row1.getValue(in1) * row2.getValue(in2);
 							break;
 						}
 					}
@@ -871,13 +873,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			} else
 			{
 				real val=0;
-				for (std::size_t in1=0;in1<d_i[index_row].size();in1++)
+				auto row1 = ws_tnl_hM.getRow(index_row);
+				auto row2 = ws_tnl_hM.getRow(index_col);
+				for (idx in1=0; in1 < row1.getSize(); in1++)
 				{
-					for (std::size_t in2=0;in2<d_i[index_col].size();in2++)
+					for (idx in2=0; in2 < row2.getSize(); in2++)
 					{
-						if (d_i[index_row][in1]==d_i[index_col][in2])
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
 						{
-							val += d_x[index_row][in1]*d_x[index_col][in2];
+							val += row1.getValue(in1) * row2.getValue(in2);
 							break;
 						}
 					}
