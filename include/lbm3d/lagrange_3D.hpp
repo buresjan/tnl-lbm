@@ -7,6 +7,7 @@
 #include <TNL/Containers/Vector.h>
 #include <complex>
 #include <TNL/Matrices/MatrixWriter.h>
+#include <cstddef>
 #include <fmt/core.h>
 #include <nlohmann/json_fwd.hpp>
 #include <omp.h>
@@ -591,7 +592,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_Hm_capacities=0, time_hm_setElement=0, time_hm_transpose=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0;
+	double time_loop_Hm, time_loop_Hm_Capacities=0,time_loop_Hm_Construct=0, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_Hm_capacities=0, time_hm_setElement=0, time_hm_transpose=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0;
 
 	fmt::print("started timer for wushu construction\n");
 	timer.start();
@@ -604,6 +605,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// sparse vector of deltas
 	d_i = new std::vector<idx>[m];
 	d_x = new  std::vector<real>[m];
+
+	typename hEllpack::RowCapacitiesType hM_row_capacities( m );
 	// fill only non zero elements-relevant
 	timer.stop();
 	fmt::print("------- timer time: {}\n",timer.getRealTime());
@@ -613,7 +616,76 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	idx support=5; // search in this support
 	// TODO: STATIC VS DYNAMIC
 	//TODO: Rewrite so it is the same as hA (split into row capacities and calculation)
-	//TODO:
+
+	//calculate row capacities of hM
+	ws_tnl_hM.setDimensions(m, n);
+
+	hM_row_capacities.setValue(0);
+	for (int i=0;i<m;i++)
+	{
+		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
+		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
+		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
+
+		// FIXME: iterate over LBM blocks
+		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
+		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
+		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
+		{
+			//real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
+			if (
+				isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/lbm.lat.physDl)&&
+				isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/lbm.lat.physDl)&&
+				isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/lbm.lat.physDl)
+			)
+			{
+				hM_row_capacities[i]++;
+			}
+		}
+	}
+	ws_tnl_hM.setRowCapacities(hM_row_capacities);
+
+	//Construct matrix hM
+	for (int i=0;i<m;i++)
+	{
+		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
+		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
+		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
+
+		// FIXME: iterate over LBM blocks
+		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
+		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
+		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
+		{
+
+				if
+				(
+					isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/lbm.lat.physDl)&&
+					isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/lbm.lat.physDl)&&
+					isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/lbm.lat.physDl)
+				)
+				{
+					real dd =
+					diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) *
+					diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) *
+					diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
+					ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
+				}
+			//TODO: Rewrite to avoid d_i and d_x
+			//hA original needs d_i and d_x
+			if (methodVariant==DiracMethod::ORIGINAL)
+			{
+				real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
+				if (dd>0)
+				{
+					// FIXME: local vs global indices
+					d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
+					d_x[i].push_back(dd);
+				}
+			}
+		}
+	}
+/*
 	#pragma omp parallel for schedule(dynamic)
 	for (int i=0;i<m;i++)
 	{
@@ -635,17 +707,18 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
+	*/
 	fmt::print("tnl wushu construct loop hM: end\n");
 	loopTimer.stop();
 	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
 	time_loop_Hm = loopTimer.getRealTime();
 	// create Matrix M: matrix realizing projection of u* to lagrange desc.
-	ws_tnl_hM.setDimensions(m, n);
+	//ws_tnl_hM.setDimensions(m, n);
 //	max_nz_per_row = 0;
 //	for (int el=0;el<m;el++)
 //		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
 //	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
-
+/*
 //TODO: Add parallelisation
 //Measurement hm_setRowCapacities
 	loopTimer.reset();
@@ -672,6 +745,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	loopTimer.stop();
 	time_hm_setElement = loopTimer.getRealTime();
 	// output to files
+	*/
 	//TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
 
 	// its transpose
@@ -688,8 +762,8 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// allocate matrix A
 	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
-	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
 
+	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
 	fmt::print("tnl wushu construct loop rowCapacity hA: start\n");
 	loopTimer.reset();
 	loopTimer.start();
