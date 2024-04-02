@@ -269,264 +269,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAI
 }
 */
 
-template< typename LBM >
-void Lagrange3D<LBM>::constructWuShuMatricesSparse()
-{
 
-	if (ws_constructed) return;
-	ws_constructed=true;
-
-	// count non zero elements in matrix ws_A
-	int m=LL.size();	// number of lagrangian nodes
-	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
-	// projdi veskery filament a najdi sousedni body (ve vzdaelenosti mensi nez je prekryv delta funkci)
-	struct DD_struct
-	{
-		real DD;
-		int ka;
-	};
-
-
-	typedef std::vector<DD_struct> VECDD;
-	typedef std::vector<int> VEC;
-	//typedef std::vector<real> VECR;
-	VEC *v = new VEC[m];
-	VECDD *vr = new VECDD[m];
-
-
-	fmt::print("wushu construct loop 1: start\n");
-//	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
-	real *LLx = new real[m];
-	real *LLy = new real[m];
-	real *LLz = new real[m];
-	int *LLlagx = new int[m];
-	for (int i=0;i<m;i++)
-	{
-		LLx[i]=LL[i].x;
-		LLy[i]=LL[i].y;
-		LLz[i]=LL[i].z;
-		LLlagx[i]=LL[i].lag_x;
-	}
-
-	fmt::print("wushu construct loop 1: cont\n");
-	#pragma omp parallel for schedule(dynamic)
-	for (int el=0;el<m;el++)
-	{
-		if (el%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
-		for (int ka=0;ka<m;ka++)
-		{
-			bool proceed=true;
-			real d1,d2,ddd;
-			if (ws_speedUpAllocation)
-			{
-				if (abs(LLlagx[el] - LLlagx[ka]) > ws_speedUpAllocationSupport) proceed=false;
-			}
-			if (!proceed) continue;
-			if (methodVariant==DiracMethod::MODIFIED)
-			{
-				d1 = diracDelta(diracDeltaTypeLL,(LLx[el] - LLx[ka])/lbm.lat.physDl);
-				if (d1>0)
-				{
-					d2 = diracDelta(diracDeltaTypeLL, (LLy[el] - LLy[ka])/lbm.lat.physDl);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta(diracDeltaTypeLL, (LLz[el] - LLz[ka])/lbm.lat.physDl);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
-			} else
-			{
-				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.lat.physDl/2.0);
-				if (d1>0)
-				{
-					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.lat.physDl/2.0);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.lat.physDl/2.0);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
-			}
-		}
-	}
-	delete [] LLx;
-	delete [] LLy;
-	delete [] LLz;
-	delete [] LLlagx;
-	// count non zero
-	int nz=0;
-	for (int el=0;el<m;el++) nz += vr[el].size();
-//	fmt::print("non-zeros: {}\n", nz);
-
-	fmt::print("wushu construct loop 1: end\n");
-
-
-
-	// create spmatrix
-	ws_A = new SpMatrix<real>();
-	ws_A->Solver = Solver;
-	ws_A->Ap = new int[m+1];
-	ws_A->Ai = new int[nz];
-	ws_A->Ax = new real[nz];
-	ws_A->m_nz = nz;
-	ws_A->m_n = m;
-
-	ws_A->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_A->Ax[i] = 0; // empty
-
-//	fmt::print("Ai construct\n");
-	int count=0;
-	for (int i=0;i<m;i++)
-	{
-		ws_A->Ap[i+1] = ws_A->Ap[i] + v[i].size();
-//		fmt::print("Ap[{}]={} ({})\n", i+1, ws_A->Ap[i+1], nz);
-		for (std::size_t j=0;j<v[i].size();j++)
-		{
-			ws_A->Ai[count]=v[i][j];
-			count++;
-		}
-	}
-	delete [] v;
-
-	// fill vectors delta_el
-	// sparse vector of deltas
-	d_i = new std::vector<idx>[m];
-	d_x = new std::vector<real>[m];
-	// fill only non zero elements-relevant
-/*
-	 // brute force
-	fmt::print("wushu construct loop 2: start\n");
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
-	{
-//		if (i%20==0)
-//			fmt::print("\r progress: {:04d} of {:04d}", i, m);
-		for (int gz=0;gz<lbm.blocks.front().local.z();gz++)
-		for (int gy=0;gy<lbm.blocks.front().local.y();gy++)
-		for (int gx=0;gx<lbm.blocks.front().local.x();gx++)
-		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-			if (dd>0)
-			{
-				d_i[i].push_back(lbm.pos(gx,gy,gz));
-				d_x[i].push_back(dd);
-			}
-		}
-	}
-	fmt::print("wushu construct loop 2: end\n");
-*/
-
-	fmt::print("wushu construct loop 2: start\n");
-	idx support=5; // search in this support
-	#pragma omp parallel for schedule(dynamic)
-	for (int i=0;i<m;i++)
-	{
-		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
-		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
-		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
-
-		// FIXME: iterate over LBM blocks
-		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
-		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
-		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
-		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-			if (dd>0)
-			{
-				// FIXME: local vs global indices
-				d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
-				d_x[i].push_back(dd);
-			}
-		}
-	}
-	fmt::print("wushu construct loop 2: end\n");
-
-
-	fmt::print("wushu construct loop 3: start\n");
-	#pragma omp parallel for schedule(dynamic)
-	for (int i=0;i<m;i++)
-	{
-		if (i%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
-		for (std::size_t ka=0;ka<vr[i].size();ka++)
-		{
-			int j=vr[i][ka].ka;
-			real ddd = vr[i][ka].DD;
-			if (methodVariant==DiracMethod::MODIFIED)
-			{
-				ws_A->get(i,j) = ddd;
-			} else
-			{
-				if (ddd>0) // we have non-zero element at i,j
-				{
-					real val=0;
-					for (std::size_t in1=0;in1<d_i[i].size();in1++)
-					{
-						for (std::size_t in2=0;in2<d_i[j].size();in2++)
-						{
-							if (d_i[i][in1]==d_i[j][in2])
-							{
-								val += d_x[i][in1]*d_x[j][in2];
-								break;
-							}
-						}
-					}
-					ws_A->get(i,j) = val;
-				}
-			}
-		}
-	}
-	delete [] vr; // free
-
-	fmt::print("wushu construct loop 3: end\n");
-
-	fmt::print("wushu construct loop 4: start\n");
-	for (int k=0;k<3;k++)
-	{
-		ws_x[k] = new real[m];
-		ws_b[k] = new real[m]; // right hand side
-
-		ws_hx[k] = new dreal[m];
-		ws_hb[k] = new dreal[m]; // right hand side
-	}
-
-//	ws_ds = new real[m]; // delta s_ell
-	#ifdef USE_CUDA
-	for (int k=0;k<3;k++)
-	{
-		cudaMalloc((void **)&ws_dx[k], m*sizeof(dreal));
-		cudaMalloc((void **)&ws_db[k], m*sizeof(dreal));
-	}
-	cudaMalloc((void **)&ws_du,  n*sizeof(dreal));
-
-	// copy zero to x1, x2 (init)
-	dreal* zero = new dreal[m];
-	for (int i=0;i<m;i++) zero[i]=0;
-	for (int k=0;k<3;k++) cudaMemcpy(ws_dx[k], zero, m*sizeof(dreal), cudaMemcpyHostToDevice); // TODO use setCudaValue ...
-	delete [] zero;
-	#endif
-
-	// create Matrix M: matrix realizing projection of u* to lagrange desc.
-	nz=0;
-	for (int el=0;el<m;el++)
-	for (std::size_t in1=0;in1<d_i[el].size();in1++)
-		nz++;
-}
 template< typename LBM >
 typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int colIndex, int rowIndex)
 {
@@ -601,11 +344,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
 
-	// fill vectors delta_el
-	// sparse vector of deltas
-	d_i = new std::vector<idx>[m];
-	d_x = new  std::vector<real>[m];
-
 	typename hEllpack::RowCapacitiesType hM_row_capacities( m );
 	// fill only non zero elements-relevant
 	timer.stop();
@@ -678,17 +416,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 					ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
 				}
-
-			if (methodVariant==DiracMethod::ORIGINAL)
-			{
-				real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-				if (dd>0)
-				{
-					// FIXME: local vs global indices
-					d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
-					d_x[i].push_back(dd);
-				}
-			}
 		}
 	}
 	loopTimer.stop();
@@ -961,7 +688,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	const char* compute_desc = "undefined";
 	switch (ws_compute)
 	{
-		case ws_computeCPU:                    compute_desc = "ws_computeCPU"; break;
 		case ws_computeCPU_TNL:                compute_desc = "ws_computeCPU_TNL"; break;
 		case ws_computeGPU_TNL:                compute_desc = "ws_computeGPU_TNL"; break;
 		case ws_computeHybrid_TNL:             compute_desc = "ws_computeHybrid_TNL"; break;
@@ -1020,9 +746,6 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 		case ws_computeHybrid_TNL:
 		case ws_computeHybrid_TNL_zerocopy:
 			constructWuShuMatricesSparse_TNL();
-			break;
-		default:
-			constructWuShuMatricesSparse();
 			break;
 	}
 	timer.reset();
@@ -1188,43 +911,6 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			dfz = hfz;
 			break;
 		}
-		case ws_computeCPU:
-		{
-			// vx, vy, rho must be copied from the device
-			// fx, fy must be zero
-			for (int el=0;el<m;el++)
-			{
-				for (int k=0;k<3;k++)
-					ws_b[k][el]=0;
-				for (std::size_t in1=0;in1<d_i[el].size();in1++)
-				{
-					int gi=d_i[el][in1];
-					ws_b[0][el] -= hvx[gi] * d_x[el][in1];
-					ws_b[1][el] -= hvy[gi] * d_x[el][in1];
-					ws_b[2][el] -= hvz[gi] * d_x[el][in1];
-				}
-			}
-			//solver
-			for (int k=0;k<3;k++) ws_A->solve(ws_b[k],ws_x[k]);
-			// transfer to fx fy
-			for (int el=0;el<m;el++)
-			{
-				for (std::size_t in1=0;in1<d_i[el].size();in1++)
-				{
-					int gi=d_i[el][in1];
-					hfx[gi] += 2 * hrho[gi] * ws_x[0][el]*d_x[el][in1];
-					hfy[gi] += 2 * hrho[gi] * ws_x[1][el]*d_x[el][in1];
-					hfz[gi] += 2 * hrho[gi] * ws_x[2][el]*d_x[el][in1];
-				}
-			}
-			// copy forces to the device
-			// FIXME: this is copied multiple times when there are multiple Lagrange3D objects
-			// (ideally there should be only one Lagrange3D object that comprises all immersed bodies)
-			dfx = hfx;
-			dfy = hfy;
-			dfz = hfz;
-			break;
-		}
 		default:
 			fmt::print(stderr, "lagrange_3D: Wu Shu compute flag {} unrecognized.\n", ws_compute);
 			break;
@@ -1277,20 +963,6 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir,int obj
 	ws_tnl_dprecond = std::make_shared< dPreconditioner >();
 //	ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
 	#endif
-
-	ws_A=0;
-	for (int k=0;k<3;k++)
-	{
-		ws_x[k]=0;
-		ws_b[k]=0;
-		ws_hx[k]=0;
-		ws_hb[k]=0;
-		ws_dx[k]=0;
-		ws_db[k]=0;
-	}
-	ws_du=0;
-	d_i=0;
-	d_x=0;
 }
 
 template< typename LBM >
@@ -1300,21 +972,5 @@ Lagrange3D<LBM>::~Lagrange3D()
 	{
 		for (int i=0;i<lag_X;i++) delete [] index_array[i];
 		delete [] index_array;
-	}
-	// WuShu
-	if (d_i) delete [] d_i;
-	if (d_x) delete [] d_x;
-
-	// WuShu
-	if (ws_constructed)
-	{
-		for (int k=0;k<3;k++)
-		{
-			if (ws_x[k]) delete [] ws_x[k];
-			if (ws_b[k]) delete [] ws_b[k];
-			if (ws_hx[k]) delete [] ws_hx[k];
-			if (ws_hb[k]) delete [] ws_hb[k];
-		}
-		if (ws_A) delete ws_A;
 	}
 }

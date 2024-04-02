@@ -33,7 +33,6 @@ using SlicedEllpack = TNL::Matrices::SparseMatrix< Real,
 													>;
 
 enum {
-	ws_computeCPU,		// use UMFPACK or PETSC ... TODO, FIXME
 	ws_computeCPU_TNL,
 	ws_computeGPU_TNL,
 	ws_computeHybrid_TNL,
@@ -130,17 +129,6 @@ struct Lagrange3D
 	#endif
 	bool ws_tnl_constructed=false;
 
-	// WuShu using sparse matrices
-	SpMatrix<real> *ws_A;
-	real *ws_x[3], *ws_b[3];
-	dreal *ws_hx[3], *ws_hb[3];
-	dreal *ws_dx[3], *ws_db[3], *ws_du;
-	int Solver = SOLVER_UMFPACK;
-
-	// sparse vectors
-	std::vector<idx> *d_i=0;
-	std::vector<real> *d_x=0;
-
 	bool indexed=false; // is i,j lagrangian index created?
 	int **index_array=0;
 
@@ -151,12 +139,11 @@ struct Lagrange3D
 	int obj_id = 0;
 
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
-	int ws_compute=ws_computeCPU;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
+	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
 	bool ws_speedUpAllocation=false;	// choose neighbors based on lag_x and lag_y proximity !!! experimental
 	int ws_speedUpAllocationSupport=1000000; // very big
 	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex);
 	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction
-	void constructWuShuMatricesSparse();
 	void constructWuShuMatricesSparse_TNL();
 	void computeWuShuForcesSparse(real time);
 

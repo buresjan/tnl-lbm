@@ -379,7 +379,6 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	int ws_compute;
 	switch (compute)
 	{
-		case 1: ws_compute = ws_computeCPU; break;
 		case 4: ws_compute = ws_computeCPU_TNL; break;
 		case 5: ws_compute = ws_computeGPU_TNL; break;
 		case 6: ws_compute = ws_computeHybrid_TNL; break;

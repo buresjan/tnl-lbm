@@ -1364,7 +1364,6 @@ void State<NSE>::SimUpdate()
 			doComputeVelocitiesStar=true;
 			switch (FF[i].ws_compute)
 			{
-				case ws_computeCPU:
 				case ws_computeCPU_TNL:
 					doCopyQuantitiesStarToHost=true;
 					doZeroForceOnHost=true;
