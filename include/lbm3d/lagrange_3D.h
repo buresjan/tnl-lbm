@@ -8,7 +8,6 @@
 
 #include "defs.h"
 #include "lbm.h"
-#include "lbm_common/spmatrix.h"
 
 #include <fmt/core.h>
 
