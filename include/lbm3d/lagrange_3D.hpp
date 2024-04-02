@@ -592,7 +592,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm, time_loop_Hm_Capacities=0,time_loop_Hm_Construct=0, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_Hm_capacities=0, time_hm_setElement=0, time_hm_transpose=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0;
+	double time_loop_Hm, time_loop_Hm_Capacities=0,time_loop_Hm_Construct=0, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0, time_Hm_transpose=0;
 
 	fmt::print("started timer for wushu construction\n");
 	timer.start();
@@ -612,7 +612,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	fmt::print("------- timer time: {}\n",timer.getRealTime());
 	timer.start();
 	loopTimer.start();
-	fmt::print("tnl wushu construct loop hM: start\n");
 	idx support=5; // search in this support
 	// TODO: STATIC VS DYNAMIC
 	//TODO: Rewrite so it is the same as hA (split into row capacities and calculation)
@@ -621,7 +620,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hM.setDimensions(m, n);
 
 	hM_row_capacities.setValue(0);
-	#pragma omp parallel for schedule(dynamic)
+	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
 		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
@@ -644,10 +643,16 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
+
+	loopTimer.stop();
+	time_loop_Hm_Capacities = loopTimer.getRealTime();
 	ws_tnl_hM.setRowCapacities(hM_row_capacities);
 
+	//hM constructionTime
+	loopTimer.reset();
+	loopTimer.start();
 	//Construct matrix hM
-	#pragma omp parallel for schedule(dynamic)
+	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
 		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
@@ -673,8 +678,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 					ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
 				}
-			//TODO: Rewrite to avoid d_i and d_x
-			//hA original needs d_i and d_x
+
 			if (methodVariant==DiracMethod::ORIGINAL)
 			{
 				real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
@@ -687,79 +691,22 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			}
 		}
 	}
-/*
-	#pragma omp parallel for schedule(dynamic)
-	for (int i=0;i<m;i++)
-	{
-		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
-		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
-		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
+	loopTimer.stop();
+	time_loop_Hm_Construct = loopTimer.getRealTime();
+	time_loop_Hm = time_loop_Hm_Capacities+time_loop_Hm_Construct;
 
-		// FIXME: iterate over LBM blocks
-		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
-		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
-		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
-		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-			if (dd>0)
-			{
-				// FIXME: local vs global indices
-				d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
-				d_x[i].push_back(dd);
-			}
-		}
-	}
-	*/
 	fmt::print("tnl wushu construct loop hM: end\n");
-	loopTimer.stop();
 	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
-	time_loop_Hm = loopTimer.getRealTime();
-	// create Matrix M: matrix realizing projection of u* to lagrange desc.
-	//ws_tnl_hM.setDimensions(m, n);
-//	max_nz_per_row = 0;
-//	for (int el=0;el<m;el++)
-//		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
-//	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
-/*
-//TODO: Add parallelisation
-//Measurement hm_setRowCapacities
-	loopTimer.reset();
-	loopTimer.start();
-	typename hEllpack::RowCapacitiesType hM_row_lengths( m );
-	#pragma omp parallel for schedule(dynamic)
-	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
-	ws_tnl_hM.setRowCapacities(hM_row_lengths);
-	loopTimer.stop();
-	time_Hm_capacities = loopTimer.getRealTime();
 
-//	fmt::print("Ai construct\n");
-//TODO: Add Metric + measurement
-//TODO: Add parallelisation
-	loopTimer.reset();
-	loopTimer.start();
-	#pragma omp parallel for schedule(dynamic)
-	for (int i=0;i<m;i++)
-	{
-		auto row = ws_tnl_hM.getRow(i);
-		for (std::size_t j=0;j<d_i[i].size();j++)
-			row.setElement(j, d_i[i][j], (dreal)d_x[i][j]);
-	}
-	loopTimer.stop();
-	time_hm_setElement = loopTimer.getRealTime();
-	// output to files
-	*/
-	//TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
 
-	// its transpose
+
+	// Transpose hM
     //TODO: Add transposition time measurement
 	loopTimer.reset();
 	loopTimer.start();
     ws_tnl_hMT.getTransposition(ws_tnl_hM);
 	loopTimer.stop();
-	time_hm_transpose = loopTimer.getRealTime();
-	// output to files
-	//TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hMT_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hMT );
-
+	time_Hm_transpose = loopTimer.getRealTime();
 
 	// allocate matrix A
 	ws_tnl_hA = std::make_shared< hEllpack >();
@@ -769,9 +716,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	fmt::print("tnl wushu construct loop rowCapacity hA: start\n");
 	loopTimer.reset();
 	loopTimer.start();
-	//This could cause issues ^^
-	//Test for CPU
-	//TODO: Rename index
+
 	//EL = Row index
 	//KA = Column index
 
@@ -794,12 +739,17 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	hA_row_capacities.setValue(0);
 	//#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	//int rowCapacity = 0;
-	#pragma omp parallel for schedule(dynamic) num_threads(threads)
+
+#ifndef HA_CAPACITY_VARIANT
+#define HA_CAPACITY_VARIANT 1
+#endif
+#if HA_CAPACITY_VARIANT == 1
+	#pragma omp parallel for schedule(dynamic) num_threads(threads) collapse(2)
 	//for (int index_row=0;index_row<m;index_row++)
 	for (int index_col=0;index_col<m;index_col++)
 	{
-		//int rowCapacity = 0;  //Number of elements where DiracDelta > 0
-		//for (int index_col=0;index_col<m;index_col++)
+		//int rowCapacity = 0;  //Number of elements where DiracDelta > 0 //old
+		//for (int index_col=0;index_col<m;index_col++) //old
 		for (int index_row=0;index_row<m;index_row++)
 		{
 			//int rowCapacity = 0;
@@ -844,6 +794,62 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		//#pragma omp critical
 		//hA_row_capacities[index_row] = rowCapacity;
 	}
+#elif HA_CAPACITY_VARIANT == 2
+	#pragma omp parallel for schedule(dynamic) num_threads(threads)
+	for (int index_row=0;index_row<m;index_row++)
+	{
+		int rowCapacity = 0;  //Number of elements where DiracDelta > 0 //old
+		for (int index_col=0;index_col<m;index_col++) //old
+		{
+			//int rowCapacity = 0;
+			//If index col = 0 then zero the array on this index
+			/*if(index_col == 0)
+			{
+				hA_row_capacities[index_row]=0;
+			}
+			*/
+			if (methodVariant==DiracMethod::MODIFIED)
+			{
+				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row))
+				{
+					#pragma omp atomic
+					rowCapacity++;
+				}
+			} else
+			{
+				real val=0;
+				auto row1 = ws_tnl_hM.getRow(index_row);
+				auto row2 = ws_tnl_hM.getRow(index_col);
+				for (idx in1=0; in1 < row1.getSize(); in1++)
+				{
+					for (idx in2=0; in2 < row2.getSize(); in2++)
+					{
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
+						{
+							val += row1.getValue(in1) * row2.getValue(in2);
+							break;
+						}
+					}
+				}
+				if (val > 0)
+					#pragma omp atomic
+					rowCapacity++;
+			}
+		}
+		//TODO: Replace rowcapacity++ with this
+		//TODO: Set row capacity to 0
+		#pragma omp critical
+		hA_row_capacities[index_row] = rowCapacity;
+	}
+#else
+	#error Unsupported HA_CAPACITIES Variant
+#endif
+
+#ifndef HA_VARIANT
+#define HA_VARIANT 1
+#endif
+
+
 	fmt::print("tnl wushu construct loop rowCapacity hA: end\n");
 	loopTimer.stop();
 	fmt::print("------- loop timer time: {}\n",loopTimer.getRealTime());
@@ -974,11 +980,13 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	j["time_loop_Hm"] = time_loop_Hm;
 	j["time_loop_Ha"] = time_loop_Ha;
 	j["time_loop_Ha_capacities"] = time_loop_Ha_Capacities;
-	j["time_Hm_capacities"] = time_Hm_capacities;
-	j["time_Hm_setElement"] = time_hm_setElement;
-	j["time_Hm_transpose"]=time_hm_transpose;
+	j["time_loop_Hm_capacities"] = time_loop_Hm_Capacities;
+	j["time_loop_Hm_construct"] = time_loop_Hm_Construct;
+	j["time_Hm_transpose"]=time_Hm_transpose;
 	j["time_write1"] = time_write1;
 	j["time_matrixCopy"] = time_matrixCopy;
+	j["variant_Ha_capacities"] = HA_CAPACITY_VARIANT;
+	j["variant_Ha"] = HA_VARIANT;
 	std::string jsonOutput = j.dump();
 	fmt::print("--outputJSON;{}\n",jsonOutput);
 }

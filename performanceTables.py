@@ -9,10 +9,11 @@ def main():
                     prog='Parallel LBM Performance Table Maker',
                     description='This program runs the simulations and displays relevant info about the simulation run',
                     epilog='Bottom Text')
-    parser.add_argument('-o', '--output', default="pyoutput.txt")
+    parser.add_argument('-o', '--output', default="prefix")
     parser.add_argument('-b', '--build', action='store_true')
     parser.add_argument('-t','--threads',type=int, default=0)
-
+    parser.add_argument('--variantHaCapacities',type=int,default=1)
+    parser.add_argument('--variantHa',type=int,default=1)
     args = parser.parse_args()
 
     if args.threads > 0:
@@ -24,10 +25,12 @@ def main():
     print("Running script for " + str(os.environ.get('OMP_NUM_THREADS', 'Default')) + " thread/s.")
     subprocess.run(["rm -rf ./results_sim_*"], shell=True)
     if args.build :
+        subprocess.run(["cmake -B build -DHA_CAPACITY_VARIANT="+str(args.variantHaCapacities)+" -DHA_VARIANT="+str(args.variantHa)], shell=True, check=True)
         subprocess.run(["cmake --build build"], shell=True, check=True)
     wuShuComputeData = {}
     wuShuConstructTable = []
-    wuShuConstructTable.append(["Threads","Dirac","ObjectID","Total Time","Total CPU Time","Time hM","Time hM Capacities","time hM setElement","time hM Transpose","Time hA Capacities","Time hA","time_write","time matrix copy"])
+    variantString=""
+    wuShuConstructTable.append(["Threads","Dirac","ObjectID","Total Time","Total CPU Time","Time hM Total","Time hM Capacities","time hM Construct","time hM Transpose","Time hA Capacities","Time hA","time_write","time matrix copy"])
     for dirac in range(1,5):
         print("Running simulation for Dirac",dirac)
         runResult = subprocess.run(["./build/sim_NSE/sim_5","0",str(dirac),"100","0","5","5"], check=True, capture_output=True,encoding="UTF-8")
@@ -44,9 +47,10 @@ def main():
                 tupleVals = splitString[1]
                 #print(tupleVals)
                 parsedJson = json.loads(str(tupleVals))
-                wuShuConstructTable.append([parsedJson["threads"],str(dirac),str(count),parsedJson["time_total"],parsedJson["cpu_time_total"],parsedJson["time_loop_Hm"],parsedJson["time_Hm_capacities"],parsedJson["time_Hm_setElement"],parsedJson["time_Hm_transpose"],parsedJson["time_loop_Ha_capacities"],parsedJson["time_loop_Ha"],parsedJson["time_write1"],parsedJson["time_matrixCopy"]])
+                wuShuConstructTable.append([parsedJson["threads"],str(dirac),str(count),parsedJson["time_total"],parsedJson["cpu_time_total"],parsedJson["time_loop_Hm"],parsedJson["time_loop_Hm_capacities"],parsedJson["time_loop_Hm_construct"],parsedJson["time_Hm_transpose"],parsedJson["time_loop_Ha_capacities"],parsedJson["time_loop_Ha"],parsedJson["time_write1"],parsedJson["time_matrixCopy"]])
                 #data.append(["Default",str(dirac),str(count),tupleVals[0],tupleVals[1],tupleVals[2],tupleVals[3]])
                 count+=1
+                variantString = "hACapacities-"+str(parsedJson["variant_Ha_capacities"])+"_hA-"+str(parsedJson["variant_Ha"])
             if line.find('--outputCalculationJSON') >=0:
                 splitString = line.split(';')
                 tupleVals = splitString[1]
@@ -58,8 +62,11 @@ def main():
                 wuShuComputeData[parsedJson["object_id"]].append({"threads":parsedJson["threads"],"dirac":str(dirac),"time_total":parsedJson["time_total"],"cpu_time_total":parsedJson["cpu_time_total"]})
 
 
-    file = open(args.output,'w')
+    filename = args.output +"_threads-"+str(args.threads)+"_"+variantString+".txt"
+    file = open(filename,'w')
     #print(tabulate(wuShuConstructTable))
+
+    file.write("Variants: "+variantString)
     file.write(tabulate(wuShuConstructTable))
     for key,val in wuShuComputeData.items():
         wuShuComputeTable = []
