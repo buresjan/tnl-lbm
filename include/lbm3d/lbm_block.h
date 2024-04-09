@@ -61,9 +61,11 @@ struct LBM_BLOCK
 	// owners of the neighboring blocks
 	std::map< TNL::Containers::SyncDirection, int > neighborRanks;
 
+#ifdef HAVE_MPI
 	// synchronizers for dfs, macro and map
 	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[CONFIG::Q + MACRO::N];
 	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
+#endif
 
 	// data for compute for the block itself and each neighbor
 	struct COMPUTE_DATA

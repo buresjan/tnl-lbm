@@ -23,6 +23,7 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	this->neighborIDs = neighborIDs;
 	this->neighborRanks = neighborRanks;
 
+#ifdef HAVE_MPI
 	// set communication pattern for all synchronizers
 	map_sync.setSynchronizationPattern(pattern);
 	for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
@@ -83,6 +84,7 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 			}
 		}
 	}
+#endif
 
 	// re-initialize compute data
 	computeData.clear();
@@ -100,9 +102,11 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	// high-priority streams for boundaries
 	for (auto direction : pattern) {
 		computeData.at(direction).stream = TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high);
+		#ifdef HAVE_MPI
 		// set the stream to the synchronizer
 		for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
 			dreal_sync[i].setCudaStream(direction, computeData.at(direction).stream);
+		#endif
 	}
 #endif
 
@@ -388,12 +392,8 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 	constexpr bool is_df = std::is_same< typename Array::ConstViewType, typename dlat_array_t::ConstViewType >::value;
 
 	// empty view, but with correct sizes
-	#ifdef HAVE_MPI
 	typename sync_array_t::LocalViewType localView(nullptr, data.indexer);
 	typename sync_array_t::ViewType view(localView, dmap.getSizes(), dmap.getLocalBegins(), dmap.getLocalEnds(), dmap.getCommunicator());
-	#else
-	typename sync_array_t::ViewType view(nullptr, data.indexer);
-	#endif
 
 	for (int i = 0; i < N; i++) {
 		// rebind just the data pointer
