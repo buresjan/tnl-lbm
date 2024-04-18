@@ -144,6 +144,7 @@ struct Lagrange3D
 	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex);
 	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction
 	void constructWuShuMatricesSparse_TNL();
+	void constructWuShuMatricesSparseGPU_TNL();
 	void computeWuShuForcesSparse(real time);
 
 	bool ws_constructed=false;	// Wu Shu matrices constructed?
@@ -163,9 +164,7 @@ struct Lagrange3D
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
 	dVectorView dmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
 
-	bool isDDNonZero(int i, real r);
-	real diracDelta(int i, real r);
-	real diracDelta(real r) { return diracDelta(diracDeltaTypeEL, r); }
+
 
 	real dist(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x - B.x, A.y - B.y, A.z - B.z ); }
 	real dist_ref(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x_ref - B.x_ref, A.y_ref - B.y_ref, A.z_ref - B.z_ref ); }
