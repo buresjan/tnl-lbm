@@ -96,22 +96,22 @@ CUDA_HOSTDEV real calculate3Dirac(int rDirac, int colIndex, int rowIndex,const L
 	real d3; //dirac 3
 	real ddd;
 
-				d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/physDl);
-				if (d1>0)
-				{
-					d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/physDl);
-					if (d2>0)
-					{
-						d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/physDl);
-						if (d3>0)
-						{
-							ddd = d1*d2*d3;
-							//fmt::print("Dirac result: {}  \n", ddd);
-							return ddd;
-						}
+	d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/physDl);
+	if (d1>0)
+	{
+		d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/physDl);
+		if (d2>0)
+		{
+			d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/physDl);
+			if (d3>0)
+			{
+				ddd = d1*d2*d3;
+				//fmt::print("Dirac result: {}  \n", ddd);
+				return ddd;
+			}
 
-					}
+		}
 
-				}
-				return 0;
+	}
+	return 0;
 }

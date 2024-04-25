@@ -47,18 +47,11 @@ __global__ void dM_row_capacities_kernel(
 		)
 		{
 			dM_row_capacities[i]++;
-			std::printf("dCapRow index: %d\n",i);
 		}
 	}
 }
 
-//typename SlicedEllpack< typename LBM::TRAITS::dreal, TNL::Devices::Cuda, typename LBM::TRAITS::idx >::ViewType
-/*
-typename Lagrange3D<LBM>::dEllpack::ViewType ws_tnl_dM,
-	typename LBM::lbm_block lbmBlock,
-	typename LBM::TRAITS::real physDl,
-*/
-//
+
 template < typename LBM >
 __global__ void dM_construction_kernel(
 	TNL::Containers::VectorView<const  LagrangePoint3D<typename LBM::TRAITS::real>,TNL::Devices::Cuda> LL,
@@ -73,7 +66,6 @@ __global__ void dM_construction_kernel(
 	int diracDeltaTypeEL
 )
 {
-
 	using idx = typename LBM::TRAITS::idx;
 	using real = typename LBM::TRAITS::real;
 	idx support=5; // search in this support
@@ -106,7 +98,6 @@ __global__ void dM_construction_kernel(
 			diracDelta(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/physDl) *
 			diracDelta(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/physDl);
 			idx index = dmap.getStorageIndex(gx,gy,gz);
-			std::printf("dConstRow index: %d ; %d\n",i,index);
 			ws_tnl_dM.setElement(i,index,dd);
 		}
 	}

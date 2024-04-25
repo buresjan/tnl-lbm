@@ -181,24 +181,24 @@ typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int 
 	real d3; //dirac 3
 	real ddd;
 
-				d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl);
-				if (d1>0)
-				{
-					d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl);
-					if (d2>0)
-					{
-						d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl);
-						if (d3>0)
-						{
-							ddd = d1*d2*d3;
-							//fmt::print("Dirac result: {}  \n", ddd);
-							return ddd;
-						}
+	d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl);
+	if (d1>0)
+	{
+		d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl);
+		if (d2>0)
+		{
+			d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl);
+			if (d3>0)
+			{
+				ddd = d1*d2*d3;
+				//fmt::print("Dirac result: {}  \n", ddd);
+				return ddd;
+			}
 
-					}
+		}
 
-				}
-				return 0;
+	}
+	return 0;
 }
 //TODO: Add second 3dirac outside Lagrange3D + pass LL by pointer
 template< typename LBM >
@@ -651,9 +651,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	dM_row_capacities.setValue(0);
 	TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Cuda> dLL;
 	dLL = LL;
-	/*
-	KERNEL
-	*/
+
 	TNL::Backend::LaunchConfiguration dM_config;
 	dM_config.blockSize.x =256;
 	dM_config.gridSize.x = TNL::roundUpDivision(m,dM_config.blockSize.x);
@@ -668,22 +666,15 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	time_loop_Hm_Capacities = loopTimer.getRealTime();
 	ws_tnl_dM.setRowCapacities(dM_row_capacities);
 
-	idx support=5; // search in this support
 	//hM constructionTime
 	loopTimer.reset();
 	loopTimer.start();
-	//Construct matrix hM
-	/*
-	KERNEL
-	*/
-	//TNL::Containers::Vector<idx,TNL::Devices::Cuda>
 
+	//Construct matrix hM
 	TNL::Backend::LaunchConfiguration dM_config_build;
 	dM_config_build.blockSize.x =256;
 	dM_config_build.gridSize.x = TNL::roundUpDivision(m,dM_config_build.blockSize.x);
-	//typename LBM::BLOCK::dmap_array_t dmap;
-	//dmap.setSizes(lbm.blocks.front().hmap.getSizes());
-	//lbm.blocks.front().hmap
+
 	TNL::Backend::launchKernelSync( dM_construction_kernel<LBM>, dM_config_build,
 		dLL.getConstView(),
 		ws_tnl_dM.getView(),
@@ -710,7 +701,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
     //TODO: Add transposition time measurement
 	loopTimer.reset();
 	loopTimer.start();
-    ws_tnl_hMT.getTransposition(ws_tnl_hM);
+    ws_tnl_dMT.getTransposition(ws_tnl_dM);
 	loopTimer.stop();
 	time_Hm_transpose = loopTimer.getRealTime();
 	// allocate matrix A
@@ -724,7 +715,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	//Initialise rowCapacities
 	dA_row_capacities.setValue(0);
 
-	//KERNEL
 	TNL::Backend::LaunchConfiguration dA_config;
 	dA_config.blockSize.x =256;
 	dA_config.gridSize.x = TNL::roundUpDivision(m,dA_config.blockSize.x);
@@ -759,7 +749,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 		diracDeltaTypeLL,
 		methodVariant
 		);
-
 
 	fmt::print("tnl wushu construct loop hA: end\n");
 	loopTimer.stop();
