@@ -1,5 +1,5 @@
 default:
-  image: "archlinux/devel-tnl:latest"
+  image: "jlk.fjfi.cvut.cz:5000/fjfi-mmg/archlinux-tnl-cuda:latest"
   before_script:
     # make sure that $PATH and other essential variables are set correctly
     - source /etc/profile
