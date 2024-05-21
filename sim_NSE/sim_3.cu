@@ -329,9 +329,6 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 		fp3.x = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
 		fp3.y = dm + i * dx;
 		fp3.z = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
-		fp3.x_ref = fp3.x;
-		fp3.y_ref = fp3.y;
-		fp3.z_ref = fp3.z;
 		// Lagrangian coordinates
 		fp3.lag_x = i;
 		fp3.lag_y = j;

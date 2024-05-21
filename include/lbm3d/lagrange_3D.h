@@ -61,9 +61,6 @@ template < typename REAL>
 struct LagrangePoint3D
 {
 	REAL x=0,y=0,z=0;
-	REAL x_ref=0, y_ref=0, z_ref=0;
-	REAL vx=0, vy=0, vz=0;
-	REAL fx=0, fy=0, fz=0;
 	// Lagrangian coordinates of the surface (as a grid)
 	int lag_x, lag_y;
 };
@@ -139,8 +136,6 @@ struct Lagrange3D
 
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
-	bool ws_speedUpAllocation=false;	// choose neighbors based on lag_x and lag_y proximity !!! experimental
-	int ws_speedUpAllocationSupport=1000000; // very big
 	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex);
 	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction
 	void constructWuShuMatricesSparse_TNL();
@@ -158,7 +153,7 @@ struct Lagrange3D
 
 	inline int N() { return LL.size(); }	// return the amount of points in the filament
 
-	CyclicVector<LagrangePoint3D<real>> LL;		// by this
+	CyclicVector<LagrangePoint3D<real>> LL;
 
 	// accessors for macroscopic quantities as a 1D vector
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
@@ -167,13 +162,6 @@ struct Lagrange3D
 
 
 	real dist(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x - B.x, A.y - B.y, A.z - B.z ); }
-	real dist_ref(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x_ref - B.x_ref, A.y_ref - B.y_ref, A.z_ref - B.z_ref ); }
-	real distx(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return fabs(A.x - B.x); }
-	real disty(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return fabs(A.y - B.y); }
-	real distz(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return fabs(A.z - B.z); }
-	real distx_ref(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return fabs(A.x_ref - B.x_ref); }
-	real disty_ref(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return fabs(A.y_ref - B.y_ref); }
-	real distz_ref(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return fabs(A.z_ref - B.z_ref); }
 
 	int findIndex(int i, int j);
 	int createIndexArray();

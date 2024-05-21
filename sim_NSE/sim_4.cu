@@ -285,9 +285,6 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 			fp.x = cx + radius * cos( phi ) * sin( theta );
 			fp.y = cy + radius * sin( phi ) * sin( theta );
 			fp.z = cz + radius * cos( theta );
-			fp.x_ref = fp.x;
-			fp.y_ref = fp.y;
-			fp.z_ref = fp.z;
 			state.FF[INDEX].LL.push_back(fp);
 			points++;
 		}
