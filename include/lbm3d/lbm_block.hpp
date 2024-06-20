@@ -65,6 +65,8 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 			map_sync.setTags(direction, blocks_per_rank * nproc + neighbor_id, this->id);
 		else
 			map_sync.setTags(direction, neighbor_id, blocks_per_rank * nproc + this->id);
+		// disable DistributedNDArraySynchronizer initializing explicit -1 tags based on the tag_offset
+		map_sync.setTagOffset( -1 );
 	}
 
 	// set tags
@@ -82,6 +84,8 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 				else
 					dreal_sync[i].setTags(direction, offset0 + neighbor_id, offset1 + this->id);
 			}
+			// disable DistributedNDArraySynchronizer initializing explicit -1 tags based on the tag_offset
+			dreal_sync[i].setTagOffset( -1 );
 		}
 	}
 #endif
