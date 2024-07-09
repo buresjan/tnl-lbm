@@ -435,7 +435,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					#pragma omp atomic
 					rowCapacity++;
 			}
-
+		}
 		//TODO: Set row capacity to 0
 		#pragma omp critical
 		hA_row_capacities[index_row] = rowCapacity;
