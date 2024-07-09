@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TNL/Devices/Host.h>
 #include <vector>
 #include <algorithm>
 #include <string>
@@ -55,14 +56,54 @@ public:
 //        if (in>=std::vector<T>::size()) n=in-std::vector<T>::size();
 //        return std::vector<T>::operator[](n);
     }
+	const T& operator[](int n) const
+    {
+                if (n<0)
+                        return operator[](n+std::vector<T>::size());
+                if (std::size_t(n)>=std::vector<T>::size())
+                        return operator[](n-std::vector<T>::size());
+                return std::vector<T>::operator[](n);
+//        int n=in;
+//        if (in<0) n=std::vector<T>::size()+in; else
+//        if (in>=std::vector<T>::size()) n=in-std::vector<T>::size();
+//        return std::vector<T>::operator[](n);
+    }
 };
 
 template < typename REAL>
 struct LagrangePoint3D
 {
+	using Real = REAL;
+
 	REAL x=0,y=0,z=0;
 	// Lagrangian coordinates of the surface (as a grid)
 	int lag_x, lag_y;
+
+	CUDA_HOSTDEV LagrangePoint3D<REAL> operator/(REAL r) const
+	{
+		LagrangePoint3D<REAL> p;
+		p.x = x/r;
+		p.y = y/r;
+		p.z = z/r;
+		return p;
+	}
+	CUDA_HOSTDEV LagrangePoint3D<REAL>&operator/=(REAL r)
+	{
+		this->x/=r;
+		this->y/=r;
+		this->z/=r;
+		return *this;
+	}
+	template <typename T>
+	CUDA_HOSTDEV LagrangePoint3D<REAL>&operator=(LagrangePoint3D<T> other)
+	{
+		this->x=(REAL)other.x;
+		this->y=(REAL)other.y;
+		this->z=(REAL)other.z;
+		this->lag_x = other.lag_x;
+		this->lag_y = other.lag_y;
+		return *this;
+	}
 };
 
 enum class DiracMethod //Enum for deciding which method is used for calculation
@@ -136,8 +177,9 @@ struct Lagrange3D
 
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
+	/*
 	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex);
-	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction
+	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction*/
 	void constructWuShuMatricesSparse_TNL();
 	void constructWuShuMatricesSparseGPU_TNL();
 	void computeWuShuForcesSparse(real time);
@@ -155,6 +197,15 @@ struct Lagrange3D
 
 	CyclicVector<LagrangePoint3D<real>> LL;
 
+	using DLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Cuda>;
+	//TODO: Change real type here during testing
+	using DLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<dreal>,TNL::Devices::Cuda>;
+	//using DLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Cuda>;
+
+	using HLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
+	//TODO: Change real type here during testing
+	//using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
+	using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<dreal>,TNL::Devices::Host>;
 	// accessors for macroscopic quantities as a 1D vector
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
 	dVectorView dmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N

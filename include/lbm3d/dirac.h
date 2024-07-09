@@ -9,28 +9,30 @@ CUDA_HOSTDEV bool isDDNonZero(int i, real r)
 	switch (i)
 	{
 		case 1: // VU: phi3
-			if(fabs(r) < 1.0)
+			if(fabs(r) < (real)1.0)
 				return true;
 			else
 				return false;
 		case 2: // VU: phi2
-			if(fabs(r) < 2.0)
+			if(fabs(r) < (real)2.0)
 				return true;
 			else
 				return false;
 		case 3: // VU: phi1
-			if (fabs(r)>=2.0)
+			if (fabs(r)>=(real)2.0)
 				return false;
 			else
 				return true;
 		case 4: // VU: phi4
-			if (fabs(r)>=1.5)
+			if (fabs(r)>=(real)1.5)
 				return false;
 			else
 				return true;
 	}
 	return false;
 }
+//TODO: Convert numbers to (reals)
+//TODO: Remove unnecessary isDDNonZero checks
 template< typename real >
 CUDA_HOSTDEV real diracDelta(int i, real r)
 {
@@ -62,22 +64,22 @@ CUDA_HOSTDEV real diracDelta(int i, real r)
 	//fmt::print("warning: zero Dirac delta: type={}\n", i);
 	return 0;
 }
-template< typename LLVectorType, typename real >
-CUDA_HOSTDEV bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL, real physDl)
+
+
+template< typename LLVectorType>
+CUDA_HOSTDEV bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL)
 {
-	//ka = colIndex
-	//el = rowIndex
 	bool d1; //dirac 1
 	bool d2; //dirac 2
 	bool d3; //dirac 3
 
-	d1 = isDDNonZero(rDirac,(LL[rowIndex].x - LL[colIndex].x)/physDl);
+	d1 = isDDNonZero(rDirac,(LL[rowIndex].x - LL[colIndex].x));
 	if (d1)
 	{
-		d2 = isDDNonZero(rDirac, (LL[rowIndex].y - LL[colIndex].y)/physDl);
+		d2 = isDDNonZero(rDirac, (LL[rowIndex].y - LL[colIndex].y));
 		if (d2)
 		{
-			d3=isDDNonZero(rDirac, (LL[rowIndex].z - LL[colIndex].z)/physDl);
+			d3=isDDNonZero(rDirac, (LL[rowIndex].z - LL[colIndex].z));
 			if (d3)
 			{
 				return true;
@@ -86,23 +88,24 @@ CUDA_HOSTDEV bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex,const L
 	}
 	return false;
 }
-template< typename LLVectorType, typename real >
-CUDA_HOSTDEV real calculate3Dirac(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL, real physDl)
+
+
+template< typename LLVectorType >
+CUDA_HOSTDEV typename LLVectorType::ValueType::Real calculate3Dirac(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL)
 {
-	//ka = colIndex
-	//el = rowIndex
+	using real = typename LLVectorType::ValueType::Real;
 	real d1; //dirac 1
 	real d2; //dirac 2
 	real d3; //dirac 3
 	real ddd;
 
-	d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/physDl);
+	d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x));
 	if (d1>0)
 	{
-		d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/physDl);
+		d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y));
 		if (d2>0)
 		{
-			d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/physDl);
+			d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z));
 			if (d3>0)
 			{
 				ddd = d1*d2*d3;

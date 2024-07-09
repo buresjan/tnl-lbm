@@ -13,15 +13,14 @@
 #ifdef USE_CUDA
 template < typename LBM >
 __global__ void dM_row_capacities_kernel(
-	TNL::Containers::VectorView<LagrangePoint3D<typename LBM::TRAITS::real>,TNL::Devices::Cuda> LL,
+	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::RowCapacitiesType::ViewType dM_row_capacities,
 	typename LBM::TRAITS::idx3d lbmBlockLocal,
-	typename LBM::TRAITS::real physDl,
 	int diracDeltaTypeEL
 	)
 {
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename LBM::TRAITS::real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
 
 	idx support=5; // search in this support
 	//Blocksize = blockDim
@@ -30,9 +29,9 @@ __global__ void dM_row_capacities_kernel(
 	{
 		return;
 	}
-	idx fi_x = floor(LL[i].x/physDl);
-	idx fi_y = floor(LL[i].y/physDl);
-	idx fi_z = floor(LL[i].z/physDl);
+	idx fi_x = floor(LL[i].x);
+	idx fi_y = floor(LL[i].y);
+	idx fi_z = floor(LL[i].z);
 
 	// FIXME: iterate over LBM blocks
 	for (int gz=MAX( 0, fi_z - support);gz<MIN(lbmBlockLocal.z(), fi_z + support);gz++)
@@ -41,9 +40,9 @@ __global__ void dM_row_capacities_kernel(
 	{
 		//real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 		if (
-			isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/physDl)&&
-			isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/physDl)&&
-			isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/physDl)
+			isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x)&&
+			isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y)&&
+			isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z)
 		)
 		{
 			dM_row_capacities[i]++;
@@ -52,9 +51,9 @@ __global__ void dM_row_capacities_kernel(
 }
 
 
-template < typename LBM >
+template < typename LBM>
 __global__ void dM_construction_kernel(
-	TNL::Containers::VectorView<const  LagrangePoint3D<typename LBM::TRAITS::real>,TNL::Devices::Cuda> LL,
+	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::ViewType ws_tnl_dM,
 	typename LBM::TRAITS::idx3d lbmBlockLocal,
 	#ifdef HAVE_MPI
@@ -62,12 +61,11 @@ __global__ void dM_construction_kernel(
 	#else
 	typename LBM::BLOCK::dmap_array_t::ConstViewType dmap,
 	#endif
-	typename LBM::TRAITS::real physDl,
 	int diracDeltaTypeEL
 )
 {
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename LBM::TRAITS::real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
 	idx support=5; // search in this support
 	//Blocksize = blockDim
 	idx i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -76,9 +74,9 @@ __global__ void dM_construction_kernel(
 	{
 		return;
 	}
-	idx fi_x = floor(LL[i].x/physDl);
-	idx fi_y = floor(LL[i].y/physDl);
-	idx fi_z = floor(LL[i].z/physDl);
+	idx fi_x = floor(LL[i].x);
+	idx fi_y = floor(LL[i].y);
+	idx fi_z = floor(LL[i].z);
 
 	// FIXME: iterate over LBM blocks
 	for (int gz=MAX( 0, fi_z - support);gz<MIN(lbmBlockLocal.z(), fi_z + support);gz++)
@@ -88,33 +86,32 @@ __global__ void dM_construction_kernel(
 
 		if
 		(
-			isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/physDl)&&
-			isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/physDl)&&
-			isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/physDl)
+			isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x)&&
+			isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y)&&
+			isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z)
 		)
 		{
 			real dd =
-			diracDelta(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/physDl) *
-			diracDelta(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/physDl) *
-			diracDelta(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/physDl);
+			diracDelta(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x) *
+			diracDelta(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y) *
+			diracDelta(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z);
 			idx index = dmap.getStorageIndex(gx,gy,gz);
 			ws_tnl_dM.setElement(i,index,dd);
 		}
 	}
 }
 
-template < typename LBM >
+template < typename LBM>
 __global__ void dA_row_capacities_kernel(
-	TNL::Containers::VectorView<const LagrangePoint3D<typename LBM::TRAITS::real>,TNL::Devices::Cuda> LL,
+	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::RowCapacitiesType::ViewType dA_row_capacities,
 	typename Lagrange3D<LBM>::dEllpack::ConstViewType ws_tnl_dM,
-	typename LBM::TRAITS::real physDl,
 	int diracDeltaTypeLL,
 	DiracMethod methodVariant
 )
 {
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename LBM::TRAITS::real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
 
 	//Blocksize = blockDim
 	idx index_row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -129,7 +126,7 @@ __global__ void dA_row_capacities_kernel(
 	{
 		if (methodVariant==DiracMethod::MODIFIED)
 		{
-			if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row,LL,physDl))
+			if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row,LL))
 			{
 				rowCapacity++;
 			}
@@ -153,18 +150,17 @@ __global__ void dA_row_capacities_kernel(
 	}
 	dA_row_capacities[index_row] = rowCapacity;
 }
-template < typename LBM >
+template < typename LBM>
 __global__ void dA_construction_kernel(
-	TNL::Containers::VectorView<const LagrangePoint3D<typename LBM::TRAITS::real>,TNL::Devices::Cuda> LL,
+	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::ViewType ws_tnl_dA,
 	typename Lagrange3D<LBM>::dEllpack::ConstViewType ws_tnl_dM,
-	typename LBM::TRAITS::real physDl,
 	int diracDeltaTypeLL,
 	DiracMethod methodVariant
 )
 {
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename LBM::TRAITS::real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
 
 	//Blocksize = blockDim
 	idx index_row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -177,10 +173,10 @@ __global__ void dA_construction_kernel(
 	{
 		if (methodVariant==DiracMethod::MODIFIED)
 		{
-			if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row,LL,physDl))
+			if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row,LL))
 			{
 				//calculate dirac with selected dirac type
-				real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row,LL,physDl);
+				real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row,LL);
 				ws_tnl_dA.setElement(index_row,index_col, ddd);
 			}
 		} else

@@ -3,6 +3,7 @@
 #include <TNL/Backend/KernelLaunch.h>
 #include <TNL/Backend/Macros.h>
 #include <TNL/Devices/Cuda.h>
+#include <TNL/Devices/Host.h>
 #include <TNL/DiscreteMath.h>
 #include <TNL/Matrices/MatrixWriter.h>
 
@@ -169,63 +170,6 @@ int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
 }
 
 
-
-
-template< typename LBM >
-typename Lagrange3D<LBM>::real Lagrange3D<LBM>::calculate3Dirac(int rDirac, int colIndex, int rowIndex)
-{
-	//ka = colIndex
-	//el = rowIndex
-	real d1; //dirac 1
-	real d2; //dirac 2
-	real d3; //dirac 3
-	real ddd;
-
-	d1 = diracDelta(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl);
-	if (d1>0)
-	{
-		d2 = diracDelta(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl);
-		if (d2>0)
-		{
-			d3=diracDelta(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl);
-			if (d3>0)
-			{
-				ddd = d1*d2*d3;
-				//fmt::print("Dirac result: {}  \n", ddd);
-				return ddd;
-			}
-
-		}
-
-	}
-	return 0;
-}
-//TODO: Add second 3dirac outside Lagrange3D + pass LL by pointer
-template< typename LBM >
-bool Lagrange3D<LBM>::is3DiracNonZero(int rDirac, int colIndex, int rowIndex)
-{
-	//ka = colIndex
-	//el = rowIndex
-	bool d1; //dirac 1
-	bool d2; //dirac 2
-	bool d3; //dirac 3
-
-	d1 = isDDNonZero(rDirac,(LL[rowIndex].x - LL[colIndex].x)/lbm.lat.physDl);
-	if (d1)
-	{
-		d2 = isDDNonZero(rDirac, (LL[rowIndex].y - LL[colIndex].y)/lbm.lat.physDl);
-		if (d2)
-		{
-			d3=isDDNonZero(rDirac, (LL[rowIndex].z - LL[colIndex].z)/lbm.lat.physDl);
-			if (d3)
-			{
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 template< typename LBM >
 void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 {
@@ -236,14 +180,40 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm, time_loop_Hm_Capacities=0,time_loop_Hm_Construct=0, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0, time_Hm_transpose=0;
+	double time_loop_Hm = 0,
+	time_loop_Hm_Capacities=0,
+	time_loop_Hm_Construct=0,
+	time_loop_Ha_Capacities=0,
+	time_loop_Ha=0,
+	time_write1=0,
+	time_matrixCopy=0,
+	time_total=0,
+	cpu_time_total=0,
+	time_Hm_transpose=0,
+	time_LL_division=0;
 
-	fmt::print("started timer for wushu construction\n");
-	timer.start();
 
 	// count non zero elements in matrix A
 	int m=LL.size();	// number of lagrangian nodes
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
+	//TODO: Add timer
+	//TODO: Add performanceTables.py timer
+
+	loopTimer.start();
+	//LL with dreal type values
+    HLPVECTOR_REAL tempLL;
+	HLPVECTOR_DREAL rLL;
+	tempLL = LL;
+	tempLL /=lbm.lat.physDl;
+	rLL = tempLL;
+
+	loopTimer.stop();
+	time_LL_division = loopTimer.getRealTime();
+
+	loopTimer.reset();
+	fmt::print("started timer for wushu construction\n");
+	timer.start();
+
 
 	typename hEllpack::RowCapacitiesType hM_row_capacities( m );
 	// fill only non zero elements-relevant
@@ -259,23 +229,25 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	ws_tnl_hM.setDimensions(m, n);
 
 	hM_row_capacities.setValue(0);
+	//TODO: Rewrite into separate variants as with hA
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
-		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
-		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
+		idx fi_x = floor(rLL[i].x);
+		idx fi_y = floor(rLL[i].y);
+		idx fi_z = floor(rLL[i].z);
 
 		// FIXME: iterate over LBM blocks
 		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
 		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
 		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
 		{
+			using real = typename Lagrange3D<LBM>::HLPVECTOR_DREAL::RealType::Real;
 			//real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
 			if (
-				isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/lbm.lat.physDl)&&
-				isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/lbm.lat.physDl)&&
-				isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/lbm.lat.physDl)
+				isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - rLL[i].x)&&
+				isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - rLL[i].y)&&
+				isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - rLL[i].z)
 			)
 			{
 				hM_row_capacities[i]++;
@@ -294,29 +266,29 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	#pragma omp parallel for schedule(static)
 	for (int i=0;i<m;i++)
 	{
-		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
-		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
-		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
+		idx fi_x = floor(rLL[i].x);
+		idx fi_y = floor(rLL[i].y);
+		idx fi_z = floor(rLL[i].z);
 
 		// FIXME: iterate over LBM blocks
 		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
 		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
 		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
 		{
-
-				if
-				(
-					isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/lbm.lat.physDl)&&
-					isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/lbm.lat.physDl)&&
-					isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/lbm.lat.physDl)
-				)
-				{
-					real dd =
-					diracDelta(diracDeltaTypeEL,(real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) *
-					diracDelta(diracDeltaTypeEL,(real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) *
-					diracDelta(diracDeltaTypeEL,(real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-					ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
-				}
+			using real = typename Lagrange3D<LBM>::HLPVECTOR_DREAL::RealType::Real;
+			if
+			(
+				isDDNonZero(diracDeltaTypeEL,(real)(gx + 0.5) - rLL[i].x)&&
+				isDDNonZero(diracDeltaTypeEL,(real)(gy + 0.5) - rLL[i].y)&&
+				isDDNonZero(diracDeltaTypeEL,(real)(gz + 0.5) - rLL[i].z)
+			)
+			{
+				real dd =
+				diracDelta(diracDeltaTypeEL,(real)(gx + 0.5) - rLL[i].x) *
+				diracDelta(diracDeltaTypeEL,(real)(gy + 0.5) - rLL[i].y) *
+				diracDelta(diracDeltaTypeEL,(real)(gz + 0.5) - rLL[i].z);
+				ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
+			}
 		}
 	}
 	loopTimer.stop();
@@ -389,7 +361,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			*/
 			if (methodVariant==DiracMethod::MODIFIED)
 			{
-				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row))
+				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row,rLL))
 				{
 					#pragma omp atomic
 					hA_row_capacities[index_row]++;
@@ -438,7 +410,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 			*/
 			if (methodVariant==DiracMethod::MODIFIED)
 			{
-				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row))
+				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, rLL))
 				{
 					#pragma omp atomic
 					rowCapacity++;
@@ -463,8 +435,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 					#pragma omp atomic
 					rowCapacity++;
 			}
-		}
-		//TODO: Replace rowcapacity++ with this
+
 		//TODO: Set row capacity to 0
 		#pragma omp critical
 		hA_row_capacities[index_row] = rowCapacity;
@@ -497,10 +468,10 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		{
 			if (methodVariant==DiracMethod::MODIFIED)
 			{
-				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row))
+				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row,rLL))
 				{
 					//calculate dirac with selected dirac type
-					real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row);
+					real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row,rLL);
 					//#pragma omp critical
 					{
 						ws_tnl_hA->setElement(index_row,index_col, ddd);
@@ -612,6 +583,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	j["time_Hm_transpose"]=time_Hm_transpose;
 	j["time_write1"] = time_write1;
 	j["time_matrixCopy"] = time_matrixCopy;
+	j["time_LL_division"] = time_LL_division;
 	j["variant_Ha_capacities"] = HA_CAPACITY_VARIANT;
 	j["variant_Ha"] = HA_VARIANT;
 	std::string jsonOutput = j.dump();
@@ -628,7 +600,17 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm, time_loop_Hm_Capacities=0,time_loop_Hm_Construct=0, time_loop_Ha_Capacities=0, time_loop_Ha=0, time_write1=0, time_matrixCopy=0, time_total=0, cpu_time_total=0, time_Hm_transpose=0;
+	double time_loop_Hm,
+	time_loop_Hm_Capacities=0,
+	time_loop_Hm_Construct=0,
+	time_loop_Ha_Capacities=0,
+	time_loop_Ha=0,
+	time_write1=0,
+	time_matrixCopy=0,
+	time_total=0,
+	cpu_time_total=0,
+	time_Hm_transpose=0,
+	time_LL_division=0;
 
 	fmt::print("started timer for wushu construction\n");
 	timer.start();
@@ -638,10 +620,23 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
 
 	typename dEllpack::RowCapacitiesType dM_row_capacities( m );
-	// fill only non zero elements-relevant
+	//TODO: Add timer
+	//TODO: Add performanceTables.py timer
+	loopTimer.start();
+	DLPVECTOR_REAL rdLL; // the only real dll
+	rdLL = LL;
+	rdLL /= lbm.lat.physDl;
+
+	DLPVECTOR_DREAL dLL;
+	dLL = rdLL;
+	loopTimer.stop();
+	time_LL_division = loopTimer.getRealTime();
+
+
 	timer.stop();
 	fmt::print("------- timer time: {}\n",timer.getRealTime());
 	timer.start();
+	loopTimer.reset();
 	loopTimer.start();
 
 
@@ -649,8 +644,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	ws_tnl_dM.setDimensions(m, n);
 
 	dM_row_capacities.setValue(0);
-	TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Cuda> dLL;
-	dLL = LL;
 
 	TNL::Backend::LaunchConfiguration dM_config;
 	dM_config.blockSize.x =256;
@@ -659,7 +652,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 		dLL.getView(),
 		dM_row_capacities.getView(),
 		lbm.blocks.front().local,
-		lbm.lat.physDl,
 		diracDeltaTypeEL);
 
 	loopTimer.stop();
@@ -684,7 +676,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 		#else
 		lbm.blocks.front().dmap.getConstView(),
 		#endif
-		lbm.lat.physDl,
 		diracDeltaTypeEL);
 
 
@@ -722,7 +713,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 		dLL.getConstView(),
 		dA_row_capacities.getView(),
 		ws_tnl_dM.getConstView(),
-		lbm.lat.physDl,
 		diracDeltaTypeLL,
 		methodVariant
 		);
@@ -745,7 +735,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 		dLL.getConstView(),
 		ws_tnl_dA->getView(),
 		ws_tnl_dM.getConstView(),
-		lbm.lat.physDl,
 		diracDeltaTypeLL,
 		methodVariant
 		);
@@ -815,6 +804,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	j["time_Hm_transpose"]=time_Hm_transpose;
 	j["time_write1"] = time_write1;
 	j["time_matrixCopy"] = time_matrixCopy;
+	j["time_LL_division"] = time_LL_division;
 	j["variant_Ha_capacities"] = HA_CAPACITY_VARIANT;
 	j["variant_Ha"] = HA_VARIANT;
 	std::string jsonOutput = j.dump();

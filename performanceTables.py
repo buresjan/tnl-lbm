@@ -8,7 +8,7 @@ def run_sim(compute,diracmin=1,diracmax=4):
     wuShuComputeData = {}
     wuShuConstructTable = []
     variantString=""
-    wuShuConstructTable.append(["Threads","Dirac","ObjectID","Total Time","Total CPU Time","Time hM Total","Time hM Capacities","time hM Construct","time hM Transpose","Time hA Capacities","Time hA","time_write","time matrix copy"])
+    wuShuConstructTable.append(["Threads","Dirac","ObjectID","Total Time","Total CPU Time","Time hM Total","Time hM Capacities","time hM Construct","time hM Transpose","Time hA Capacities","Time hA","time_write","time matrix copy","time LL division"])
     for dirac in range(diracmin,diracmax+1):
         print("Running simulation for Dirac",dirac)
         runResult = subprocess.run(["./build/sim_NSE/sim_5","0",str(dirac),"100","0","5",str(compute)], check=True, capture_output=True,encoding="UTF-8")
@@ -25,7 +25,7 @@ def run_sim(compute,diracmin=1,diracmax=4):
                 tupleVals = splitString[1]
                 #print(tupleVals)
                 parsedJson = json.loads(str(tupleVals))
-                wuShuConstructTable.append([parsedJson["threads"],str(dirac),str(count),parsedJson["time_total"],parsedJson["cpu_time_total"],parsedJson["time_loop_Hm"],parsedJson["time_loop_Hm_capacities"],parsedJson["time_loop_Hm_construct"],parsedJson["time_Hm_transpose"],parsedJson["time_loop_Ha_capacities"],parsedJson["time_loop_Ha"],parsedJson["time_write1"],parsedJson["time_matrixCopy"]])
+                wuShuConstructTable.append([parsedJson["threads"],str(dirac),str(count),parsedJson["time_total"],parsedJson["cpu_time_total"],parsedJson["time_loop_Hm"],parsedJson["time_loop_Hm_capacities"],parsedJson["time_loop_Hm_construct"],parsedJson["time_Hm_transpose"],parsedJson["time_loop_Ha_capacities"],parsedJson["time_loop_Ha"],parsedJson["time_write1"],parsedJson["time_matrixCopy"],parsedJson["time_LL_division"]])
                 #data.append(["Default",str(dirac),str(count),tupleVals[0],tupleVals[1],tupleVals[2],tupleVals[3]])
                 count+=1
                 variantString = "hACapacities-"+str(parsedJson["variant_Ha_capacities"])+"_hA-"+str(parsedJson["variant_Ha"])
