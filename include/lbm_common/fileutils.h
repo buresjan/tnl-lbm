@@ -1,3 +1,5 @@
+#pragma once
+
 #include <unistd.h>   // access
 
 static bool fileExists(const char* fname)

@@ -82,7 +82,6 @@ struct StateLocal : State<NSE>
 	using BLOCK = LBM_BLOCK< NSE >;
 
 	using State<NSE>::nse;
-	using State<NSE>::log;
 	using State<NSE>::vtk_helper;
 	using State<NSE>::id;
 	using State<NSE>::FF;
@@ -161,7 +160,7 @@ struct StateLocal : State<NSE>
 		real rho = 1.0;//nse.physFluidDensity;
 //		real target_velocity = nse.lbm2physVelocity(lbm_input_velocity);
 		real lbm_input_velocity = nse.phys2lbmVelocity(phys_input_U_bar);
-		log("Reynolds = {:f} lbmvel {:f} physvel {:f} (phys_input_U_bar {:f})",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
+		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f} (phys_input_U_bar {:f})",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
 
 		// FIXME: MPI !!!
 		// todo: compute C_D: integrate over the whole domain
@@ -183,8 +182,12 @@ struct StateLocal : State<NSE>
 		real phys_cd_full = -nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 		real phys_cl_full = -nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-		log("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
+		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
+			if (!nse.terminate)
+				spdlog::error("nan detected");
+			nse.terminate=true;
+		}
+		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
 
 // not used for evaluation of the results
 //		// FIXME: MPI !!!
@@ -205,9 +208,9 @@ struct StateLocal : State<NSE>
 //		real phys_cd=-nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cl=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-//		log("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-////		log("Reynolds = {:f} lbmvel 0.07 physvel {:f}",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
+//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
+//		spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
+////		spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
 
 // not used for evaluation of the results
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
@@ -218,8 +221,8 @@ struct StateLocal : State<NSE>
 //		real phys_cd_lagr=-nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cl_lagr=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-//		log("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
+//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
+//		spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
 
 		// empty files
@@ -288,8 +291,8 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
+		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -345,7 +348,7 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 	state.FF[INDEX].diracDeltaType = dirac_delta;
 	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
 	state.FIL_INDEX=INDEX;
-	state.log("added {} lagrangian points", points);
+	spdlog::info("added {} lagrangian points", points);
 
 	// compute sigma: take lag grid into account
 	state.FF[INDEX].computeMaxMinDist();
@@ -355,11 +358,11 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 //	real sigma_min = state.FF[INDEX].computeMinDist();
 //	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
 
-	state.log("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
-//	state.log("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
-//	state.log("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
-	state.log("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	state.log("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
+	spdlog::info("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
+//	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
+//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
+	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
+	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
 
 	state.writeVTK_Points("cylinder",0,0,state.FF[INDEX]);
 	return INDEX;
@@ -400,9 +403,11 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
-	state.setid("sim_3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
-	if (state.isMark()) return 0;
+	const std::string state_id = fmt::format("sim_3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
+	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
+
+	if (state.isMark())
+		return 0;
 
 	state.phys_input_U_max = Umax;
 	state.phys_input_U_bar = Ubar;
@@ -430,7 +435,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 		case 5: ws_compute = ws_computeGPU_TNL; break;
 		case 6: ws_compute = ws_computeHybrid_TNL; break;
 		case 7: ws_compute = ws_computeHybrid_TNL_zerocopy; break;
-		default: state.log("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
+		default: spdlog::warn("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
 	}
 
 	// add cuts

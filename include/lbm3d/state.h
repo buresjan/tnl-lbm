@@ -11,6 +11,7 @@
 #include <TNL/Timer.h>
 #include <fmt/core.h>
 
+#include "lbm_common/logging.h"
 #include "defs.h"
 #include "kernels.h"
 #include "lbm.h"
@@ -93,6 +94,8 @@ struct State
 	using T_PROBE1DLINECUT = probe1Dlinecut<real>;
 	using T_COUNTER = counter<real>;
 
+	std::string id;
+
 	LBM<NSE> nse;
 
 	std::vector< T_PROBE3DCUT > probe3Dvec;
@@ -156,9 +159,6 @@ struct State
 	void write1Dcut_Y(idx y, idx z, const std::string& fname);
 	void write1Dcut_Z(idx x, idx y, const std::string& fname);
 
-	int verbosity=1;
-	std::string id = "default";
-
 	virtual bool outputData(const BLOCK_NSE& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) { return false; }
 
 	bool getPNGdimensions(const char * filename, int &w, int &h);
@@ -194,12 +194,6 @@ struct State
 	void flagDelete(const char*flagname);
 	bool flagExists(const char*flagname);
 
-
-	template < typename... ARGS >
-	void setid(const char* fmt, ARGS... args);
-
-	template < typename... ARGS >
-	void log(const char* fmt, ARGS... args);
 
 	// save & load state
 	void move(const std::string& srcdir, const std::string& dstdir, const std::string& srcfilename, const std::string& dstfilename);
@@ -256,13 +250,16 @@ struct State
 
 	// constructors
 	template< typename... ARGS >
-	State(const TNL::MPI::Comm& communicator, lat_t ilat, ARGS&&... args)
-	: nse(communicator, ilat, std::forward<ARGS>(args)...)
+	State(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, ARGS&&... args)
+	: id(id), nse(communicator, ilat, std::forward<ARGS>(args)...)
 	{
+		// initialize default spdlog logger
+		init_logging(id, communicator);
+
 		bool local_estimate = estimateMemoryDemands();
 		bool global_result = TNL::MPI::reduce(local_estimate, MPI_LAND, communicator);
 		if (!local_estimate)
-			log("Not enough memory available (CPU or GPU). [disable this check in lbm3d/state.h -> State constructor]");
+			spdlog::error("Not enough memory available (CPU or GPU). [disable this check in lbm3d/state.h -> State constructor]");
 		if (!global_result)
 			throw std::runtime_error("Not enough memory available (CPU or GPU).");
 

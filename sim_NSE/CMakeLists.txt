@@ -17,7 +17,7 @@ foreach(target IN ITEMS ${TARGETS})
     target_compile_definitions(${target} PUBLIC "-DUSE_CUDA")
 
     # add dependencies to the target
-    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA PNG::PNG fmt::fmt)
+    target_link_libraries(${target} PUBLIC TNL::TNL_CUDA PNG::PNG fmt::fmt spdlog::spdlog)
 
     # enable OpenMP for the target
     if(OPENMP_FOUND)

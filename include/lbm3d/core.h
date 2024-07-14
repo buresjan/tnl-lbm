@@ -31,7 +31,7 @@ void execute(STATE& state)
 			// copy all LBM quantities from device to host
 			state.copyAllToHost();
 
-			state.log("maximum wall time reached");
+			spdlog::info("maximum wall time reached");
 			// copy data to CPU (if needed)
 			state.saveState(true);
 			quit = true;
@@ -50,14 +50,14 @@ void execute(STATE& state)
 		// check final time
 		if (state.nse.physTime() > state.nse.physFinalTime)
 		{
-			state.log("physFinalTime reached");
+			spdlog::info("physFinalTime reached");
 			quit = true;
 		}
 
 		// handle termination locally
 		if (state.nse.quit())
 		{
-			state.log("terminate flag triggered");
+			spdlog::info("terminate flag triggered");
 			quit = true;
 		}
 

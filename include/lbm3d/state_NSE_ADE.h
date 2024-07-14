@@ -13,7 +13,6 @@ struct State_NSE_ADE : State<NSE>
 	using State<NSE>::nse;
 	using State<NSE>::cnt;
 	using State<NSE>::vtk_helper;
-	using State<NSE>::log;
 
 	using idx = typename TRAITS::idx;
 	using idx3d = typename TRAITS::idx3d;
@@ -23,8 +22,8 @@ struct State_NSE_ADE : State<NSE>
 	LBM<ADE> ade;
 
 	// constructor
-	State_NSE_ADE(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, real iphysDiffusion)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt),
+	State_NSE_ADE(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, real iphysDiffusion)
+		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt),
 		  ade(communicator, ilat, iphysDiffusion, iphysDt)
 	{
 		// ADE allocation
@@ -52,11 +51,11 @@ struct State_NSE_ADE : State<NSE>
 
 	void SimInit() override
 	{
-		log("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
+		spdlog::info("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
 		for (auto& block : nse.blocks)
-			log("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
+			spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-		log("\nSTART: simulation NSE:{}-ADE:{} lbmViscosity {:e} lbmDiffusion {:e} physDl {:e} physDt {:e}", NSE::COLL::id, ADE::COLL::id, nse.lbmViscosity(), ade.lbmViscosity(), nse.lat.physDl, nse.physDt);
+		spdlog::info("\nSTART: simulation NSE:{}-ADE:{} lbmViscosity {:e} lbmDiffusion {:e} physDl {:e} physDt {:e}", NSE::COLL::id, ADE::COLL::id, nse.lbmViscosity(), ade.lbmViscosity(), nse.lat.physDl, nse.physDt);
 
 		// reset counters
 		for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -146,13 +145,13 @@ struct State_NSE_ADE : State<NSE>
 		// debug
 		for (auto& block : nse.blocks)
 		if (block.data.lbmViscosity == 0) {
-			log("error: NSE viscosity is 0");
+			spdlog::error("error: NSE viscosity is 0");
 			nse.terminate = true;
 			return;
 		}
 		for (auto& block : ade.blocks)
 		if (block.data.lbmViscosity == 0) {
-			log("error: ADE diffusion is 0");
+			spdlog::error("error: ADE diffusion is 0");
 			nse.terminate = true;
 			return;
 		}
@@ -346,7 +345,7 @@ struct State_NSE_ADE : State<NSE>
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
 			block.writeVTK_3D(nse.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-			this->log("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
+			spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
 		}
 		for (const auto& block : ade.blocks)
 		{
@@ -357,7 +356,7 @@ struct State_NSE_ADE : State<NSE>
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
 			block.writeVTK_3D(ade.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-			this->log("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
+			spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
 		}
 	}
 
@@ -390,7 +389,7 @@ struct State_NSE_ADE : State<NSE>
 					probevec.lz,
 					probevec.step
 				);
-				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
+				spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			for (const auto& block : ade.blocks)
 			{
@@ -415,7 +414,7 @@ struct State_NSE_ADE : State<NSE>
 					probevec.lz,
 					probevec.step
 				);
-				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
+				spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			probevec.cycle++;
 		}
@@ -445,7 +444,7 @@ struct State_NSE_ADE : State<NSE>
 					case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 						break;
 				}
-				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
+				spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			for (const auto& block : ade.blocks)
 			{
@@ -465,7 +464,7 @@ struct State_NSE_ADE : State<NSE>
 					case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 						break;
 				}
-				this->log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
+				spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 			}
 			probevec.cycle++;
 		}

@@ -54,7 +54,6 @@ struct StateLocal : State<NSE>
 	using BLOCK = LBM_BLOCK< NSE >;
 
 	using State<NSE>::nse;
-	using State<NSE>::log;
 	using State<NSE>::vtk_helper;
 	using State<NSE>::id;
 	using State<NSE>::FF;
@@ -131,7 +130,7 @@ struct StateLocal : State<NSE>
 		real Fx=0, Fy=0, Fz=0, dV=nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		real rho = 1.0;//nse.physFluidDensity;
 		real target_velocity = nse.lbm2physVelocity(lbm_input_velocity);
-		log("Reynolds = {:f} lbmvel {:f} physvel {:f}", lbm_input_velocity*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity));
+		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f}", lbm_input_velocity*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity));
 
 		// FIXME: MPI !!!
 		// todo: compute C_D: integrate over the whole domain
@@ -151,8 +150,12 @@ struct StateLocal : State<NSE>
 
 		real lbm_cd_full=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 		real phys_cd_full=-nse.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-		log("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
+		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
+			if (!nse.terminate)
+				spdlog::error("nan detected");
+			nse.terminate=true;
+		}
+		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
 
 // not used for evaluation of the results
 //		// FIXME: MPI !!!
@@ -171,9 +174,9 @@ struct StateLocal : State<NSE>
 //		}
 //		real lbm_cd=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd=-nse.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-//		log("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-////		log("Reynolds = {:f} lbmvel 0.07 physvel {:f}", 0.07*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
+//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
+//		spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
+////		spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}", 0.07*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
 
 // not used for evaluation of the results
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
@@ -182,8 +185,8 @@ struct StateLocal : State<NSE>
 ////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*ball_diameter*ball_diameter/(real)FF[FIL_INDEX].LL.size());
 //		real lbm_cd_lagr=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd_lagr=-nse.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) log("nan detected"); nse.terminate=true; }
-//		log("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
+//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
+//		spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
 
 		// empty files
@@ -235,8 +238,8 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
+		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -297,16 +300,16 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 	state.FF[INDEX].diracDeltaType = dirac_delta;
 	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
 	state.FIL_INDEX=INDEX;
-	state.log("added {} lagrangian points", points);
+	spdlog::info("added {} lagrangian points", points);
 
 	real sigma_min = state.FF[INDEX].computeMinDist();
 	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
 
-	state.log("Ball surface: wanted sigma {:e} ({:f} i.e. {:d} points), wanted_unit_area {:e}, sigma_min {:e}, sigma_max {:e}", sigma, count, N, wanted_unit_area, sigma_min, sigma_max);
-//	state.log("Added {} Lagrangian points (requested {}) partial area {:e}",points, N, a);
-//	state.log("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
-	state.log("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	state.log("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
+	spdlog::info("Ball surface: wanted sigma {:e} ({:f} i.e. {:d} points), wanted_unit_area {:e}, sigma_min {:e}, sigma_max {:e}", sigma, count, N, wanted_unit_area, sigma_min, sigma_max);
+//	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}",points, N, a);
+//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
+	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
+	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
 
 	state.writeVTK_Points("ball.vtk",0,0,state.FF[INDEX]);
 	return INDEX;
@@ -354,9 +357,11 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
-	state.setid("sim_4_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
-	if (state.isMark()) return 0;
+	const std::string state_id = fmt::format("sim_4_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
+	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
+
+	if (state.isMark())
+		return 0;
 
 	state.lbm_input_velocity = i_LBM_VELOCITY;
 	state.nse.physCharLength = BALL_DIAMETER; // [m]
@@ -383,7 +388,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 		case 5: ws_compute = ws_computeGPU_TNL; break;
 		case 6: ws_compute = ws_computeHybrid_TNL; break;
 		case 7: ws_compute = ws_computeHybrid_TNL_zerocopy; break;
-		default: state.log("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
+		default: spdlog::warn("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
 	}
 
 	// add cuts

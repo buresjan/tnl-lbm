@@ -49,39 +49,6 @@ bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
 	return false;
 }
 
-
-template< typename NSE >
-template< typename... ARGS >
-void State<NSE>::log(const char* fmts, ARGS... args)
-{
-	const std::string dir = fmt::format("results_{}", id);
-	mkdir(dir.c_str(), 0777);
-	const std::string fname = fmt::format("{}/log_rank{:03d}", dir, nse.rank);
-
-	FILE* f = fopen(fname.c_str(), "at"); // append information
-	if (f==0) {
-		fmt::print(stderr, "unable to create/access file {}", fname);
-		return;
-	}
-	// insert time stamp
-	fmt::print(f, "{} ", timestamp());
-	fmt::print(f, fmts, args...);
-	fmt::print(f, "\n");
-	fclose(f);
-
-	fmt::print(fmts, args...);
-	fmt::print("\n");
-
-}
-
-/// outputs information into log file "type"
-template< typename NSE >
-template< typename... ARGS >
-void State<NSE>::setid(const char* fmts, ARGS... args)
-{
-	id = fmt::format(fmts, args...);
-}
-
 template< typename NSE >
 void State<NSE>::flagCreate(const char* flagname)
 {
@@ -148,12 +115,12 @@ bool State<NSE>::isMark()
 		const std::string fname = fmt::format("results_{}/mark", id);
 		if (fileExists(fname.c_str()))
 		{
-			log("Mark {} already exists.", fname);
+			spdlog::info("Mark {} already exists.", fname);
 			result = true;
 		}
 		else
 		{
-			log("Mark {} does not exist. Creating new mark.", fname);
+			spdlog::info("Mark {} does not exist. Creating new mark.", fname);
 			mark("");
 			result = false;
 		}
@@ -321,7 +288,7 @@ void State<NSE>::writeVTKs_1D()
 			const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dvec[i].name, nse.rank, probe1Dvec[i].cycle);
 			// create parent directories
 			create_file(fname.c_str());
-			log("[1dcut {}]", fname);
+			spdlog::info("[1dcut {}]", fname);
 //			probeLine(probe1Dvec[i].from[0],probe1Dvec[i].from[1],probe1Dvec[i].from[2],probe1Dvec[i].to[0],probe1Dvec[i].to[1],probe1Dvec[i].to[2],fname);
 			switch (probe1Dvec[i].type)
 			{
@@ -342,7 +309,7 @@ void State<NSE>::writeVTKs_1D()
 		const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
 		// create parent directories
 		create_file(fname.c_str());
-		log("[1dcut {}]", fname);
+		spdlog::info("[1dcut {}]", fname);
 		write1Dcut(probe1Dlinevec[i].from, probe1Dlinevec[i].to, fname);
 		probe1Dlinevec[i].cycle++;
 	}
@@ -565,7 +532,7 @@ void State<NSE>::writeVTKs_3D()
 			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 		};
 		block.writeVTK_3D(nse.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-		log("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
+		spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
 
 		if (local_scratch)
 		{
@@ -633,7 +600,7 @@ void State<NSE>::writeVTKs_3Dcut()
 				probevec.lz,
 				probevec.step
 			);
-			log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
+			spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 		}
 		probevec.cycle++;
 	}
@@ -722,7 +689,7 @@ void State<NSE>::writeVTKs_2D()
 				case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 					break;
 			}
-			log("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
+			spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
 		}
 		probevec.cycle++;
 	}
@@ -875,20 +842,20 @@ void State<NSE>::move(const std::string& srcdir, const std::string& dstdir, cons
 	// rename works only on the same filesystem
 	if (rename(src.c_str(), dst.c_str()) == 0)
 	{
-		log("renamed {} to {}", src, dst);
+		spdlog::debug("renamed {} to {}", src, dst);
 		return;
 	}
 	if (errno != EXDEV)
 	{
-		perror("move: something went wrong!!!");
+		spdlog::error("move: something went wrong!!!");
 		return;
 	}
 
 	// manual copy data and meta data
 	if (move_file(src.c_str(), dst.c_str()) == 0)
-		log("moved {} to {}", src, dst);
+		spdlog::debug("moved {} to {}", src, dst);
 	else
-		log("move: manual move failed");
+		spdlog::error("move: manual move failed");
 }
 
 template< typename NSE >
@@ -906,24 +873,24 @@ int State<NSE>::saveLoadTextData(int direction, const std::string& dirname, cons
 		FILE* f = fopen(fname.c_str(), "wt");
 		if (f==0)
 		{
-			log("unable to create file {}", fname);
+			spdlog::error("unable to create file {}", fname);
 			return 0;
 		}
 		fprintf(f, fmt.c_str(), args...);
 		fclose(f);
-		log("[saveLoadTextData: saved data into {}]", fname);
+		spdlog::info("[saveLoadTextData: saved data into {}]", fname);
 	}
 	if (direction==FileToMemory)
 	{
 		FILE* f = fopen(fname.c_str(), "rt");
 		if (f==0)
 		{
-			log("unable to access file {}", fname);
+			spdlog::error("unable to access file {}", fname);
 			return 0;
 		}
 		fscanf(f, fmt.c_str(), &args...);
 		fclose(f);
-		log("[saveLoadTextData: read data from {}]", fname);
+		spdlog::info("[saveLoadTextData: read data from {}]", fname);
 	}
 	return 1;
 }
@@ -941,24 +908,24 @@ int State<NSE>::saveloadBinaryData(int direction, const std::string& dirname, co
 		FILE* f = fopen(fname.c_str(), "wb");
 		if (f==0)
 		{
-			log("unable to create file {}", fname);
+			spdlog::error("unable to create file {}", fname);
 			return 0;
 		}
 		fwrite(data, sizeof(VARTYPE), length, f);
 		fclose(f);
-		log("[saveLoadBinaryData: saved data into {}]", fname);
+		spdlog::info("[saveLoadBinaryData: saved data into {}]", fname);
 	}
 	if (direction==FileToMemory)
 	{
 		FILE* f = fopen(fname.c_str(), "rb");
 		if (f==0)
 		{
-			log("unable to access file {}", fname);
+			spdlog::error("unable to access file {}", fname);
 			return 0;
 		}
 		fread(data, sizeof(VARTYPE), length, f);
 		fclose(f);
-		log("[saveLoadBinaryData: read data from {}]", fname);
+		spdlog::info("[saveLoadBinaryData: read data from {}]", fname);
 	}
 	return 1;
 }
@@ -1071,12 +1038,12 @@ void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
 			std::string dst_suffix;
 			if (i == 0)
 			{
-				log("[moving files from local scratch to temporary files in the destination directory]");
+				spdlog::info("[moving files from local scratch to temporary files in the destination directory]");
 				dst_suffix = ".tmp";
 			}
 			else
 			{
-				log("[renaming temporary files to the target files]");
+				spdlog::info("[renaming temporary files to the target files]");
 				src_suffix = ".tmp";
 				tmp_dirname = final_dirname;
 			}
@@ -1143,7 +1110,7 @@ void State<NSE>::saveState(bool forced)
 //	flagCreate("do_save_state");
 	if (flagExists("savestate") || !check_savestate_flag || forced)
 	{
-		log("[saveState invoked]");
+		spdlog::debug("[saveState invoked]");
 		saveAndLoadState(MemoryToFile, "current_state");
 		if (delete_savestate_flag && !forced)
 		{
@@ -1163,7 +1130,7 @@ void State<NSE>::loadState(bool forced)
 //	flagCreate("do_save_state");
 	if (flagExists("loadstate") || forced)
 	{
-		log("[loadState invoked]");
+		spdlog::debug("[loadState invoked]");
 //		printf("Provadim cteni df\n");
 		saveAndLoadState(FileToMemory, "current_state");
 //		if (delete_savestate_flag)
@@ -1183,7 +1150,7 @@ bool State<NSE>::wallTimeReached()
 		long actualtimediff = timer_total.getRealTime();
 		if (actualtimediff >= wallTime)
 		{
-			log("wallTime reached: {} / {} [sec]", actualtimediff, wallTime);
+			spdlog::info("wallTime reached: {} / {} [sec]", actualtimediff, wallTime);
 			local_result = true;
 		}
 	}
@@ -1246,14 +1213,14 @@ bool State<NSE>::estimateMemoryDemands()
 //	cudaGetDeviceCount(&num_gpus);
 
 	// display CPU and GPU configuration
-//	log("number of CUDA devices:\t{}", num_gpus);
+//	spdlog::info("number of CUDA devices:\t{}", num_gpus);
 //	for (int i = 0; i < num_gpus; i++)
 	{
 		int gpu_id;
 		cudaGetDevice(&gpu_id);
 		cudaDeviceProp dprop;
 		cudaGetDeviceProperties(&dprop, gpu_id);
-		log("Rank {} uses GPU id {}: {}", nse.rank, gpu_id, dprop.name);
+		spdlog::info("Rank {} uses GPU id {}: {}", nse.rank, gpu_id, dprop.name);
 		// NOTE: cudaSetDevice breaks MPI !!!
 //		cudaSetDevice(i);
 		size_t free=0, total=0;
@@ -1266,17 +1233,17 @@ bool State<NSE>::estimateMemoryDemands()
 //	CPUtotal += CPUDFs;
 	#endif
 
-	log("Local memory budget analysis / estimation for MPI rank {}", nse.rank);
-	log("CPU RAM for DFs:   {:d} MiB", CPUDFs/1024/1024);
-//	log("CPU RAM for lat:   {:d} MiB", memDFs/1024/1024);
-	log("CPU RAM for map:   {:d} MiB", memMap/1024/1024);
-	log("CPU RAM for macro: {:d} MiB", memMacro/1024/1024);
-	log("TOTAL CPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%)", CPUtotal/1024/1024, CPUavail/1024/1024, 100.0*CPUtotal/CPUavail);
+	spdlog::info("Local memory budget analysis / estimation for MPI rank {}", nse.rank);
+	spdlog::info("CPU RAM for DFs:   {:d} MiB", CPUDFs/1024/1024);
+//	spdlog::info("CPU RAM for lat:   {:d} MiB", memDFs/1024/1024);
+	spdlog::info("CPU RAM for map:   {:d} MiB", memMap/1024/1024);
+	spdlog::info("CPU RAM for macro: {:d} MiB", memMacro/1024/1024);
+	spdlog::info("TOTAL CPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%)", CPUtotal/1024/1024, CPUavail/1024/1024, 100.0*CPUtotal/CPUavail);
 	#ifdef USE_CUDA
-	log("GPU RAM for DFs:   {:d} MiB", DFMAX*memDFs/1024/1024);
-	log("GPU RAM for map:   {:d} MiB", memMap/1024/1024);
-	log("GPU RAM for macro: {:d} MiB", memMacro/1024/1024);
-	log("TOTAL GPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%), total GPU RAM: {:d} MiB", GPUtotal/1024/1024, GPUavail/1024/1024, 100.0*GPUtotal/GPUavail, GPUtotal_hw/1024/1024);
+	spdlog::info("GPU RAM for DFs:   {:d} MiB", DFMAX*memDFs/1024/1024);
+	spdlog::info("GPU RAM for map:   {:d} MiB", memMap/1024/1024);
+	spdlog::info("GPU RAM for macro: {:d} MiB", memMacro/1024/1024);
+	spdlog::info("TOTAL GPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%), total GPU RAM: {:d} MiB", GPUtotal/1024/1024, GPUavail/1024/1024, 100.0*GPUtotal/GPUavail, GPUtotal_hw/1024/1024);
 	if (GPUavail <= GPUtotal) return false;
 	#endif
 	if (CPUavail <= CPUtotal) return false;
@@ -1318,11 +1285,11 @@ void State<NSE>::SimInit()
 
 	timer_SimInit.start();
 
-	log("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
+	spdlog::info("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
 	for (auto& block : nse.blocks)
-		log("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
+		spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-	log("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lbmViscosity(), nse.lat.physDl, nse.physDt);
+	spdlog::info("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lbmViscosity(), nse.lat.physDl, nse.physDt);
 
 	// reset counters
 	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -1391,7 +1358,7 @@ void State<NSE>::SimUpdate()
 	// debug
 	for (auto& block : nse.blocks)
 	if (block.data.lbmViscosity == 0) {
-		log("error: LBM viscosity is 0");
+		spdlog::error("error: LBM viscosity is 0");
 		nse.terminate = true;
 		return;
 	}
@@ -1727,18 +1694,15 @@ void State<NSE>::AfterSimUpdate()
 		// simple estimate of time of accomplishment
 		double ETA = getWallTime() * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
 
-		if (verbosity > 0)
-		{
-			log("GLUPS={:.3f} iter={:d} t={:1.3f}s dt={:1.2e} lbmVisc={:1.2e} WT={:.0f}s ETA={:.0f}s",
-				LUPS * 1e-9,
-				nse.iterations,
-				nse.physTime(),
-				nse.physDt,
-				nse.lbmViscosity(),
-				getWallTime(),
-				ETA
-			);
-		}
+		spdlog::info("GLUPS={:.3f} iter={:d} t={:1.3f}s dt={:1.2e} lbmVisc={:1.2e} WT={:.0f}s ETA={:.0f}s",
+			LUPS * 1e-9,
+			nse.iterations,
+			nse.physTime(),
+			nse.physDt,
+			nse.lbmViscosity(),
+			getWallTime(),
+			ETA
+		);
 	}
 
 	timer_AfterSimUpdate.stop();
@@ -1750,15 +1714,14 @@ void State<NSE>::AfterSimFinished()
 	// only the first process writes the info
 	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
 	if (nse.iterations > 1)
-	if (verbosity > 0)
 	{
-		log("total walltime: {:.1f} s, SimInit time: {:.1f} s, SimUpdate time: {:.1f} s, AfterSimUpdate time: {:.1f} s",
+		spdlog::info("total walltime: {:.1f} s, SimInit time: {:.1f} s, SimUpdate time: {:.1f} s, AfterSimUpdate time: {:.1f} s",
 			getWallTime(),
 			timer_SimInit.getRealTime(),
 			timer_SimUpdate.getRealTime(),
 			timer_AfterSimUpdate.getRealTime()
 		);
-		log("compute time: {:.1f} s, compute overlaps time: {:.1f} s, wait for communication time: {:.1f} s, wait for computation time: {:.1f} s",
+		spdlog::info("compute time: {:.1f} s, compute overlaps time: {:.1f} s, wait for communication time: {:.1f} s, wait for computation time: {:.1f} s",
 			timer_compute.getRealTime(),
 			timer_compute_overlaps.getRealTime(),
 			timer_wait_communication.getRealTime(),
@@ -1766,7 +1729,7 @@ void State<NSE>::AfterSimFinished()
 		);
 		const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
 		const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / timer_compute.getRealTime());
-		log("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): {:.3f}, based on compute time: {:.3f}",
+		spdlog::info("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): {:.3f}, based on compute time: {:.3f}",
 			avgLUPS * 1e-9,
 			computeLUPS * 1e-9
 		);
