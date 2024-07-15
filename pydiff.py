@@ -11,13 +11,14 @@ def printDiff(str1,str2):
 def main():
     parser = argparse.ArgumentParser(
                     prog='Parallel IBM Pydiff',
-                    description='This program is a special diff for comparing matrices with possible rounding errors',
+                    description='''This script compares two .mtx files and returns whether the content of the matrices is within a certain margin of error.
+                    The margin of error can be set using the -m or --maring parameter. By default this value is set to 1e-5. ''',
                     epilog='Bottom Text')
     parser.add_argument("file1",type=argparse.FileType("r"))
     parser.add_argument("file2",type=argparse.FileType("r"))
-    parser.add_argument('-d','--digits',type=float, default=1e-5)
+    parser.add_argument('-m','--margin',type=float, default=1e-5) #this parameter used to be -d digits but needed to be renamed because it was a float number
     args = parser.parse_args()
-    n = args.digits
+    n = args.margin
     filestr1 = args.file1.readlines()
     filestr2 = args.file2.readlines()
     filestr1.sort()

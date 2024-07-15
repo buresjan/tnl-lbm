@@ -3,12 +3,12 @@ import json
 import argparse
 import os
 from tabulate import tabulate
+import itertools
 
 def run_sim(compute,diracmin=1,diracmax=4):
     wuShuComputeData = {}
     wuShuConstructTable = []
     variantString=""
-    wuShuConstructTable.append(["Threads","Dirac","ObjectID","Total Time","Total CPU Time","Time hM Total","Time hM Capacities","time hM Construct","time hM Transpose","Time hA Capacities","Time hA","time_write","time matrix copy","time LL division"])
     for dirac in range(diracmin,diracmax+1):
         print("Running simulation for Dirac",dirac)
         runResult = subprocess.run(["./build/sim_NSE/sim_5","0",str(dirac),"100","0","5",str(compute)], check=True, capture_output=True,encoding="UTF-8")
@@ -91,7 +91,20 @@ def main():
     file = open(filename,'w')
     #print(tabulate(wuShuConstructTable))
     file.write("Variants: "+variantString+'\n')
-    file.write(tabulate(wuShuConstructTable)+'\n')
+    constructTableHeaders = ["Threads","Dirac","ObjectID","Total Time","Total CPU Time","Time hM Total","Time hM Capacities","time hM Construct","time hM Transpose","Time hA Capacities","Time hA","time_write","time matrix copy","time LL division"]
+    wuShuConstructTable=list(sorted(wuShuConstructTable,key=lambda x: x[2]))
+    wushuFinalConstrTable = list()
+    print(wuShuConstructTable)
+    for k,g in itertools.groupby(wuShuConstructTable,key=lambda x: x[2]):
+        ejh = list(g)
+        print(ejh)
+        for l in ejh:
+            print(l)
+            wushuFinalConstrTable.append(list(l))
+        
+    print(wushuFinalConstrTable)
+
+    file.write(tabulate(wushuFinalConstrTable,tablefmt="github",headers=constructTableHeaders)+'\n')
     for key,val in wuShuComputeData.items():
         wuShuComputeTable = []
         wuShuComputeTable.append(["Threads","Dirac","Iteration","Total Time","Total CPU Time"])
