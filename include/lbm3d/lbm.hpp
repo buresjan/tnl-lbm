@@ -235,7 +235,8 @@ void LBM<CONFIG>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 
 	t.stop();
 
-	if (nproc > 1 && iterations % 100 == 0) {
+	auto profile_logger = spdlog::get("profile");
+	if (profile_logger && nproc > 1 && iterations % 100 == 0) {
 		// count the data volume
 		std::size_t total_sent_bytes = 0;
 		std::size_t total_recv_bytes = 0;
@@ -263,11 +264,12 @@ void LBM<CONFIG>::synchronizeDFsAndMacroDevice(uint8_t dftype)
 		const double sent_GBps = sent_GB / t.getRealTime();
 		const double recv_GBps = recv_GB / t.getRealTime();
 		const double total_GBps = sent_GBps + recv_GBps;
-		std::cout << "Rank " << rank << " MPI synchronization stats (last iteration):\n"
-					 "    sent " << sent_GB << " GB in " << total_sent_messages << " messages, "
-						"received " << recv_GB << " GB in " << total_recv_messages << " messages, "
-						"in " << t.getRealTime() << " seconds\n";
-		std::cout << "    bandwidth: unidirectional " << recv_GBps << " GB/s, bidirectional " << total_GBps << " GB/s\n";
+		profile_logger->info(
+			"MPI synchronization stats (last iteration):\n"
+			"sent {} GB in {} messages, received {} GB in {} messages, in {} seconds\n"
+			"bandwidth: unidirectional {} GB/s, bidirectional {} GB/s",
+			sent_GB, total_sent_messages, recv_GB, total_recv_messages, t.getRealTime(), recv_GBps, total_GBps
+		);
 	}
 }
 

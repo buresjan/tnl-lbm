@@ -41,7 +41,6 @@ struct StateLocal : State<NSE>
 
 	using State<NSE>::nse;
 	using State<NSE>::vtk_helper;
-	using State<NSE>::log;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -246,13 +245,13 @@ struct StateLocal : State<NSE>
 		l1errors[error_idx] = l1error_phys;
 
 		if (nse.rank == 0)
-			log("at t={:1.2f}s, iterations={:d} l1error_phys={:e} l2error_phys={:e} stopping={:e}",
+			spdlog::info("at t={:1.2f}s, iterations={:d} l1error_phys={:e} l2error_phys={:e} stopping={:e}",
 				nse.physTime(), nse.iterations, l1error_phys, l2error_phys, stopping);
 	}
 
 
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice, int RES)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt, periodic_lattice)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice, int RES)
+		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt, periodic_lattice)
 	{
 		errors_count = 10;
 		l1errors = new real[errors_count];
@@ -303,10 +302,9 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal<NSE> state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, use_forcing, RES);
-
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
-	state.setid("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
+	const std::string state_id = fmt::format("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
+	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, use_forcing, RES);
 
 	if (state.isMark())
 		return 0;
@@ -390,9 +388,9 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 		state.nse.physFinalTime /= factor;
 	}
 
-	state.log("PHYS_DL = {:e}", PHYS_DL);
-//	state.log("in lbm units: forcing={:e} velocity={:e}", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
-	state.log("in lbm units: forcing={:e}", force);
+	spdlog::info("PHYS_DL = {:e}", PHYS_DL);
+//	spdlog::info("in lbm units: forcing={:e} velocity={:e}", state.nse.blocks.front().data.fx, state.nse.blocks.front().data.inflow_vx);
+	spdlog::info("in lbm units: forcing={:e}", force);
 
 	// add cuts
 //	state.add2Dcut_X(LBM_X/2,"cut_X");

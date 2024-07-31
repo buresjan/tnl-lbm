@@ -284,7 +284,6 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 	using State_NSE_ADE<NSE, ADE>::ade;
 	using State<NSE>::cnt;
 	using State<NSE>::vtk_helper;
-	using State<NSE>::log;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -295,8 +294,8 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 	real lbmInflowDensity = no1;
 
 	// constructor
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt, real iphysDiffusion)
-		: State_NSE_ADE<NSE, ADE>(communicator, ilat, iphysViscosity, iphysDt, iphysDiffusion)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt, real iphysDiffusion)
+		: State_NSE_ADE<NSE, ADE>(id, communicator, ilat, iphysViscosity, iphysDt, iphysDiffusion)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -506,7 +505,7 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 			{
 				real oldlbmInflowDensity = lbmInflowDensity;
 				lbmInflowDensity = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
-				log("[probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+				spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
 			}
 		}
 	}
@@ -541,8 +540,9 @@ int simT1_test(int RESOLUTION = 2)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal< NSE, ADE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
-	state.setid("sim_T1_res{:02d}_np{:03d}", RESOLUTION, state.nse.nproc);
+	const std::string state_id = fmt::format("sim_T1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
+	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
+
 //	state.printIter = 100;
 //	state.printIter = 100;
 	state.nse.physFinalTime = 10.0;

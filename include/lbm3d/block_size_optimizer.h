@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cmath>
+#include <spdlog/spdlog.h>
 
 #include <TNL/Containers/ndarray/Meta.h>
 #include <TNL/Containers/StaticVector.h>
@@ -74,8 +74,10 @@ idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_
 	// dimension, otherwise the LBM kernel may be slow
 	const idx multiple = domain_size[i] / warp_size;
 	if( multiple * warp_size != domain_size[i] )
-		std::cout << "WARNING: the domain size " << domain_size << " is not a multiple of 32 in its " << i << "-th component, "
-			"the execution of the LBM kernel may be slow." << std::endl;
+		spdlog::warn(
+			"the domain size [{},{},{}] is not a multiple of 32 in its {}-th component, "
+			"the execution of the LBM kernel may be slow.", domain_size.x(), domain_size.y(), domain_size.z(), i
+		);
 
 	idx3d best = {1, 1, 1};
 	best[i] = max_threads;
@@ -92,6 +94,6 @@ idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_
 	}
 #endif
 
-	std::cout << "CUDA block size optimizer: using block size " << best << " for subdomain size " << domain_size << std::endl;
+	spdlog::info("CUDA block size optimizer: using block size [{},{},{}] for subdomain size [{},{},{}]", best.x(), best.y(), best.z(), domain_size.x(), domain_size.y(), domain_size.z());
 	return best;
 }

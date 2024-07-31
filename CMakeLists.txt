@@ -60,6 +60,13 @@ FetchContent_Declare(fmt
 )
 FetchContent_MakeAvailable(fmt)
 
+FetchContent_Declare(spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG master
+    FIND_PACKAGE_ARGS
+)
+FetchContent_MakeAvailable(spdlog)
+
 # Add TNL modules
 if(SYSTEM_TNL)
     find_package(TNL REQUIRED)

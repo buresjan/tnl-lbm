@@ -11,7 +11,6 @@ struct StateLocal : State<NSE>
 
 	using State<NSE>::nse;
 	using State<NSE>::vtk_helper;
-	using State<NSE>::log;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -40,7 +39,7 @@ struct StateLocal : State<NSE>
 			}
 		// make sure that all ranks get the same value
 		lbmInflowDensity = TNL::MPI::reduce(lbmInflowDensity, MPI_MAX, nse.communicator);
-		log("[probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+		spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
 	}
 
 	virtual void setupBoundaries()
@@ -136,8 +135,8 @@ struct StateLocal : State<NSE>
 			block.data.inflow_rho = lbmInflowDensity;
 	}
 
-	StateLocal(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt)
-		: State<NSE>(communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt)
+		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -152,7 +151,7 @@ struct StateLocal : State<NSE>
 	{
 		if (this->flagExists("savestate") || !this->check_savestate_flag || forced)
 		{
-			log("[saveState invoked]");
+			spdlog::debug("[saveState invoked]");
 			this->saveAndLoadState(MemoryToFile, "current_state");
 			if (this->delete_savestate_flag && !forced)
 			{
@@ -170,7 +169,7 @@ struct StateLocal : State<NSE>
 	{
 		if (this->flagExists("loadstate") || forced)
 		{
-			log("[loadState invoked]");
+			spdlog::debug("[loadState invoked]");
 			this->saveAndLoadState(FileToMemory, "current_state");
 
 			// set lbmInflowDensity from hmacro
@@ -208,8 +207,8 @@ int sim01_test(int RESOLUTION = 2)
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
 
-	StateLocal< NSE > state(MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
-	state.setid("sim_1_res{:02d}_np{:03d}", RESOLUTION, state.nse.nproc);
+	const std::string state_id = fmt::format("sim_1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
+	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
 
 //	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;
