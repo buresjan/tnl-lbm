@@ -74,6 +74,10 @@ FetchContent_Declare(TNL
 )
 FetchContent_MakeAvailable(TNL)
 
+find_package(PNG REQUIRED)
+find_package(OpenMP COMPONENTS CXX)
+find_package(MPI COMPONENTS CXX)
+
 # Add project subdirectories
 add_subdirectory(include)
 add_subdirectory(sim_NSE)

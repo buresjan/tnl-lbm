@@ -5,10 +5,6 @@ set(TARGETS
         sim_4
 )
 
-find_package(PNG REQUIRED)
-find_package(OpenMP COMPONENTS CXX)
-find_package(MPI COMPONENTS CXX)
-
 foreach(target IN ITEMS ${TARGETS})
     # create the target
     add_executable(${target} ${target}.cu)
