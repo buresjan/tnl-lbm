@@ -1208,26 +1208,13 @@ bool State<NSE>::estimateMemoryDemands()
 	GPUtotal += DFMAX*memDFs + memMacro + memMap;
 //	CPUDFs = 0;
 
-	// get number of CUDA GPUs
-//	int num_gpus=0;
-//	cudaGetDeviceCount(&num_gpus);
-
-	// display CPU and GPU configuration
-//	spdlog::info("number of CUDA devices:\t{}", num_gpus);
-//	for (int i = 0; i < num_gpus; i++)
-	{
-		int gpu_id;
-		cudaGetDevice(&gpu_id);
-		cudaDeviceProp dprop;
-		cudaGetDeviceProperties(&dprop, gpu_id);
-		spdlog::info("Rank {} uses GPU id {}: {}", nse.rank, gpu_id, dprop.name);
-		// NOTE: cudaSetDevice breaks MPI !!!
-//		cudaSetDevice(i);
-		size_t free=0, total=0;
-		cudaMemGetInfo(&free, &total);
-		GPUavail += free;
-		GPUtotal_hw += total;
-	}
+	const int gpu_id = TNL::Backend::getDevice();
+	const std::string gpu_name = TNL::Backend::getDeviceName(gpu_id);
+	spdlog::info("Rank {} uses GPU id {}: {}", nse.rank, gpu_id, gpu_name);
+	const std::size_t free = TNL::Backend::getFreeGlobalMemory();
+	const std::size_t total = TNL::Backend::getGlobalMemorySize(gpu_id);
+	GPUavail += free;
+	GPUtotal_hw += total;
 
 	#else
 //	CPUtotal += CPUDFs;
