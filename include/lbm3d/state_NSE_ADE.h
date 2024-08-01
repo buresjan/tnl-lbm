@@ -297,9 +297,6 @@ struct State_NSE_ADE : State<NSE>
 				nse.copyDFsToHost(output_df);
 			if (ADE::CPU_MACRO::N>0)
 				ade.copyDFsToHost(output_df);
-			#ifdef USE_CUDA
-			checkCudaDevice;
-			#endif
 		}
 	}
 

@@ -497,7 +497,7 @@ void computeNonNewtonianKernels(STATE& state)
 
 	// synchronize the whole GPU and check errors
 	cudaDeviceSynchronize();
-	checkCudaDevice;
+	TNL_CHECK_CUDA_DEVICE;
 
 
 #if 0
@@ -559,7 +559,7 @@ void computeNonNewtonianKernels(STATE& state)
 
 	// synchronize the whole GPU and check errors
 	cudaDeviceSynchronize();
-	checkCudaDevice;
+	TNL_CHECK_CUDA_DEVICE;
 }
 
 

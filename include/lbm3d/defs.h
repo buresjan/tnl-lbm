@@ -38,9 +38,8 @@ using TNLMPI_INIT = TNL::MPI::ScopedInitializer;
 #endif
 
 #ifdef USE_CUDA
-	#define checkCudaDevice TNL_CHECK_CUDA_DEVICE
 	#include <cuda_profiler_api.h>
-#endif // USE_CUDA
+#endif
 
 
 // number of dist. functions, default=2

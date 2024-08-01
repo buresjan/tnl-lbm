@@ -252,7 +252,7 @@ void LBM_BLOCK<CONFIG>::copyForcesToDevice()
 	cudaMemcpy(dfx(), hfx(), local.x()*local.y()*local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
 	cudaMemcpy(dfy(), hfy(), local.x()*local.y()*local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
 	cudaMemcpy(dfz(), hfz(), local.x()*local.y()*local.z()*sizeof(dreal), cudaMemcpyHostToDevice);
-	checkCudaDevice;
+	TNL_CHECK_CUDA_DEVICE;
 	#endif
 }
 

@@ -439,7 +439,7 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 			const dim3 gridSize = get_grid_size(block);
 			cudaLBMComputeQCriterion< NSE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
 			cudaStreamSynchronize(0);
-			checkCudaDevice;
+			TNL_CHECK_CUDA_DEVICE;
 		#else
 			#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
@@ -455,7 +455,7 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 			const dim3 gridSize = get_grid_size(block);
 			cudaLBMComputePhiGradMag< ADE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
 			cudaStreamSynchronize(0);
-			checkCudaDevice;
+			TNL_CHECK_CUDA_DEVICE;
 		#else
 			#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
