@@ -56,13 +56,15 @@ include(FetchContent)
 FetchContent_Declare(fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
     GIT_TAG master
+    SYSTEM
     FIND_PACKAGE_ARGS
 )
 FetchContent_MakeAvailable(fmt)
 
 FetchContent_Declare(spdlog
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG master
+    GIT_TAG v1.x
+    SYSTEM
     FIND_PACKAGE_ARGS
 )
 FetchContent_MakeAvailable(spdlog)
