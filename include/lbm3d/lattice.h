@@ -41,8 +41,8 @@ struct Lattice
    //! \brief Physical viscosity of the fluid.
    real physViscosity = 0;
 
-   //! \brief Getter for non-dimensional lattice viscosity.
-   __cuda_callable__ real lbmViscosity() { return physDt / physDl / physDl * physViscosity; }
+   //! \brief Returns the non-dimensional lattice viscosity.
+   __cuda_callable__ real lbmViscosity() const { return physDt / physDl / physDl * physViscosity; }
 
    // getters for physical coordinates (note that here x,y,z are *global* lattice indices)
    __cuda_callable__ PointType lbm2physPoint(idx x, idx y, idx z) const { return physOrigin + (PointType(x, y, z) - 0.5) * physDl; }
@@ -56,11 +56,11 @@ struct Lattice
    __cuda_callable__ real phys2lbmY(real y) const { return (y - physOrigin.y()) / physDl + 0.5; }
    __cuda_callable__ real phys2lbmZ(real z) const { return (z - physOrigin.z()) / physDl + 0.5; }
 
-   __cuda_callable__ real lbm2physVelocity(real lbm_velocity) { return lbm_velocity / physDt * physDl; }
-   __cuda_callable__ real phys2lbmVelocity(real phys_velocity) { return phys_velocity * physDt / physDl; }
+   __cuda_callable__ real lbm2physVelocity(real lbm_velocity) const { return lbm_velocity / physDt * physDl; }
+   __cuda_callable__ real phys2lbmVelocity(real phys_velocity) const { return phys_velocity * physDt / physDl; }
 
-   __cuda_callable__ real lbm2physForce(real lbm_force) { return lbm_force * physDl / physDt / physDt; }
-   __cuda_callable__ real phys2lbmForce(real phys_force) { return phys_force / physDl * physDt * physDt; }
+   __cuda_callable__ real lbm2physForce(real lbm_force) const { return lbm_force * physDl / physDt / physDt; }
+   __cuda_callable__ real phys2lbmForce(real phys_force) const { return phys_force / physDl * physDt * physDt; }
 
 
    //! \brief Returns the spatial dimension of the lattice.
