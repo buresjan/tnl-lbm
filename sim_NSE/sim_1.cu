@@ -135,13 +135,13 @@ struct StateLocal : State<NSE>
 			block.data.inflow_rho = lbmInflowDensity;
 	}
 
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt)
-		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, real iphysVelocity)
+		: State<NSE>(id, communicator, lat)
 	{
 		for (auto& block : nse.blocks)
 		{
 			block.data.inflow_rho = no1;
-			block.data.inflow_vx = nse.phys2lbmVelocity(iphysVelocity);
+			block.data.inflow_vx = nse.lat.phys2lbmVelocity(iphysVelocity);
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
 		}
@@ -206,9 +206,11 @@ int sim01_test(int RESOLUTION = 2)
 	lat.global = typename lat_t::CoordinatesType( X, Y, Z );
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
+	lat.physDt = PHYS_DT;
+	lat.physViscosity = PHYS_VISCOSITY;
 
 	const std::string state_id = fmt::format("sim_1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT);
+	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VELOCITY);
 
 //	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;

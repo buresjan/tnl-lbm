@@ -4,8 +4,8 @@
 #include "lattice_decomposition.h"
 
 template< typename CONFIG >
-LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice)
-: communicator(communicator), lat(ilat)
+LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice)
+: communicator(communicator), lat(lat)
 {
 	// initialize MPI info
 	rank = communicator.rank();
@@ -17,14 +17,12 @@ LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysVisco
 	blocks.push_back(std::move(block));
 	total_blocks = nproc;
 
-	physDt = iphysDt;
 	physCharLength = lat.physDl * lat.global.y();
-	physViscosity = iphysViscosity;
 }
 
 template< typename CONFIG >
-LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt)
-: communicator(communicator), lat(ilat), blocks(std::forward<std::vector<BLOCK>>(blocks))
+LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t lat, std::vector<BLOCK>&& blocks)
+: communicator(communicator), lat(lat), blocks(std::forward<std::vector<BLOCK>>(blocks))
 {
 	// initialize MPI info
 	rank = communicator.rank();
@@ -32,9 +30,7 @@ LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLO
 
 	total_blocks = TNL::MPI::reduce(blocks.size(), MPI_SUM, communicator);
 
-	physDt = iphysDt;
 	physCharLength = lat.physDl * (real)lat.global.y();
-	physViscosity = iphysViscosity;
 }
 
 template< typename CONFIG >

@@ -1278,7 +1278,7 @@ void State<NSE>::SimInit()
 	for (auto& block : nse.blocks)
 		spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-	spdlog::info("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lbmViscosity(), nse.lat.physDl, nse.physDt);
+	spdlog::info("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
 
 	// reset counters
 	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -1680,8 +1680,8 @@ void State<NSE>::AfterSimUpdate()
 			LUPS * 1e-9,
 			nse.iterations,
 			nse.physTime(),
-			nse.physDt,
-			nse.lbmViscosity(),
+			nse.lat.physDt,
+			nse.lat.lbmViscosity(),
 			getWallTime(),
 			ETA
 		);
@@ -1725,7 +1725,7 @@ void State<NSE>::updateKernelData()
 
 	// this is not in nse.updateKernelData so that it can be overridden for ADE
 	for( auto& block : nse.blocks )
-		block.data.lbmViscosity = nse.lbmViscosity();
+		block.data.lbmViscosity = nse.lat.lbmViscosity();
 }
 
 template< typename NSE >

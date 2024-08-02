@@ -250,8 +250,8 @@ struct State
 
 	// constructors
 	template< typename... ARGS >
-	State(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, ARGS&&... args)
-	: id(id), nse(communicator, ilat, std::forward<ARGS>(args)...)
+	State(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, ARGS&&... args)
+	: id(id), nse(communicator, lat, std::forward<ARGS>(args)...)
 	{
 		// initialize default spdlog logger
 		init_logging(id, communicator);

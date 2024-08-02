@@ -22,9 +22,9 @@ struct State_NSE_ADE : State<NSE>
 	LBM<ADE> ade;
 
 	// constructor
-	State_NSE_ADE(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, real iphysDiffusion)
-		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt),
-		  ade(communicator, ilat, iphysDiffusion, iphysDt)
+	State_NSE_ADE(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade)
+		: State<NSE>(id, communicator, lat_nse),
+		  ade(communicator, lat_ade)
 	{
 		// ADE allocation
 		ade.allocateHostData();
@@ -55,7 +55,7 @@ struct State_NSE_ADE : State<NSE>
 		for (auto& block : nse.blocks)
 			spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-		spdlog::info("\nSTART: simulation NSE:{}-ADE:{} lbmViscosity {:e} lbmDiffusion {:e} physDl {:e} physDt {:e}", NSE::COLL::id, ADE::COLL::id, nse.lbmViscosity(), ade.lbmViscosity(), nse.lat.physDl, nse.physDt);
+		spdlog::info("\nSTART: simulation NSE:{}-ADE:{} lbmViscosity {:e} lbmDiffusion {:e} physDl {:e} physDt {:e}", NSE::COLL::id, ADE::COLL::id, nse.lat.lbmViscosity(), ade.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
 
 		// reset counters
 		for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -135,9 +135,9 @@ struct State_NSE_ADE : State<NSE>
 
 		// update LBM viscosity/diffusivity
 		for( auto& block : nse.blocks )
-			block.data.lbmViscosity = nse.lbmViscosity();
+			block.data.lbmViscosity = nse.lat.lbmViscosity();
 		for( auto& block : ade.blocks )
-			block.data.lbmViscosity = ade.lbmViscosity();
+			block.data.lbmViscosity = ade.lat.lbmViscosity();
 	}
 
 	void SimUpdate() override

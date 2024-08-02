@@ -27,7 +27,7 @@ struct LBM
 	int rank = 0;
 	int nproc = 1;
 
-	// global lattice size and physical coordinates
+	// global lattice size and physical units conversion
 	lat_t lat;
 
 	// local lattice blocks (subdomains)
@@ -41,11 +41,7 @@ struct LBM
 #endif
 
 	// input parameters: constant in time
-//	point_t physOrigin;			// spatial coordinates of the point at the center between (0,0,0) and (1,1,1) lattice sites
-//	real physDl; 				// spatial step (fixed throughout the computation)
-	real physDt;				// temporal step (fixed or variable throughout the computation)
-	real physViscosity;			// physical viscosity of the fluid
-	real physCharLength;			// characteristic length, default is physDl * (real)Y but you can specify that manually
+	real physCharLength;			// characteristic length used for Re calculation, default is physDl * (real)Y but you can specify that manually
 	real physFinalTime = 1e10;			// default 1e10
 	real physStartTime = 0;			// used for ETA calculation only (default is 0)
 	int iterations = 0;			// number of lbm iterations
@@ -57,20 +53,11 @@ struct LBM
 	LBM() = delete;
 	LBM(const LBM&) = delete;
 	LBM(LBM&&) = default;
-	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice = false);
-	LBM(const TNL::MPI::Comm& communicator, lat_t ilat, std::vector<BLOCK>&& blocks, real iphysViscosity, real iphysDt);
+	LBM(const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice = false);
+	LBM(const TNL::MPI::Comm& communicator, lat_t lat, std::vector<BLOCK>&& blocks);
 
-//	real Re(real physvel) { return fabs(physvel) * lat.physDl * (real)Y / physViscosity; } // TODO: change Y to charLength --- specify this explicitely
-	real Re(real physvel) { return fabs(physvel) * physCharLength / physViscosity; } // TODO: change Y to charLength --- specify this explicitely
-	dreal lbmViscosity() { return (dreal) (physDt / lat.physDl / lat.physDl * physViscosity); }
-	real physTime() { return physDt*(real)iterations; }
-	real lbm2physVelocity(real lbm_velocity) { return lbm_velocity / physDt * lat.physDl; }
-	real lbm2physForce(real lbm_force) { return lbm_force * lat.physDl / physDt / physDt; }
-	real phys2lbmVelocity(real phys_velocity)  { return phys_velocity * physDt / lat.physDl; }
-	real phys2lbmForce(real phys_force) { return phys_force / lat.physDl * physDt * physDt; }
-
-//	real physNormVelocity(idx gi) { return NORM( lbm2physVelocity(hvx[gi]), lbm2physVelocity(hvy[gi]), lbm2physVelocity(hvz[gi]) ); }
-//	real physNormVelocity(idx GX, idx GY, idx GZ) { return physNormVelocity(pos(GX,GY,GZ)); }
+	real Re(real physvel) { return fabs(physvel) * physCharLength / lat.physViscosity; }
+	real physTime() { return lat.physDt*(real)iterations; }
 
 	void resetForces() { resetForces(0,0,0);}
 	void resetForces(real ifx, real ify, real ifz);

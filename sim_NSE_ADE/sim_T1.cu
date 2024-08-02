@@ -294,13 +294,13 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 	real lbmInflowDensity = no1;
 
 	// constructor
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysVelocity, real iphysDt, real iphysDiffusion)
-		: State_NSE_ADE<NSE, ADE>(id, communicator, ilat, iphysViscosity, iphysDt, iphysDiffusion)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade, real iphysVelocity)
+		: State_NSE_ADE<NSE, ADE>(id, communicator, lat_nse, lat_ade)
 	{
 		for (auto& block : nse.blocks)
 		{
 //			block.data.inflow_rho = no1;
-			block.data.inflow_vx = nse.phys2lbmVelocity(iphysVelocity);
+			block.data.inflow_vx = nse.lat.phys2lbmVelocity(iphysVelocity);
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
 		}
@@ -475,9 +475,9 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
 //		if (index==k++) return vtk_helper("lbm_qcriterion", block.hmacro(NSE::MACRO::e_qcrit,x,y,z), 1, desc, value, dofs);
@@ -535,13 +535,19 @@ int simT1_test(int RESOLUTION = 2)
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	// initialize the lattice
-	lat_t lat;
-	lat.global = typename lat_t::CoordinatesType( X, Y, Z );
-	lat.physOrigin = PHYS_ORIGIN;
-	lat.physDl = PHYS_DL;
+	lat_t lat_nse;
+	lat_nse.global = typename lat_t::CoordinatesType( X, Y, Z );
+	lat_nse.physOrigin = PHYS_ORIGIN;
+	lat_nse.physDl = PHYS_DL;
+	lat_nse.physDt = PHYS_DT;
+	lat_nse.physViscosity = PHYS_VISCOSITY;
+
+	// lattice for the ADE is the same as that for NSE, except for viscosity (diffusion)
+	lat_t lat_ade = lat_nse;
+	lat_ade.physViscosity = PHYS_DIFFUSION;
 
 	const std::string state_id = fmt::format("sim_T1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_VELOCITY, PHYS_DT, PHYS_DIFFUSION);
+	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade, PHYS_VELOCITY);
 
 //	state.printIter = 100;
 //	state.printIter = 100;

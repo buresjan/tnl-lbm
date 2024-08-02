@@ -131,18 +131,18 @@ struct StateLocal : State<NSE>
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
 		if (index==k++)
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("force", nse.lbm2physForce(block.hmacro(MACRO::e_fx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("force", nse.lbm2physForce(block.hmacro(MACRO::e_fy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("force", nse.lbm2physForce(block.hmacro(MACRO::e_fz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("force", nse.lat.lbm2physForce(block.hmacro(MACRO::e_fx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("force", nse.lat.lbm2physForce(block.hmacro(MACRO::e_fy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("force", nse.lat.lbm2physForce(block.hmacro(MACRO::e_fz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
 		//if (index==k++) return vtk_helper("density", block.hmacro(MACRO::e_rho,x,y,z)*nse.physFluidDensity, 1, desc, value, dofs);
@@ -158,9 +158,9 @@ struct StateLocal : State<NSE>
 		// compute drag
 		real Fx=0, Fy=0, Fz=0, dV=nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		real rho = 1.0;//nse.physFluidDensity;
-//		real target_velocity = nse.lbm2physVelocity(lbm_input_velocity);
-		real lbm_input_velocity = nse.phys2lbmVelocity(phys_input_U_bar);
-		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f} (phys_input_U_bar {:f})",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity, nse.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
+//		real target_velocity = nse.lat.lbm2physVelocity(lbm_input_velocity);
+		real lbm_input_velocity = nse.lat.phys2lbmVelocity(phys_input_U_bar);
+		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f} (phys_input_U_bar {:f})",lbm_input_velocity*cylinder_diameter/nse.lat.physDl/nse.lat.lbmViscosity(), lbm_input_velocity, nse.lat.lbm2physVelocity(lbm_input_velocity), phys_input_U_bar);
 
 		// FIXME: MPI !!!
 		// todo: compute C_D: integrate over the whole domain
@@ -179,9 +179,9 @@ struct StateLocal : State<NSE>
 		}
 
 		real lbm_cd_full = -Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-		real phys_cd_full = -nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+		real phys_cd_full = -nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-		real phys_cl_full = -nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+		real phys_cl_full = -nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
 			if (!nse.terminate)
 				spdlog::error("nan detected");
@@ -205,9 +205,9 @@ struct StateLocal : State<NSE>
 //			}
 //		}
 //		real lbm_cd=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-//		real phys_cd=-nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		real phys_cd=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-//		real phys_cl=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		real phys_cl=-nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
 //		spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
 ////		spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
@@ -218,9 +218,9 @@ struct StateLocal : State<NSE>
 //		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
 ////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)FF[FIL_INDEX].LL.size());
 //		real lbm_cd_lagr=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-//		real phys_cd_lagr=-nse.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-//		real phys_cl_lagr=-nse.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
+//		real phys_cl_lagr=-nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
 //		spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
@@ -278,7 +278,7 @@ struct StateLocal : State<NSE>
 	virtual void updateKernelVelocities()
 	{
 		for (auto& block : nse.blocks)
-			block.data.inflow_vx = nse.phys2lbmVelocity(phys_input_U_max);
+			block.data.inflow_vx = nse.lat.phys2lbmVelocity(phys_input_U_max);
 	}
 
 	virtual void setupBoundaries()
@@ -291,8 +291,8 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
 	}
 
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt)
-		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
+		: State<NSE>(id, communicator, lat)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -300,8 +300,8 @@ struct StateLocal : State<NSE>
 			block.data.inflow_vx = 0;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
-			block.data.physDl = ilat.physDl;
-			block.data.H = (ilat.global.y()-2.0)*ilat.physDl; // domain width and height
+			block.data.physDl = lat.physDl;
+			block.data.H = (lat.global.y()-2.0)*lat.physDl; // domain width and height
 		}
 	}
 };
@@ -402,9 +402,11 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.global = typename lat_t::CoordinatesType( LBM_X, LBM_Y, LBM_Z );
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
+	lat.physDt = PHYS_DT;
+	lat.physViscosity = PHYS_VISCOSITY;
 
 	const std::string state_id = fmt::format("sim_3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
-	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT);
+	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
 	if (state.isMark())
 		return 0;

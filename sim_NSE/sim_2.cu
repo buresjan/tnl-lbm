@@ -82,7 +82,7 @@ struct StateLocal : State<NSE>
 
 //		real coef = (nse.blocks.front().data.fx != 0) ? nse.blocks.front().data.fx : nse.blocks.front().data.inflow_vx;
 		real coef = nse.blocks.front().data.fx;
-		return coef * 16.0*a*a/PI/PI/PI*sum/nse.lbmViscosity();
+		return coef * 16.0*a*a/PI/PI/PI*sum/nse.lat.lbmViscosity();
 	}
 
 	real analytical_ux(idx lbm_y, idx lbm_z)
@@ -161,16 +161,16 @@ struct StateLocal : State<NSE>
 		{
 			switch (dof)
 			{
-				case 0: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", nse.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
+				case 0: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
+				case 1: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
+				case 2: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
 			}
 		}
-		if (index==k++) return vtk_helper("lbm_analytical_ux", nse.lbm2physVelocity(analytical_ux(y, z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_ux", nse.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_uy", nse.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_uz", nse.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 1, desc, value, dofs);
-		if (index==k++) return vtk_helper("lbm_error_ux", nse.lbm2physVelocity(fabs(block.hmacro(MACRO::e_vx,x,y,z) - analytical_ux(y,z))), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_analytical_ux", nse.lat.lbm2physVelocity(analytical_ux(y, z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_ux", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx,x,y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_uy", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy,x,y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_uz", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vz,x,y,z)), 1, desc, value, dofs);
+		if (index==k++) return vtk_helper("lbm_error_ux", nse.lat.lbm2physVelocity(fabs(block.hmacro(MACRO::e_vx,x,y,z) - analytical_ux(y,z))), 1, desc, value, dofs);
 		return false;
 	}
 
@@ -225,8 +225,8 @@ struct StateLocal : State<NSE>
 		real l1error_phys = l1sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		real l2error_phys = l2sum*nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		l2error_phys = sqrt(l2error_phys);
-		l1error_phys = nse.lbm2physVelocity(l1error_phys);
-		l2error_phys = nse.lbm2physVelocity(l2error_phys);
+		l1error_phys = nse.lat.lbm2physVelocity(l1error_phys);
+		l2error_phys = nse.lat.lbm2physVelocity(l2error_phys);
 
 		// dynamic stopping criterion
 		real threshold = 1e-4;
@@ -250,8 +250,8 @@ struct StateLocal : State<NSE>
 	}
 
 
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t ilat, real iphysViscosity, real iphysDt, bool periodic_lattice, int RES)
-		: State<NSE>(id, communicator, ilat, iphysViscosity, iphysDt, periodic_lattice)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice, int RES)
+		: State<NSE>(id, communicator, lat, periodic_lattice)
 	{
 		errors_count = 10;
 		l1errors = new real[errors_count];
@@ -301,10 +301,12 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	lat.global = typename lat_t::CoordinatesType( LBM_X, LBM_Y, LBM_Z );
 	lat.physOrigin = PHYS_ORIGIN;
 	lat.physDl = PHYS_DL;
+	lat.physDt = PHYS_DT;
+	lat.physViscosity = PHYS_VISCOSITY;
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
 	const std::string state_id = fmt::format("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, PHYS_VISCOSITY, PHYS_DT, use_forcing, RES);
+	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, use_forcing, RES);
 
 	if (state.isMark())
 		return 0;
@@ -317,7 +319,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 // NOTE: this is for NSE_Data_ConstInflow
 //	if (use_forcing)
 //	{
-//		state.nse.blocks.front().data.fx = state.nse.phys2lbmForce(1e-4);
+//		state.nse.blocks.front().data.fx = state.nse.lat.phys2lbmForce(1e-4);
 //		state.nse.blocks.front().data.fy = 0;
 //		state.nse.blocks.front().data.fz = 0;
 //		state.nse.blocks.front().data.inflow_vx = 0;
@@ -328,7 +330,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 //		state.nse.blocks.front().data.fx = 0;
 //		state.nse.blocks.front().data.fy = 0;
 //		state.nse.blocks.front().data.fz = 0;
-//		state.nse.blocks.front().data.inflow_vx = state.nse.phys2lbmVelocity(2e-6);
+//		state.nse.blocks.front().data.inflow_vx = state.nse.lat.phys2lbmVelocity(2e-6);
 //		state.nse.blocks.front().data.inflow_vy = 0;
 //		state.nse.blocks.front().data.inflow_vz = 0;
 //	}
@@ -337,14 +339,14 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	dreal force = 1e-4;
 	if (use_forcing)
 	{
-		state.nse.blocks.front().data.fx = state.nse.phys2lbmForce(force);
+		state.nse.blocks.front().data.fx = state.nse.lat.phys2lbmForce(force);
 		state.nse.blocks.front().data.fy = 0;
 		state.nse.blocks.front().data.fz = 0;
 		state.nse.blocks.front().data.vx_profile = NULL;
 	} else
 	{
 		// calculate analytical solution using forcing just like above
-		state.nse.blocks.front().data.fx = state.nse.phys2lbmForce(force);
+		state.nse.blocks.front().data.fx = state.nse.lat.phys2lbmForce(force);
 		state.nse.blocks.front().data.fy = 0;
 		state.nse.blocks.front().data.fz = 0;
 		state.cache_analytical();
