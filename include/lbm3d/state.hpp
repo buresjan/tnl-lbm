@@ -1,5 +1,7 @@
 #pragma once
 
+#include <png.h>
+
 #include "state.h"
 
 #include "lbm_common/png_tool.h"

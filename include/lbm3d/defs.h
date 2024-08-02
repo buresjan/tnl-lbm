@@ -16,8 +16,6 @@
 #include <iostream>
 #include <utility>
 
-#include <png.h>
-
 #include <TNL/Containers/StaticVector.h>
 #include <TNL/Containers/NDArray.h>
 #include <TNL/Containers/DistributedNDArray.h>
@@ -25,6 +23,10 @@
 #include <TNL/Containers/BlockPartitioning.h>
 #include <TNL/MPI.h>
 #include <TNL/Backend/Stream.h>
+#include <TNL/Backend/Types.h>
+#if ! defined( __CUDACC__ ) && ! defined( __HIP__ )
+	using TNL::dim3;
+#endif
 
 #include "../lbm_common/ciselnik.h"
 
