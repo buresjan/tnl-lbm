@@ -98,12 +98,15 @@ struct LBM_BLOCK
 	dim3 getCudaBlockSize(const idx3d& local_size);
 	dim3 getCudaGridSize(const idx3d& local_size, const dim3& block_size, idx x = 0, idx y = 0, idx z = 0);
 
-	// TODO: parametrize
+	// maximum width of overlaps for the map and fs arrays
+	// (the real overlap may still be 0 if there is no neighbor in the particular direction)
 	#ifdef HAVE_MPI
 	static constexpr int overlap_width = 1;
 	#else
 	static constexpr int overlap_width = 0;
 	#endif
+	// maximum width of overlaps for the macro arrays
+	static constexpr int macro_overlap_width = MACRO::overlap_width;
 
 	int df_overlap_X() { return data.indexer.template getOverlap< 0 >(); }
 	int df_overlap_Y() { return data.indexer.template getOverlap< 1 >(); }

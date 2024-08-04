@@ -484,11 +484,11 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 		hfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
 		if (local.x() != global.x())
-			hfs[dfty].getOverlaps().template setSize< 1 >( 1 );
+			hfs[dfty].getOverlaps().template setSize< 1 >( overlap_width );
 		if (local.y() != global.y())
-			hfs[dfty].getOverlaps().template setSize< 2 >( 1 );
+			hfs[dfty].getOverlaps().template setSize< 2 >( overlap_width );
 		if (local.z() != global.z())
-			hfs[dfty].getOverlaps().template setSize< 3 >( 1 );
+			hfs[dfty].getOverlaps().template setSize< 3 >( overlap_width );
 		hfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 		hfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 		hfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -499,11 +499,11 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	hmap.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	if (local.x() != global.x())
-		hmap.getOverlaps().template setSize< 0 >( 1 );
+		hmap.getOverlaps().template setSize< 0 >( overlap_width );
 	if (local.y() != global.y())
-		hmap.getOverlaps().template setSize< 1 >( 1 );
+		hmap.getOverlaps().template setSize< 1 >( overlap_width );
 	if (local.z() != global.z())
-		hmap.getOverlaps().template setSize< 2 >( 1 );
+		hmap.getOverlaps().template setSize< 2 >( overlap_width );
 	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	hmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
 	hmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
@@ -514,21 +514,21 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	cpumacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	if (local.x() != global.x())
-		hmacro.getOverlaps().template setSize< 1 >( 1 );
+		hmacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
 	if (local.y() != global.y())
-		hmacro.getOverlaps().template setSize< 2 >( 1 );
+		hmacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
 	if (local.z() != global.z())
-		hmacro.getOverlaps().template setSize< 3 >( 1 );
+		hmacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
 	hmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	hmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	hmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	hmacro.allocate();
 	if (local.x() != global.x())
-		cpumacro.getOverlaps().template setSize< 1 >( 1 );
+		cpumacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
 	if (local.y() != global.y())
-		cpumacro.getOverlaps().template setSize< 2 >( 1 );
+		cpumacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
 	if (local.z() != global.z())
-		cpumacro.getOverlaps().template setSize< 3 >( 1 );
+		cpumacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
 	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	cpumacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	cpumacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -548,11 +548,11 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmap.setSizes(global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 	if (local.x() != global.x())
-		dmap.getOverlaps().template setSize< 0 >( 1 );
+		dmap.getOverlaps().template setSize< 0 >( overlap_width );
 	if (local.y() != global.y())
-		dmap.getOverlaps().template setSize< 1 >( 1 );
+		dmap.getOverlaps().template setSize< 1 >( overlap_width );
 	if (local.z() != global.z())
-		dmap.getOverlaps().template setSize< 2 >( 1 );
+		dmap.getOverlaps().template setSize< 2 >( overlap_width );
 	dmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
 	dmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
 	dmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
@@ -564,11 +564,11 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 		dfs[dfty].setSizes(0, global.x(), global.y(), global.z());
 		#ifdef HAVE_MPI
 		if (local.x() != global.x())
-			dfs[dfty].getOverlaps().template setSize< 1 >( 1 );
+			dfs[dfty].getOverlaps().template setSize< 1 >( overlap_width );
 		if (local.y() != global.y())
-			dfs[dfty].getOverlaps().template setSize< 2 >( 1 );
+			dfs[dfty].getOverlaps().template setSize< 2 >( overlap_width );
 		if (local.z() != global.z())
-			dfs[dfty].getOverlaps().template setSize< 3 >( 1 );
+			dfs[dfty].getOverlaps().template setSize< 3 >( overlap_width );
 		dfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 		dfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 		dfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
@@ -579,11 +579,11 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmacro.setSizes(0, global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 	if (local.x() != global.x())
-		dmacro.getOverlaps().template setSize< 1 >( 1 );
+		dmacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
 	if (local.y() != global.y())
-		dmacro.getOverlaps().template setSize< 2 >( 1 );
+		dmacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
 	if (local.z() != global.z())
-		dmacro.getOverlaps().template setSize< 3 >( 1 );
+		dmacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
 	dmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
 	dmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	dmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);

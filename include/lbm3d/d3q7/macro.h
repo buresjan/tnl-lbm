@@ -10,6 +10,9 @@ struct D3Q7_MACRO_Default
 
 	static const bool use_syncMacro = false;
 
+	// maximum width of overlaps for the macro arrays
+	static constexpr int overlap_width = 1;
+
 	// called from LBMKernelInit
 	template < typename LBM_KS >
 	CUDA_HOSTDEV static void zeroForcesInKS(LBM_KS &KS)
