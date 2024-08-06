@@ -118,12 +118,15 @@ struct State_NSE_ADE : State<NSE>
 		this->copyAllToDevice();
 
 #ifdef HAVE_MPI
-		// synchronize overlaps with MPI (initial synchronization can be synchronous)
-		nse.synchronizeMapDevice();
-		nse.synchronizeDFsAndMacroDevice(df_cur);
+		if (nse.nproc > 1)
+		{
+			// synchronize overlaps with MPI (initial synchronization can be synchronous)
+			nse.synchronizeMapDevice();
+			nse.synchronizeDFsAndMacroDevice(df_cur);
 
-		ade.synchronizeMapDevice();
-		ade.synchronizeDFsAndMacroDevice(df_cur);
+			ade.synchronizeMapDevice();
+			ade.synchronizeDFsAndMacroDevice(df_cur);
+		}
 #endif
 	}
 
