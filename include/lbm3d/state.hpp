@@ -1393,9 +1393,10 @@ void State<NSE>::SimUpdate()
 		for (auto& block : nse.blocks)
 		{
 		#ifdef USE_CUDA
+			const auto direction = TNL::Containers::SyncDirection::None;
 			TNL::Backend::LaunchConfiguration launch_config;
-			launch_config.blockSize = block.getCudaBlockSize(block.local);
-			launch_config.gridSize = block.getCudaGridSize(block.local, launch_config.blockSize);
+			launch_config.blockSize = block.computeData.at(direction).blockSize;
+			launch_config.gridSize = block.computeData.at(direction).gridSize;
 			if (doZeroForceOnDevice)
 				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
 			else
