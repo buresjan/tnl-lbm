@@ -27,7 +27,7 @@ build_Release:
     - cmake -B build -S . -G Ninja
             -DCMAKE_BUILD_TYPE=Release
             -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
-    - ninja -C build
+    - cmake --build build
 
 build_Debug:
   stage: build
@@ -35,4 +35,24 @@ build_Debug:
     - cmake -B build -S . -G Ninja
             -DCMAKE_BUILD_TYPE=Debug
             -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
-    - ninja -C build
+    - cmake --build build
+
+build_without_MPI:
+  stage: build
+  script:
+    - cmake -B build -S . -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
+            -DTNL_LBM_ENABLE_MPI=OFF
+    - cmake --build build
+
+build_subproject:
+  stage: build
+  image: "jlk.fjfi.cvut.cz:5000/fjfi-mmg/archlinux-cuda:latest"
+  script:
+    - pacman -Syu --needed --noconfirm cmake ninja git libpng
+    - cd tests/subproject
+    - cmake -B build -S . -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
+    - cmake --build build
