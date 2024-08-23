@@ -84,7 +84,6 @@ struct LBM
 	void setBoundaryX(idx x, map_t value);
 	void setBoundaryY(idx y, map_t value);
 	void setBoundaryZ(idx z, map_t value);
-	bool isFluid(idx x, idx y, idx z);
 
 	void resetMap(map_t geo_type);
 

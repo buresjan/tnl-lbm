@@ -106,15 +106,6 @@ void LBM<CONFIG>::setBoundaryZ(idx z, map_t value)
 		block.setBoundaryZ(z, value);
 }
 
-template< typename CONFIG >
-bool LBM<CONFIG>::isFluid(idx x, idx y, idx z)
-{
-	for( auto& block : blocks )
-		if (block.isFluid(x, y, z))
-			return true;
-	return false;
-}
-
 
 template< typename CONFIG >
 void LBM<CONFIG>::resetMap(map_t geo_type)

@@ -304,13 +304,6 @@ void LBM_BLOCK<CONFIG>::setBoundaryZ(idx z, map_t value)
 }
 
 template< typename CONFIG >
-bool LBM_BLOCK<CONFIG>::isFluid(idx x, idx y, idx z) const
-{
-	if (!isLocalIndex(x, y, z)) return false;
-	return CONFIG::BC::isFluid(hmap(x,y,z));
-}
-
-template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::resetMap(map_t geo_type)
 {
 	hmap.setValue(geo_type);
