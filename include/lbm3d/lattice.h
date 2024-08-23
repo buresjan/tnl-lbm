@@ -42,7 +42,13 @@ struct Lattice
    real physViscosity = 0;
 
    //! \brief Returns the non-dimensional lattice viscosity.
-   __cuda_callable__ real lbmViscosity() const { return physDt / physDl / physDl * physViscosity; }
+   __cuda_callable__ real lbmViscosity() const { return phys2lbmViscosity(physViscosity); }
+
+   //! \brief Converts the given viscosity from physical to non-dimensional units.
+   __cuda_callable__ real phys2lbmViscosity(real physViscosity) const { return physDt / physDl / physDl * physViscosity; }
+
+   //! \brief Converts the given viscosity from non-dimensional to physical units.
+   __cuda_callable__ real lbm2physViscosity(real lbmViscosity) const { return physDl * physDl / physDt * lbmViscosity; }
 
    // getters for physical coordinates (note that here x,y,z are *global* lattice indices)
    __cuda_callable__ PointType lbm2physPoint(idx x, idx y, idx z) const { return physOrigin + (PointType(x, y, z) - 0.5) * physDl; }

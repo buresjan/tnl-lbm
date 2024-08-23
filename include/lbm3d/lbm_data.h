@@ -105,9 +105,34 @@ struct NSE_Data_NoInflow : NSE_Data<TRAITS>
 template < typename TRAITS >
 struct ADE_Data : LBM_Data<TRAITS>
 {
+	using idx = typename LBM_Data<TRAITS>::idx;
 	using dreal = typename LBM_Data<TRAITS>::dreal;
 
+	// pointer for the variable diffusion coefficient array
+	// (can be nullptr in which case it is unused and the lbmViscosity
+	// scalar is used instead)
+	dreal* diffusion_coefficient_ptr = nullptr;
+
+	// TODO: documentation
+	bool* phi_transfer_direction_ptr = nullptr;
+
+	// coefficient for the GEO_TRANSFER_FS and GEO_TRANSFER_SF boundary conditions
+	dreal phiTransferCoefficient = 0;
+
 	// TODO: source term on the rhs of the ADE
+
+	CUDA_HOSTDEV dreal diffusionCoefficient(idx x, idx y, idx z)
+	{
+		if (diffusion_coefficient_ptr == nullptr)
+			return this->lbmViscosity;
+		else
+			return diffusion_coefficient_ptr[LBM_Data<TRAITS>::indexer.getStorageIndex(x, y, z)];
+	}
+
+	CUDA_HOSTDEV bool& phiTransferDirection(int q, idx x, idx y, idx z)
+	{
+		return phi_transfer_direction_ptr[LBM_Data<TRAITS>::Fxyz(q, x, y, z)];
+	}
 };
 
 template < typename TRAITS >

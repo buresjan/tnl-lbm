@@ -26,6 +26,10 @@ struct LBM_BLOCK
 	using dmacro_array_t = typename CONFIG::dmacro_array_t;
 	using cpumacro_array_t = typename CONFIG::cpumacro_array_t;
 	using sync_array_t = typename CONFIG::sync_array_t;
+	using dreal_array_t = typename CONFIG::dreal_array_t;
+	using hreal_array_t = typename CONFIG::hreal_array_t;
+	using hboollat_array_t = typename CONFIG::hboollat_array_t;
+	using dboollat_array_t = typename CONFIG::dboollat_array_t;
 
 	// KernelData contains only the necessary data for the CUDA kernel. these are copied just before the kernel is called
 	typename CONFIG::DATA data;
@@ -37,6 +41,21 @@ struct LBM_BLOCK
 	hmacro_array_t hmacro;
 	dmacro_array_t dmacro;
 	cpumacro_array_t cpumacro;
+
+	// Arrays for non-constant diffusion coefficient depending on spatial coordinates.
+	// Note that these arrays are empty (zero size) by default and `lat.lbmViscosity`
+	// is used instead as a constant throughout the domain. A convenient way to
+	// allocate these arrays is to call `allocateDiffusionCoefficientArrays` from
+	// `setupBoundaries`.
+	hreal_array_t hdiffusionCoeff;
+	dreal_array_t ddiffusionCoeff;
+
+	// Arrays for the heat/mass transfer boundary condition.
+	// Note that these arrays are empty (zero size) by default and the
+	// simulation that wants to use the boundary condition must call
+	// `allocatePhiTransferDirectionArrays` to initialize these arrays.
+	hboollat_array_t hphiTransferDirection;
+	dboollat_array_t dphiTransferDirection;
 
 	// distribution functions
 	hlat_array_t hfs[DFMAX];
@@ -152,6 +171,8 @@ struct LBM_BLOCK
 
 	void allocateHostData();
 	void allocateDeviceData();
+	void allocateDiffusionCoefficientArrays();
+	void allocatePhiTransferDirectionArrays();
 
 	template< typename F >
 	void forLocalLatticeSites(F f);

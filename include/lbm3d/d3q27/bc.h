@@ -18,7 +18,13 @@ struct D3Q27_BC_All
 		GEO_OUTFLOW_EQ,
 		GEO_OUTFLOW_RIGHT,
 		GEO_PERIODIC,
-		GEO_NOTHING
+		GEO_NOTHING,
+		GEO_SYM_TOP,
+		GEO_SYM_BOTTOM,
+		GEO_SYM_LEFT,
+		GEO_SYM_RIGHT,
+		GEO_SYM_BACK,
+		GEO_SYM_FRONT
 	};
 
 	CUDA_HOSTDEV static bool isPeriodic(map_t mapgi)
@@ -29,6 +35,11 @@ struct D3Q27_BC_All
 	CUDA_HOSTDEV static bool isFluid(map_t mapgi)
 	{
 		return (mapgi==GEO_FLUID);
+	}
+
+	CUDA_HOSTDEV static bool isWall(map_t mapgi)
+	{
+		return (mapgi==GEO_WALL);
 	}
 
 	template< typename LBM_KS >
@@ -85,6 +96,78 @@ struct D3Q27_BC_All
 			TNL::swap( KS.f[zzm], KS.f[zzp] );
 			TNL::swap( KS.f[zmz], KS.f[zpz] );
 			TNL::swap( KS.f[zmp], KS.f[zpm] );
+			break;
+		case GEO_SYM_TOP:
+			KS.f[mmm] = KS.f[mmp];
+			KS.f[mzm] = KS.f[mzp];
+			KS.f[mpm] = KS.f[mpp];
+			KS.f[zmm] = KS.f[zmp];
+			KS.f[zzm] = KS.f[zzp];
+			KS.f[zpm] = KS.f[zpp];
+			KS.f[pmm] = KS.f[pmp];
+			KS.f[pzm] = KS.f[pzp];
+			KS.f[ppm] = KS.f[ppp];
+			COLL::computeDensityAndVelocity(KS);
+			break;
+		case GEO_SYM_BOTTOM:
+			KS.f[mmp] = KS.f[mmm];
+			KS.f[mzp] = KS.f[mzm];
+			KS.f[mpp] = KS.f[mpm];
+			KS.f[zmp] = KS.f[zmm];
+			KS.f[zzp] = KS.f[zzm];
+			KS.f[zpp] = KS.f[zpm];
+			KS.f[pmp] = KS.f[pmm];
+			KS.f[pzp] = KS.f[pzm];
+			KS.f[ppp] = KS.f[ppm];
+			COLL::computeDensityAndVelocity(KS);
+			break;
+		case GEO_SYM_LEFT:
+			KS.f[pmm] = KS.f[mmm];
+			KS.f[pmz] = KS.f[mmz];
+			KS.f[pmp] = KS.f[mmp];
+			KS.f[pzm] = KS.f[mzm];
+			KS.f[pzz] = KS.f[mzz];
+			KS.f[pzp] = KS.f[mzp];
+			KS.f[ppm] = KS.f[mpm];
+			KS.f[ppz] = KS.f[mpz];
+			KS.f[ppp] = KS.f[mpp];
+			COLL::computeDensityAndVelocity(KS);
+			break;
+		case GEO_SYM_RIGHT:
+			KS.f[mmm] = KS.f[pmm];
+			KS.f[mmz] = KS.f[pmz];
+			KS.f[mmp] = KS.f[pmp];
+			KS.f[mzm] = KS.f[pzm];
+			KS.f[mzz] = KS.f[pzz];
+			KS.f[mzp] = KS.f[pzp];
+			KS.f[mpm] = KS.f[ppm];
+			KS.f[mpz] = KS.f[ppz];
+			KS.f[mpp] = KS.f[ppp];
+			COLL::computeDensityAndVelocity(KS);
+			break;
+		case GEO_SYM_BACK:
+			KS.f[mpm] = KS.f[mmm];
+			KS.f[mpz] = KS.f[mmz];
+			KS.f[mpp] = KS.f[mmp];
+			KS.f[zpm] = KS.f[zmm];
+			KS.f[zpz] = KS.f[zmz];
+			KS.f[zpp] = KS.f[zmp];
+			KS.f[ppm] = KS.f[pmm];
+			KS.f[ppz] = KS.f[pmz];
+			KS.f[ppp] = KS.f[pmp];
+			COLL::computeDensityAndVelocity(KS);
+			break;
+		case GEO_SYM_FRONT:
+			KS.f[mmm] = KS.f[mpm];
+			KS.f[mmz] = KS.f[mpz];
+			KS.f[mmp] = KS.f[mpp];
+			KS.f[zmm] = KS.f[zpm];
+			KS.f[zmz] = KS.f[zpz];
+			KS.f[zmp] = KS.f[zpp];
+			KS.f[pmm] = KS.f[ppm];
+			KS.f[pmz] = KS.f[ppz];
+			KS.f[pmp] = KS.f[ppp];
+			COLL::computeDensityAndVelocity(KS);
 			break;
 		default:
 			COLL::computeDensityAndVelocity(KS);

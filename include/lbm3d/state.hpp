@@ -1233,9 +1233,12 @@ template< typename NSE >
 void State<NSE>::reset()
 {
 	nse.resetMap(NSE::BC::GEO_FLUID);
-	setupBoundaries();		// this can be virtualized
 	resetLattice(1.0, 0, 0, 0);
 //	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
+
+	// setup domain geometry after all resets, including setEqLat,
+	// so it can override the defaults with different initial condition
+	setupBoundaries();
 }
 
 template< typename NSE >

@@ -1,5 +1,6 @@
 set(TARGETS
         sim_T1
+        sim_T2
 )
 
 foreach(target IN ITEMS ${TARGETS})

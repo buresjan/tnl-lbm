@@ -36,7 +36,6 @@ struct State_NSE_ADE : State<NSE>
 	{
 		nse.resetMap(NSE::BC::GEO_FLUID);
 		ade.resetMap(ADE::BC::GEO_FLUID);
-		this->setupBoundaries();
 
 		// reset lattice for NSE and ADE
 		// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
@@ -47,6 +46,10 @@ struct State_NSE_ADE : State<NSE>
 		ade.forAllLatticeSites( [&] (BLOCK_ADE& block, idx x, idx y, idx z) {
 			block.setEqLat(x,y,z,0,0,0,0);//phi,vx,vy,vz);
 		} );
+
+		// setup domain geometry after all resets, including setEqLat,
+		// so it can override the defaults with different initial condition
+		this->setupBoundaries();
 	}
 
 	void SimInit() override
@@ -141,6 +144,12 @@ struct State_NSE_ADE : State<NSE>
 			block.data.lbmViscosity = nse.lat.lbmViscosity();
 		for( auto& block : ade.blocks )
 			block.data.lbmViscosity = ade.lat.lbmViscosity();
+
+		// update ADE-specific data
+		for( auto& block : ade.blocks ) {
+			block.data.diffusion_coefficient_ptr = block.ddiffusionCoeff.getData();
+			block.data.phi_transfer_direction_ptr = block.dphiTransferDirection.getData();
+		}
 	}
 
 	void SimUpdate() override
@@ -153,7 +162,7 @@ struct State_NSE_ADE : State<NSE>
 			return;
 		}
 		for (auto& block : ade.blocks)
-		if (block.data.lbmViscosity == 0) {
+		if (block.data.lbmViscosity == 0 && block.data.diffusion_coefficient_ptr == nullptr) {
 			spdlog::error("error: ADE diffusion is 0");
 			nse.terminate = true;
 			return;
