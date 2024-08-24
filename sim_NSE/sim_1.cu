@@ -18,7 +18,8 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	real lbmInflowDensity = no1;
+	real lbm_inflow_density = 1;
+	real lbm_inflow_vx = 0;
 
 	void extrapolateInflowDensity()
 	{
@@ -27,19 +28,19 @@ struct StateLocal : State<NSE>
 		idx y = nse.lat.global.y()/3;
 		idx z = nse.lat.global.z()/3;
 
-		real oldlbmInflowDensity = lbmInflowDensity;
+		real old_lbm_inflow_density = lbm_inflow_density;
 		for (auto& block : nse.blocks)
 			if (block.isLocalIndex(x, y, z)) {
-				lbmInflowDensity = block.dmacro.getElement(MACRO::e_rho, x, y, z);
+				lbm_inflow_density = block.dmacro.getElement(MACRO::e_rho, x, y, z);
 				break;
 			}
 			else {
 				// set to zero so that MPI::reduce works with MPI_MAX
-				lbmInflowDensity = 0;
+				lbm_inflow_density = 0;
 			}
 		// make sure that all ranks get the same value
-		lbmInflowDensity = TNL::MPI::reduce(lbmInflowDensity, MPI_MAX, nse.communicator);
-		spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+		lbm_inflow_density = TNL::MPI::reduce(lbm_inflow_density, MPI_MAX, nse.communicator);
+		spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
 	}
 
 	virtual void setupBoundaries()
@@ -131,21 +132,17 @@ struct StateLocal : State<NSE>
 
 	virtual void updateKernelVelocities()
 	{
-		for (auto& block : nse.blocks)
-			block.data.inflow_rho = lbmInflowDensity;
-	}
-
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, real iphysVelocity)
-		: State<NSE>(id, communicator, lat)
-	{
-		for (auto& block : nse.blocks)
-		{
-			block.data.inflow_rho = no1;
-			block.data.inflow_vx = nse.lat.phys2lbmVelocity(iphysVelocity);
+		for (auto& block : nse.blocks) {
+			block.data.inflow_rho = lbm_inflow_density;
+			block.data.inflow_vx = lbm_inflow_vx;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
 		}
 	}
+
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
+		: State<NSE>(id, communicator, lat)
+	{}
 
 	virtual void saveState(bool forced=false)
 	{
@@ -179,7 +176,7 @@ struct StateLocal : State<NSE>
 };
 
 template < typename NSE >
-int sim01_test(int RESOLUTION = 2)
+int sim(int RESOLUTION = 2)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -210,7 +207,10 @@ int sim01_test(int RESOLUTION = 2)
 	lat.physViscosity = PHYS_VISCOSITY;
 
 	const std::string state_id = fmt::format("sim_1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VELOCITY);
+	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat);
+
+	// problem parameters
+	state.lbm_inflow_vx = lat.phys2lbmVelocity(PHYS_VELOCITY);
 
 //	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;
@@ -262,7 +262,7 @@ void run(int RES)
 				D3Q27_MACRO_Void< TRAITS >
 			>;
 
-	sim01_test<NSE_CONFIG>(RES);
+	sim<NSE_CONFIG>(RES);
 }
 
 int main(int argc, char **argv)

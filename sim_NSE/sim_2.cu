@@ -250,7 +250,7 @@ struct StateLocal : State<NSE>
 	}
 
 
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice, int RES)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice)
 		: State<NSE>(id, communicator, lat, periodic_lattice)
 	{
 		errors_count = 10;
@@ -265,7 +265,7 @@ struct StateLocal : State<NSE>
 };
 
 template < typename NSE >
-int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
+int sim(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -306,7 +306,7 @@ int sim02(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 
 	const char* prec = (std::is_same<dreal,float>::value) ? "float" : "double";
 	const std::string state_id = fmt::format("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, use_forcing, RES);
+	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, use_forcing);
 
 	if (state.isMark())
 		return 0;
@@ -452,7 +452,7 @@ void run()
 	{
 //		int res=4;
 		int res = pow(2, i);
-		sim02<NSE_CONFIG>(res, use_forcing, scaling);
+		sim<NSE_CONFIG>(res, use_forcing, scaling);
 	}
 }
 

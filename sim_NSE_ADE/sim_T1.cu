@@ -291,26 +291,13 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	real lbmInflowDensity = no1;
+	dreal lbm_inflow_density = 1;
+	dreal lbm_inflow_vx = 0;
 
 	// constructor
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade, real iphysVelocity)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade)
 		: State_NSE_ADE<NSE, ADE>(id, communicator, lat_nse, lat_ade)
-	{
-		for (auto& block : nse.blocks)
-		{
-//			block.data.inflow_rho = no1;
-			block.data.inflow_vx = nse.lat.phys2lbmVelocity(iphysVelocity);
-			block.data.inflow_vy = 0;
-			block.data.inflow_vz = 0;
-		}
-
-		for (auto& block : ade.blocks)
-		{
-			// TODO: phys -> lbm conversion for concentration?
-			block.data.inflow_phi = 1e-3;
-		}
-	}
+	{}
 
 	void setupBoundaries() override
 	{
@@ -405,8 +392,19 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 
 	void updateKernelVelocities() override
 	{
-//		for (auto& block : nse.blocks)
-//			block.data.inflow_rho = lbmInflowDensity;
+		for (auto& block : nse.blocks)
+		{
+//			block.data.inflow_rho = lbm_inflow_density;
+			block.data.inflow_vx = lbm_inflow_vx;
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
+		}
+
+		for (auto& block : ade.blocks)
+		{
+			// TODO: phys -> lbm conversion for concentration?
+			block.data.inflow_phi = 1e-3;
+		}
 	}
 
 #if 0
@@ -503,9 +501,9 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 			for (auto& block : nse.blocks)
 			if (block.isLocalIndex(x, y, z))
 			{
-				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
-				spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+				real old_lbm_inflow_density = lbm_inflow_density;
+				lbm_inflow_density = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
+				spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
 			}
 		}
 	}
@@ -547,7 +545,10 @@ int simT1_test(int RESOLUTION = 2)
 	lat_ade.physViscosity = PHYS_DIFFUSION;
 
 	const std::string state_id = fmt::format("sim_T1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade, PHYS_VELOCITY);
+	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade);
+
+	// problem parameters
+	state.lbm_inflow_vx = lat_nse.phys2lbmVelocity(PHYS_VELOCITY);
 
 //	state.printIter = 100;
 //	state.printIter = 100;
