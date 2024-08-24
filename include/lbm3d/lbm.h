@@ -87,8 +87,6 @@ struct LBM
 
 	void resetMap(map_t geo_type);
 
-	bool quit() { return terminate; }
-
 	void allocateHostData();
 	void allocateDeviceData();
 	void updateKernelData();		// copy physical parameters to data structure accessible by the CUDA kernel
