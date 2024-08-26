@@ -15,6 +15,7 @@
 #include "lbm3d/d3q7/bc.h"
 #include "lbm3d/d3q7/macro.h"
 #include "lbm3d/state_NSE_ADE.h"
+#include "lbm3d/obstacles_lbm.h"
 
 template < typename TRAITS >
 struct NSE_Data_FreeRhoConstInflow : NSE_Data< TRAITS >
@@ -301,6 +302,11 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 
 	void setupBoundaries() override
 	{
+		lbmDrawCube(nse, NSE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+		lbmDrawCube(ade, ADE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+		//lbmDrawSphere(nse, NSE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+		//lbmDrawSphere(ade, ADE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+
 		nse.setBoundaryX(0, NSE::BC::GEO_INFLOW); 		// left
 		nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_EQ);
 //		nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_RIGHT);
@@ -330,64 +336,6 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 		ade.setBoundaryZ(ade.lat.global.z()-1, ADE::BC::GEO_NOTHING);	// bottom
 		ade.setBoundaryY(0, ADE::BC::GEO_NOTHING); 		// back
 		ade.setBoundaryY(ade.lat.global.y()-1, ADE::BC::GEO_NOTHING);		// front
-
-		// draw a sphere
-		if (1)
-		{
-			int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.2/nse.lat.physDl);
-			int cx=floor(0.45/nse.lat.physDl);
-			real radius=0.05; // 10 cm diameter
-			int range=ceil(radius/nse.lat.physDl)+1;
-			for (int py=cy-range;py<=cy+range;py++)
-			for (int pz=cz-range;pz<=cz+range;pz++)
-			for (int px=cx-range;px<=cx+range;px++)
-				//if (NORM( (real)(px-cx)*nse.lat.physDl, (real)(py-cy)*nse.lat.physDl, (real)(pz-cz)*nse.lat.physDl) < radius )
-				if ((real)(px-cx)*nse.lat.physDl < radius && (real)(py-cy)*nse.lat.physDl < radius && (real)(pz-cz)*nse.lat.physDl < radius )
-				{
-					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
-					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
-				}
-		}
-
-		// draw a cylinder
-		if (0)
-		{
-			//int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.2/nse.lat.physDl);
-			int cx=floor(0.45/nse.lat.physDl);
-			real radius=0.05; // 10 cm diameter
-			int range=ceil(radius/nse.lat.physDl)+1;
-			//for (int py=cy-range;py<=cy+range;py++)
-			for (int pz=cz-range;pz<=cz+range;pz++)
-			for (int px=cx-range;px<=cx+range;px++)
-			for (int py=0;py<=nse.lat.global.y()-1;py++)
-				if (NORM( (real)(px-cx)*nse.lat.physDl,0, (real)(pz-cz)*nse.lat.physDl) < radius )
-				{
-					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
-					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
-				}
-		}
-
-		// draw a block
-		if (0)
-		{
-			//int cy=floor(0.2/nse.lat.physDl);
-			//int cz=floor(0.20/nse.lat.physDl);
-			int cx=floor(0.20/nse.lat.physDl);
-			//int range=nse.lat.global.z()/4;
-			int width=nse.lat.global.z()/10;
-			//for (int py=cy-range;py<=cy+range;py++)
-			//for (int pz=0;pz<=cz;pz++)
-			for (int px=cx;px<=cx+width;px++)
-			for (int pz=1;pz<=nse.lat.global.z()-2;pz++)
-			for (int py=1;py<=nse.lat.global.y()-2;py++)
-				if (!((pz>=nse.lat.global.z()*4/10 &&  pz<=nse.lat.global.z()*6/10) && (py>=nse.lat.global.y()*4/10 && py<=nse.lat.global.y()*6/10)))
-				{
-					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
-					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
-				}
-		}
 	}
 
 	void updateKernelVelocities() override
