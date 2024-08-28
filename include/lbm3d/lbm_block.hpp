@@ -587,7 +587,7 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmacro.allocate();
 	#endif
 #else
-	// TODO: skip douple allocation !!!
+	// TODO: skip double allocation !!!
 //	dmap=hmap;
 //	dmacro=hmacro;
 //	for (uint8_t dfty=0;dfty<DFMAX;dfty++)

@@ -1,6 +1,5 @@
 #include "lbm3d/core.h"
 
-// 3D test domain
 template < typename NSE >
 struct StateLocal : State<NSE>
 {
@@ -173,7 +172,6 @@ int sim(int RESOLUTION = 2)
 	// problem parameters
 	state.lbm_inflow_vx = lat.phys2lbmVelocity(PHYS_VELOCITY);
 
-//	state.printIter = 100;
 	state.nse.physFinalTime = 1.0;
 	state.cnt[PRINT].period = 0.001;
 	state.cnt[PROBE1].period = 0.001;

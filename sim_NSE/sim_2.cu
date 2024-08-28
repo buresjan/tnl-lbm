@@ -30,7 +30,6 @@ struct NSE_Data_XProfileInflow : NSE_Data < TRAITS >
 	}
 };
 
-// uloha: periodic, forcing accelerated
 template < typename NSE >
 struct StateLocal : State<NSE>
 {
@@ -129,13 +128,13 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryZ(1, BC::GEO_WALL);		// top
 		nse.setBoundaryZ(nse.lat.global.z()-2, BC::GEO_WALL);	// bottom
 		nse.setBoundaryY(1, BC::GEO_WALL); 		// back
-		nse.setBoundaryY(nse.lat.global.y()-2, BC::GEO_WALL);		// front
+		nse.setBoundaryY(nse.lat.global.y()-2, BC::GEO_WALL);	// front
 
 		// extra layer needed due to A-A pattern
 		nse.setBoundaryZ(0, BC::GEO_NOTHING);		// top
 		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_NOTHING);	// bottom
 		nse.setBoundaryY(0, BC::GEO_NOTHING); 		// back
-		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);		// front
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);	// front
 	}
 
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)

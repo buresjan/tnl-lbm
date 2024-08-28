@@ -273,7 +273,6 @@ struct D3Q27_MACRO_QCriterion : D3Q27_MACRO_Base< TRAITS >
 };
 #endif
 
-// 3D test domain
 template < typename NSE, typename ADE >
 struct StateLocal : State_NSE_ADE<NSE, ADE>
 {
@@ -498,8 +497,6 @@ int simT1_test(int RESOLUTION = 2)
 	// problem parameters
 	state.lbm_inflow_vx = lat_nse.phys2lbmVelocity(PHYS_VELOCITY);
 
-//	state.printIter = 100;
-//	state.printIter = 100;
 	state.nse.physFinalTime = 10.0;
 	state.cnt[PRINT].period = 0.01;
 //	state.cnt[PROBE1].period = 0.001;
