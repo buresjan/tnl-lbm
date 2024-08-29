@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import subprocess
 import json
 import argparse
@@ -28,7 +30,7 @@ def run_sim(compute,diracmin=1,diracmax=4):
                 wuShuConstructTable.append([parsedJson["threads"],str(dirac),str(count),parsedJson["time_total"],parsedJson["cpu_time_total"],parsedJson["time_loop_Hm"],parsedJson["time_loop_Hm_capacities"],parsedJson["time_loop_Hm_construct"],parsedJson["time_Hm_transpose"],parsedJson["time_loop_Ha_capacities"],parsedJson["time_loop_Ha"],parsedJson["time_write1"],parsedJson["time_matrixCopy"],parsedJson["time_LL_division"]])
                 #data.append(["Default",str(dirac),str(count),tupleVals[0],tupleVals[1],tupleVals[2],tupleVals[3]])
                 count+=1
-                variantString = "hACapacities-"+str(parsedJson["variant_Ha_capacities"])+"_hA-"+str(parsedJson["variant_Ha"])
+                variantString = "hACapacities-"+str(parsedJson.get("variant_Ha_capacities"))+"_hA-"+str(parsedJson.get("variant_Ha"))
             if line.find('--outputCalculationJSON') >=0:
                 splitString = line.split(';')
                 tupleVals = splitString[1]
@@ -101,7 +103,7 @@ def main():
         for l in ejh:
             print(l)
             wushuFinalConstrTable.append(list(l))
-        
+
     print(wushuFinalConstrTable)
 
     file.write(tabulate(wushuFinalConstrTable,tablefmt="github",headers=constructTableHeaders)+'\n')
