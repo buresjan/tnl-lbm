@@ -1,9 +1,9 @@
 #include "lbm3d/core.h"
 
-// cylinder in 3D - Schafer- Turek problem
-// ibmlbm
+// cylinder in 3D - Schafer-Turek problem
+// IBM-LBM
 
-// filament varianty
+// filament variants
 enum { NIC, NORMAL, MIRROR, FLIP, MIRRORFLIP };
 
 //const int DOMAIN_INNER = -1;
@@ -103,7 +103,6 @@ struct StateLocal : State<NSE>
 	real cylinder_diameter=0.01;
 	real cylinder_c[3];
 
-	// virtualize
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
 		int k=0;
@@ -147,10 +146,6 @@ struct StateLocal : State<NSE>
 		}
 		//if (index==k++) return vtk_helper("density", block.hmacro(MACRO::e_rho,x,y,z)*nse.physFluidDensity, 1, desc, value, dofs);
 		return false;
-	}
-
-	virtual void statReset()
-	{
 	}
 
 	virtual void probe1()
@@ -283,12 +278,12 @@ struct StateLocal : State<NSE>
 
 	virtual void setupBoundaries()
 	{
-		nse.setBoundaryZ(0, BC::GEO_WALL);// top
-		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_WALL);// bottom
-		nse.setBoundaryY(0, BC::GEO_WALL); // back
-		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_WALL);// front
 		nse.setBoundaryX(0, BC::GEO_INFLOW); // left
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
+		nse.setBoundaryY(0, BC::GEO_WALL); // back
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_WALL);// front
+		nse.setBoundaryZ(0, BC::GEO_WALL);// top
+		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_WALL);// bottom
 	}
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)

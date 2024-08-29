@@ -351,21 +351,19 @@ void State<NSE>::write1Dcut(point_t from, point_t to, const std::string& fname)
 		point_t p = i + s * (f - i);
 		for (const auto& block : nse.blocks)
 		{
-			if (!block.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z())) continue;
-			if (block.isFluid((idx) p.x(), (idx) p.y(), (idx) p.z()))
+			if (!block.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z()))
+				continue;
+			fprintf(fout, "%e", (s*dist-0.5)*nse.lat.physDl);
+			index=0;
+			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
 			{
-				fprintf(fout, "%e", (s*dist-0.5)*nse.lat.physDl);
-				index=0;
-				while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+				for (int dof=0;dof<dofs;dof++)
 				{
-					for (int dof=0;dof<dofs;dof++)
-					{
-						outputData(block, index-1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
-						fprintf(fout, "\t%e", value);
-					}
+					outputData(block, index-1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
+					fprintf(fout, "\t%e", value);
 				}
-				fprintf(fout, "\n");
 			}
+			fprintf(fout, "\n");
 		}
 	}
 	fclose(fout);
@@ -393,20 +391,17 @@ void State<NSE>::write1Dcut_X(idx y, idx z, const std::string& fname)
 	for (const auto& block : nse.blocks)
 	for (idx i = block.offset.x(); i < block.offset.x() + block.local.x(); i++)
 	{
-		if (block.isFluid(i,y,z))
+		fprintf(fout, "%e", nse.lat.lbm2physX(i));
+		index=0;
+		if (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
 		{
-			fprintf(fout, "%e", nse.lat.lbm2physX(i));
-			index=0;
-			if (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+			for (int dof=0;dof<dofs;dof++)
 			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(block, index-1,dof,idd,i,y,z,value,dofs);
-					fprintf(fout, "\t%e", value);
-				}
+				outputData(block, index-1,dof,idd,i,y,z,value,dofs);
+				fprintf(fout, "\t%e", value);
 			}
-			fprintf(fout, "\n");
 		}
+		fprintf(fout, "\n");
 	}
 	fclose(fout);
 }
@@ -433,20 +428,17 @@ void State<NSE>::write1Dcut_Y(idx x, idx z, const std::string& fname)
 	for (const auto& block : nse.blocks)
 	for (idx i = block.offset.y(); i < block.offset.y() + block.local.y(); i++)
 	{
-		if (block.isFluid(x,i,z))
+		fprintf(fout, "%e", nse.lat.lbm2physY(i));
+		int index=0;
+		while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
 		{
-			fprintf(fout, "%e", nse.lat.lbm2physY(i));
-			int index=0;
-			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+			for (int dof=0;dof<dofs;dof++)
 			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(block, index-1,dof,idd,x,i,z,value,dofs);
-					fprintf(fout, "\t%e", value);
-				}
+				outputData(block, index-1,dof,idd,x,i,z,value,dofs);
+				fprintf(fout, "\t%e", value);
 			}
-			fprintf(fout, "\n");
 		}
+		fprintf(fout, "\n");
 	}
 	fclose(fout);
 }
@@ -473,20 +465,17 @@ void State<NSE>::write1Dcut_Z(idx x, idx y, const std::string& fname)
 	for (const auto& block : nse.blocks)
 	for (idx i = block.offset.z(); i < block.offset.z() + block.local.z(); i++)
 	{
-		if (block.isFluid(x,y,i))
+		fprintf(fout, "%e", nse.lat.lbm2physZ(i));
+		index=0;
+		while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
 		{
-			fprintf(fout, "%e", nse.lat.lbm2physZ(i));
-			index=0;
-			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
+			for (int dof=0;dof<dofs;dof++)
 			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(block, index-1,dof,idd,x,y,i,value,dofs);
-					fprintf(fout, "\t%e", value);
-				}
+				outputData(block, index-1,dof,idd,x,y,i,value,dofs);
+				fprintf(fout, "\t%e", value);
 			}
-			fprintf(fout, "\n");
 		}
+		fprintf(fout, "\n");
 	}
 	fclose(fout);
 }
@@ -1244,9 +1233,12 @@ template< typename NSE >
 void State<NSE>::reset()
 {
 	nse.resetMap(NSE::BC::GEO_FLUID);
-	setupBoundaries();		// this can be virtualized
 	resetLattice(1.0, 0, 0, 0);
 //	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
+
+	// setup domain geometry after all resets, including setEqLat,
+	// so it can override the defaults with different initial condition
+	setupBoundaries();
 }
 
 template< typename NSE >

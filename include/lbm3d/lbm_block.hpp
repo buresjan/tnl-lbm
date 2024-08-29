@@ -304,13 +304,6 @@ void LBM_BLOCK<CONFIG>::setBoundaryZ(idx z, map_t value)
 }
 
 template< typename CONFIG >
-bool LBM_BLOCK<CONFIG>::isFluid(idx x, idx y, idx z) const
-{
-	if (!isLocalIndex(x, y, z)) return false;
-	return CONFIG::BC::isFluid(hmap(x,y,z));
-}
-
-template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::resetMap(map_t geo_type)
 {
 	hmap.setValue(geo_type);
@@ -321,12 +314,16 @@ template< typename CONFIG >
 void  LBM_BLOCK<CONFIG>::copyMapToHost()
 {
 	hmap = dmap;
+	hdiffusionCoeff = ddiffusionCoeff;
+	hphiTransferDirection = dphiTransferDirection;
 }
 
 template< typename CONFIG >
 void  LBM_BLOCK<CONFIG>::copyMapToDevice()
 {
 	dmap = hmap;
+	ddiffusionCoeff = hdiffusionCoeff;
+	dphiTransferDirection = hphiTransferDirection;
 }
 
 template< typename CONFIG >
@@ -590,7 +587,7 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmacro.allocate();
 	#endif
 #else
-	// TODO: skip douple allocation !!!
+	// TODO: skip double allocation !!!
 //	dmap=hmap;
 //	dmacro=hmacro;
 //	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
@@ -610,6 +607,142 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	data.XYZ = data.indexer.getStorageSize();
 	data.dmap = dmap.getData();
 	data.dmacro = dmacro.getData();
+}
+
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::allocateDiffusionCoefficientArrays()
+{
+	hdiffusionCoeff.setSizes(global.x(), global.y(), global.z());
+	ddiffusionCoeff.setSizes(global.x(), global.y(), global.z());
+#ifdef HAVE_MPI
+	hdiffusionCoeff.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	hdiffusionCoeff.allocate();
+	ddiffusionCoeff.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	ddiffusionCoeff.allocate();
+#endif
+}
+
+template< typename CONFIG >
+void LBM_BLOCK<CONFIG>::allocatePhiTransferDirectionArrays()
+{
+	using hbool_array_t = typename CONFIG::hbool_array_t;
+	hbool_array_t TransferFS;
+	hbool_array_t TransferSF;
+	hbool_array_t TransferSW;
+	TransferFS.setSizes(global.x(), global.y(), global.z());
+	TransferSF.setSizes(global.x(), global.y(), global.z());
+	TransferSW.setSizes(global.x(), global.y(), global.z());
+
+	#ifdef HAVE_MPI
+	TransferFS.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	TransferFS.allocate();
+	TransferSF.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	TransferSF.allocate();
+	TransferSW.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	TransferSW.allocate();
+	#endif
+
+	TransferFS.setValue(false);
+	TransferSF.setValue(false);
+	TransferSW.setValue(false);
+
+	hphiTransferDirection.setSizes(0, global.x(), global.y(), global.z());
+	dphiTransferDirection.setSizes(0, global.x(), global.y(), global.z());
+	#ifdef HAVE_MPI
+	hphiTransferDirection.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+	hphiTransferDirection.allocate();
+	dphiTransferDirection.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+	dphiTransferDirection.allocate();
+	#endif
+
+	forLocalLatticeSites( [&] (LBM_BLOCK& block, idx x, idx y, idx z) {
+		if (CONFIG::BC::isFluid(hmap(x, y, z))) {
+			if (CONFIG::BC::isSolid(hmap(x+1, y, z))) {
+				TransferFS(x, y, z) = true;
+				hphiTransferDirection(pzz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isSolid(hmap(x, y+1, z))) {
+				TransferFS(x, y, z) = true;
+				hphiTransferDirection(zpz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isSolid(hmap(x, y, z+1))) {
+				TransferFS(x, y, z) = true;
+				hphiTransferDirection(zzp, x, y, z) = true;
+			}
+			if (CONFIG::BC::isSolid(hmap(x-1, y, z))) {
+				TransferFS(x, y, z) = true;
+				hphiTransferDirection(mzz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isSolid(hmap(x, y-1, z))) {
+				TransferFS(x, y, z) = true;
+				hphiTransferDirection(zmz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isSolid(hmap(x, y, z-1))) {
+				TransferFS(x, y, z) = true;
+				hphiTransferDirection(zzm, x, y, z) = true;
+			}
+		}
+		if (CONFIG::BC::isSolid(hmap(x, y, z))) {
+			if (CONFIG::BC::isFluid(hmap(x+1, y, z))) {
+				TransferSF(x, y, z) = true;
+				hphiTransferDirection(pzz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isFluid(hmap(x, y+1, z))) {
+				TransferSF(x, y, z) = true;
+				hphiTransferDirection(zpz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isFluid(hmap(x, y, z+1))) {
+				TransferSF(x, y, z) = true;
+				hphiTransferDirection(zzp, x, y, z) = true;
+			}
+			if (CONFIG::BC::isFluid(hmap(x-1, y, z))) {
+				TransferSF(x, y, z) = true;
+				hphiTransferDirection(mzz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isFluid(hmap(x, y-1, z))) {
+				TransferSF(x, y, z) = true;
+				hphiTransferDirection(zmz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isFluid(hmap(x, y, z-1))) {
+				TransferSF(x, y, z) = true;
+				hphiTransferDirection(zzm, x, y, z) = true;
+			}
+
+			if (CONFIG::BC::isWall(hmap(x+1, y, z))) {
+				TransferSW(x, y, z) = true;
+				hphiTransferDirection(pzz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isWall(hmap(x, y+1, z))) {
+				TransferSW(x, y, z) = true;
+				hphiTransferDirection(zpz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isWall(hmap(x, y, z+1))) {
+				TransferSW(x, y, z) = true;
+				hphiTransferDirection(zzp, x, y, z) = true;
+			}
+			if (CONFIG::BC::isWall(hmap(x-1, y, z))) {
+				TransferSW(x, y, z) = true;
+				hphiTransferDirection(mzz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isWall(hmap(x, y-1, z))) {
+				TransferSW(x, y, z) = true;
+				hphiTransferDirection(zmz, x, y, z) = true;
+			}
+			if (CONFIG::BC::isWall(hmap(x, y, z-1))) {
+				TransferSW(x, y, z) = true;
+				hphiTransferDirection(zzm, x, y, z) = true;
+			}
+		}
+	} );
+
+	forLocalLatticeSites( [&] (LBM_BLOCK& block, idx x, idx y, idx z) {
+		if (TransferFS(x, y, z))
+			hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_FS;
+		if (TransferSF(x, y, z))
+			hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SF;
+		if (TransferSW(x, y, z))
+			hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SW;
+	} );
 }
 
 template< typename CONFIG >

@@ -1,6 +1,5 @@
 #include "lbm3d/core.h"
 
-// 3D test domain
 template < typename NSE >
 struct StateLocal : State<NSE>
 {
@@ -18,7 +17,8 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	real lbmInflowDensity = no1;
+	real lbm_inflow_density = 1;
+	real lbm_inflow_vx = 0;
 
 	void extrapolateInflowDensity()
 	{
@@ -27,19 +27,19 @@ struct StateLocal : State<NSE>
 		idx y = nse.lat.global.y()/3;
 		idx z = nse.lat.global.z()/3;
 
-		real oldlbmInflowDensity = lbmInflowDensity;
+		real old_lbm_inflow_density = lbm_inflow_density;
 		for (auto& block : nse.blocks)
 			if (block.isLocalIndex(x, y, z)) {
-				lbmInflowDensity = block.dmacro.getElement(MACRO::e_rho, x, y, z);
+				lbm_inflow_density = block.dmacro.getElement(MACRO::e_rho, x, y, z);
 				break;
 			}
 			else {
 				// set to zero so that MPI::reduce works with MPI_MAX
-				lbmInflowDensity = 0;
+				lbm_inflow_density = 0;
 			}
 		// make sure that all ranks get the same value
-		lbmInflowDensity = TNL::MPI::reduce(lbmInflowDensity, MPI_MAX, nse.communicator);
-		spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+		lbm_inflow_density = TNL::MPI::reduce(lbm_inflow_density, MPI_MAX, nse.communicator);
+		spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
 	}
 
 	virtual void setupBoundaries()
@@ -58,53 +58,14 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryY(0, BC::GEO_NOTHING); 		// back
 		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_NOTHING);	// front
 
-		// draw a sphere
-		if (0)
-		{
-			int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.2/nse.lat.physDl);
-			int cx=floor(0.45/nse.lat.physDl);
-			real radius=0.05; // 10 cm diameter
-			int range=ceil(radius/nse.lat.physDl)+1;
-			for (int py=cy-range;py<=cy+range;py++)
-			for (int pz=cz-range;pz<=cz+range;pz++)
-			for (int px=cx-range;px<=cx+range;px++)
-				if (NORM( (real)(px-cx)*nse.lat.physDl, (real)(py-cy)*nse.lat.physDl, (real)(pz-cz)*nse.lat.physDl) < radius )
-					nse.setMap(px,py,pz,BC::GEO_WALL);
-		}
-
-		// draw a cylinder
-		if (0)
-		{
-			//int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.2/nse.lat.physDl);
-			int cx=floor(0.45/nse.lat.physDl);
-			real radius=0.05; // 10 cm diameter
-			int range=ceil(radius/nse.lat.physDl)+1;
-			//		for (int py=cy-range;py<=cy+range;py++)
-			for (int pz=cz-range;pz<=cz+range;pz++)
-			for (int px=cx-range;px<=cx+range;px++)
-			for (int py=0;py<=nse.lat.global.y()-1;py++)
-				if (NORM( (real)(px-cx)*nse.lat.physDl,0, (real)(pz-cz)*nse.lat.physDl) < radius )
-					nse.setMap(px,py,pz,BC::GEO_WALL);
-		}
-
-		// draw a block
-		if (1)
-		{
-			//int cy=floor(0.2/nse.lat.physDl);
-			//int cz=floor(0.20/nse.lat.physDl);
-			int cx=floor(0.20/nse.lat.physDl);
-			//int range=nse.lat.global.z()/4;
-			int width=nse.lat.global.z()/10;
-			//for (int py=cy-range;py<=cy+range;py++)
-			//for (int pz=0;pz<=cz;pz++)
-			for (int px=cx;px<=cx+width;px++)
-			for (int pz=1;pz<=nse.lat.global.z()-2;pz++)
-			for (int py=1;py<=nse.lat.global.y()-2;py++)
-				if (!((pz>=nse.lat.global.z()*4/10 &&  pz<=nse.lat.global.z()*6/10) && (py>=nse.lat.global.y()*4/10 && py<=nse.lat.global.y()*6/10)))
-					nse.setMap(px,py,pz,BC::GEO_WALL);
-		}
+		// draw a wall with a hole
+		int cx=floor(0.20/nse.lat.physDl);
+		int width=nse.lat.global.z()/10;
+		for (int px=cx;px<=cx+width;px++)
+		for (int pz=1;pz<=nse.lat.global.z()-2;pz++)
+		for (int py=1;py<=nse.lat.global.y()-2;py++)
+			if (!(pz>=nse.lat.global.z()*4/10 && pz<=nse.lat.global.z()*6/10 && py>=nse.lat.global.y()*4/10 && py<=nse.lat.global.y()*6/10))
+				nse.setMap(px,py,pz,BC::GEO_WALL);
 	}
 
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
@@ -131,21 +92,17 @@ struct StateLocal : State<NSE>
 
 	virtual void updateKernelVelocities()
 	{
-		for (auto& block : nse.blocks)
-			block.data.inflow_rho = lbmInflowDensity;
-	}
-
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, real iphysVelocity)
-		: State<NSE>(id, communicator, lat)
-	{
-		for (auto& block : nse.blocks)
-		{
-			block.data.inflow_rho = no1;
-			block.data.inflow_vx = nse.lat.phys2lbmVelocity(iphysVelocity);
+		for (auto& block : nse.blocks) {
+			block.data.inflow_rho = lbm_inflow_density;
+			block.data.inflow_vx = lbm_inflow_vx;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
 		}
 	}
+
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
+		: State<NSE>(id, communicator, lat)
+	{}
 
 	virtual void saveState(bool forced=false)
 	{
@@ -179,7 +136,7 @@ struct StateLocal : State<NSE>
 };
 
 template < typename NSE >
-int sim01_test(int RESOLUTION = 2)
+int sim(int RESOLUTION = 2)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -210,9 +167,11 @@ int sim01_test(int RESOLUTION = 2)
 	lat.physViscosity = PHYS_VISCOSITY;
 
 	const std::string state_id = fmt::format("sim_1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat, PHYS_VELOCITY);
+	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat);
 
-//	state.printIter = 100;
+	// problem parameters
+	state.lbm_inflow_vx = lat.phys2lbmVelocity(PHYS_VELOCITY);
+
 	state.nse.physFinalTime = 1.0;
 	state.cnt[PRINT].period = 0.001;
 	state.cnt[PROBE1].period = 0.001;
@@ -262,7 +221,7 @@ void run(int RES)
 				D3Q27_MACRO_Void< TRAITS >
 			>;
 
-	sim01_test<NSE_CONFIG>(RES);
+	sim<NSE_CONFIG>(RES);
 }
 
 int main(int argc, char **argv)

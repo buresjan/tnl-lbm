@@ -55,7 +55,7 @@ void execute(STATE& state)
 		}
 
 		// handle termination locally
-		if (state.nse.quit())
+		if (state.nse.terminate)
 		{
 			spdlog::info("terminate flag triggered");
 			quit = true;

@@ -62,6 +62,45 @@ struct D3Q27_MACRO_Default : D3Q27_MACRO_Base< TRAITS >
 
 
 template < typename TRAITS >
+struct D3Q27_MACRO_Mean : D3Q27_MACRO_Base< TRAITS >
+{
+	using dreal = typename TRAITS::dreal;
+	using idx = typename TRAITS::idx;
+
+	enum { e_rho, e_vx, e_vy, e_vz, e_vm_x, e_vm_y, e_vm_z, e_vm2_x, e_vm2_y, e_vm2_z, e_vm2_xy, e_vm2_xz, e_vm2_yz, N };
+
+	template < typename LBM_DATA, typename LBM_KS >
+	CUDA_HOSTDEV static void outputMacro(LBM_DATA &SD, LBM_KS &KS, idx x, idx y, idx z)
+	{
+		// instant quantities
+		SD.macro(e_rho, x, y, z) = KS.rho;
+		SD.macro(e_vx, x, y, z) = KS.vx;
+		SD.macro(e_vy, x, y, z) = KS.vy;
+		SD.macro(e_vz, x, y, z) = KS.vz;
+		// mean quantities
+		SD.macro(e_vm_x, x, y, z) += KS.vx;
+		SD.macro(e_vm_y, x, y, z) += KS.vy;
+		SD.macro(e_vm_z, x, y, z) += KS.vz;
+		SD.macro(e_vm2_x, x, y, z) += KS.vx*KS.vx;
+		SD.macro(e_vm2_y, x, y, z) += KS.vy*KS.vy;
+		SD.macro(e_vm2_z, x, y, z) += KS.vz*KS.vz;
+		SD.macro(e_vm2_xy, x, y, z) += KS.vx*KS.vy;
+		SD.macro(e_vm2_xz, x, y, z) += KS.vx*KS.vz;
+		SD.macro(e_vm2_yz, x, y, z) += KS.vy*KS.vz;
+	}
+
+	template < typename LBM_DATA, typename LBM_KS >
+	CUDA_HOSTDEV static void copyQuantities(LBM_DATA &SD, LBM_KS &KS, idx x, idx y, idx z)
+	{
+		KS.lbmViscosity = SD.lbmViscosity;
+		KS.fx = SD.fx;
+		KS.fy = SD.fy;
+		KS.fz = SD.fz;
+	}
+};
+
+
+template < typename TRAITS >
 struct D3Q27_MACRO_Void : D3Q27_MACRO_Base< TRAITS >
 {
 	using dreal = typename TRAITS::dreal;

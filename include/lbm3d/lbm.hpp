@@ -86,6 +86,13 @@ void LBM<CONFIG>::setMap(idx x, idx y, idx z, map_t value)
 }
 
 template< typename CONFIG >
+void LBM<CONFIG>::allocatePhiTransferDirectionArrays()
+{
+	for( auto& block : blocks )
+		block.allocatePhiTransferDirectionArrays();
+}
+
+template< typename CONFIG >
 void LBM<CONFIG>::setBoundaryX(idx x, map_t value)
 {
 	for( auto& block : blocks )
@@ -104,15 +111,6 @@ void LBM<CONFIG>::setBoundaryZ(idx z, map_t value)
 {
 	for( auto& block : blocks )
 		block.setBoundaryZ(z, value);
-}
-
-template< typename CONFIG >
-bool LBM<CONFIG>::isFluid(idx x, idx y, idx z)
-{
-	for( auto& block : blocks )
-		if (block.isFluid(x, y, z))
-			return true;
-	return false;
 }
 
 
@@ -291,6 +289,13 @@ void LBM<CONFIG>::allocateDeviceData()
 {
 	for( auto& block : blocks )
 		block.allocateDeviceData();
+}
+
+template< typename CONFIG >
+void LBM<CONFIG>::allocateDiffusionCoefficientArrays()
+{
+	for( auto& block : blocks )
+		block.allocateDiffusionCoefficientArrays();
 }
 
 template< typename CONFIG >

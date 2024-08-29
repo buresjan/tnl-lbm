@@ -50,7 +50,7 @@ build_subproject:
   stage: build
   image: "jlk.fjfi.cvut.cz:5000/fjfi-mmg/archlinux-cuda:latest"
   script:
-    - pacman -Syu --needed --noconfirm cmake ninja git libpng
+    - pacman -Syu --needed --noconfirm cmake ninja git libpng fmt spdlog
     - cd tests/subproject
     - cmake -B build -S . -G Ninja
             -DCMAKE_BUILD_TYPE=Debug

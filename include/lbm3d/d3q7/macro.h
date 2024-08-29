@@ -28,7 +28,7 @@ struct D3Q7_MACRO_Default
 	template < typename LBM_DATA, typename LBM_KS >
 	CUDA_HOSTDEV static void copyQuantities(LBM_DATA &SD, LBM_KS &KS, idx x, idx y, idx z)
 	{
-		KS.lbmViscosity = SD.lbmViscosity;
+		KS.lbmViscosity = SD.diffusionCoefficient(x, y, z);
 	}
 };
 

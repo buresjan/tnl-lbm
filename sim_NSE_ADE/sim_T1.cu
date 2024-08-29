@@ -15,6 +15,7 @@
 #include "lbm3d/d3q7/bc.h"
 #include "lbm3d/d3q7/macro.h"
 #include "lbm3d/state_NSE_ADE.h"
+#include "lbm3d/obstacles_lbm.h"
 
 template < typename TRAITS >
 struct NSE_Data_FreeRhoConstInflow : NSE_Data< TRAITS >
@@ -272,7 +273,6 @@ struct D3Q27_MACRO_QCriterion : D3Q27_MACRO_Base< TRAITS >
 };
 #endif
 
-// 3D test domain
 template < typename NSE, typename ADE >
 struct StateLocal : State_NSE_ADE<NSE, ADE>
 {
@@ -291,29 +291,21 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	real lbmInflowDensity = no1;
+	dreal lbm_inflow_density = 1;
+	dreal lbm_inflow_vx = 0;
 
 	// constructor
-	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade, real iphysVelocity)
+	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade)
 		: State_NSE_ADE<NSE, ADE>(id, communicator, lat_nse, lat_ade)
-	{
-		for (auto& block : nse.blocks)
-		{
-//			block.data.inflow_rho = no1;
-			block.data.inflow_vx = nse.lat.phys2lbmVelocity(iphysVelocity);
-			block.data.inflow_vy = 0;
-			block.data.inflow_vz = 0;
-		}
-
-		for (auto& block : ade.blocks)
-		{
-			// TODO: phys -> lbm conversion for concentration?
-			block.data.inflow_phi = 1e-3;
-		}
-	}
+	{}
 
 	void setupBoundaries() override
 	{
+		lbmDrawCube(nse, NSE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+		lbmDrawCube(ade, ADE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+		//lbmDrawSphere(nse, NSE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+		//lbmDrawSphere(ade, ADE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
+
 		nse.setBoundaryX(0, NSE::BC::GEO_INFLOW); 		// left
 		nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_EQ);
 //		nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_RIGHT);
@@ -343,70 +335,23 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 		ade.setBoundaryZ(ade.lat.global.z()-1, ADE::BC::GEO_NOTHING);	// bottom
 		ade.setBoundaryY(0, ADE::BC::GEO_NOTHING); 		// back
 		ade.setBoundaryY(ade.lat.global.y()-1, ADE::BC::GEO_NOTHING);		// front
-
-		// draw a sphere
-		if (1)
-		{
-			int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.2/nse.lat.physDl);
-			int cx=floor(0.45/nse.lat.physDl);
-			real radius=0.05; // 10 cm diameter
-			int range=ceil(radius/nse.lat.physDl)+1;
-			for (int py=cy-range;py<=cy+range;py++)
-			for (int pz=cz-range;pz<=cz+range;pz++)
-			for (int px=cx-range;px<=cx+range;px++)
-				//if (NORM( (real)(px-cx)*nse.lat.physDl, (real)(py-cy)*nse.lat.physDl, (real)(pz-cz)*nse.lat.physDl) < radius )
-				if ((real)(px-cx)*nse.lat.physDl < radius && (real)(py-cy)*nse.lat.physDl < radius && (real)(pz-cz)*nse.lat.physDl < radius )
-				{
-					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
-					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
-				}
-		}
-
-		// draw a cylinder
-		if (0)
-		{
-			//int cy=floor(0.2/nse.lat.physDl);
-			int cz=floor(0.2/nse.lat.physDl);
-			int cx=floor(0.45/nse.lat.physDl);
-			real radius=0.05; // 10 cm diameter
-			int range=ceil(radius/nse.lat.physDl)+1;
-			//for (int py=cy-range;py<=cy+range;py++)
-			for (int pz=cz-range;pz<=cz+range;pz++)
-			for (int px=cx-range;px<=cx+range;px++)
-			for (int py=0;py<=nse.lat.global.y()-1;py++)
-				if (NORM( (real)(px-cx)*nse.lat.physDl,0, (real)(pz-cz)*nse.lat.physDl) < radius )
-				{
-					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
-					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
-				}
-		}
-
-		// draw a block
-		if (0)
-		{
-			//int cy=floor(0.2/nse.lat.physDl);
-			//int cz=floor(0.20/nse.lat.physDl);
-			int cx=floor(0.20/nse.lat.physDl);
-			//int range=nse.lat.global.z()/4;
-			int width=nse.lat.global.z()/10;
-			//for (int py=cy-range;py<=cy+range;py++)
-			//for (int pz=0;pz<=cz;pz++)
-			for (int px=cx;px<=cx+width;px++)
-			for (int pz=1;pz<=nse.lat.global.z()-2;pz++)
-			for (int py=1;py<=nse.lat.global.y()-2;py++)
-				if (!((pz>=nse.lat.global.z()*4/10 &&  pz<=nse.lat.global.z()*6/10) && (py>=nse.lat.global.y()*4/10 && py<=nse.lat.global.y()*6/10)))
-				{
-					nse.setMap(px,py,pz,NSE::BC::GEO_WALL);
-					ade.setMap(px,py,pz,ADE::BC::GEO_WALL);
-				}
-		}
 	}
 
 	void updateKernelVelocities() override
 	{
-//		for (auto& block : nse.blocks)
-//			block.data.inflow_rho = lbmInflowDensity;
+		for (auto& block : nse.blocks)
+		{
+//			block.data.inflow_rho = lbm_inflow_density;
+			block.data.inflow_vx = lbm_inflow_vx;
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
+		}
+
+		for (auto& block : ade.blocks)
+		{
+			// TODO: phys -> lbm conversion for concentration?
+			block.data.inflow_phi = 1e-3;
+		}
 	}
 
 #if 0
@@ -503,9 +448,9 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 			for (auto& block : nse.blocks)
 			if (block.isLocalIndex(x, y, z))
 			{
-				real oldlbmInflowDensity = lbmInflowDensity;
-				lbmInflowDensity = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
-				spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", oldlbmInflowDensity, lbmInflowDensity);
+				real old_lbm_inflow_density = lbm_inflow_density;
+				lbm_inflow_density = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
+				spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
 			}
 		}
 	}
@@ -547,10 +492,11 @@ int simT1_test(int RESOLUTION = 2)
 	lat_ade.physViscosity = PHYS_DIFFUSION;
 
 	const std::string state_id = fmt::format("sim_T1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade, PHYS_VELOCITY);
+	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade);
 
-//	state.printIter = 100;
-//	state.printIter = 100;
+	// problem parameters
+	state.lbm_inflow_vx = lat_nse.phys2lbmVelocity(PHYS_VELOCITY);
+
 	state.nse.physFinalTime = 10.0;
 	state.cnt[PRINT].period = 0.01;
 //	state.cnt[PROBE1].period = 0.001;
