@@ -275,7 +275,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.add2Dcut_Y(LBM_Y/2,"cut_Y");
 	state.add2Dcut_Z(LBM_Z/2,"cut_Z");
 
-	state.ball_c[0] = 5.5*state.ball_diameter;
+	state.ball_c[0] = 2*state.ball_diameter;
 	state.ball_c[1] = 5.5*state.ball_diameter;
 	state.ball_c[2] = 5.5*state.ball_diameter;
 	// create a filament
