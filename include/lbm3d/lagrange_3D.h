@@ -194,14 +194,11 @@ struct Lagrange3D
 	real computeMaxDistFromMinDist(real mindist);		// computes min and max distance between neighboring nodes
 //	void integrateForce(real &Fx, real &Fy, real &Fz, real surface_element_size) { printf("integrateForce not implemented yet."); }
 
-	// special log file for the linear system solvers
-	std::string logfile;
-
-	template < typename... ARGS >
-	void log(const char* fmt, ARGS... args);
+	// flag to enable matrix output to .mtx files
+	bool mtx_output = false;
 
 	// constructors
-	Lagrange3D(LBM &inputLBM, const std::string& resultsDir, int obj_id);
+	Lagrange3D(LBM &inputLBM, const std::string& state_id, int obj_id);
 	~Lagrange3D();
 
 	// disable copy-constructor and copy-assignment, leave only move-constructor and move-assignment

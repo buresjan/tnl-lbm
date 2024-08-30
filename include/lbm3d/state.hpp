@@ -11,8 +11,7 @@
 template< typename NSE >
 int State<NSE>::addLagrange3D()
 {
-	const std::string dir = fmt::format("results_{}", id);
-	FF.emplace_back(nse, std::move(dir),FF.size());
+	FF.emplace_back(nse, id, FF.size());
 	return FF.size()-1;
 }
 
@@ -1273,7 +1272,7 @@ void State<NSE>::SimInit()
 	for (auto& block : nse.blocks)
 		spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-	spdlog::info("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
+	spdlog::info("START: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
 
 	// reset counters
 	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;

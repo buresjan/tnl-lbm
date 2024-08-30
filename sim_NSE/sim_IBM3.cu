@@ -282,6 +282,8 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	real sigma = nasobek * PHYS_DL;
 	state.FIL_INDEX = drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma, method, dirac_delta, ws_compute);
 
+	state.FF[state.FIL_INDEX].mtx_output = true;
+
 	execute(state);
 
 	return 0;

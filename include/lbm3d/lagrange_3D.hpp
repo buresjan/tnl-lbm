@@ -15,7 +15,7 @@
 #include <fmt/core.h>
 #include <nlohmann/json.hpp>
 
-#include "lbm_common/timeutils.h"
+#include "lbm_common/logging.h"
 #include "lagrange_3D.h"
 #include "ibm_kernels.h"
 #include "dirac.h"
@@ -238,6 +238,8 @@ void Lagrange3D<LBM>::allocateMatricesCPU()
 template< typename LBM >
 void Lagrange3D<LBM>::constructMatricesCPU()
 {
+	auto ibm_logger = spdlog::get("ibm");
+
 	// Start timer to measure WuShu construction time
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
@@ -253,11 +255,9 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	double cpu_time_total = 0;
 	double time_Hm_transpose = 0;
 
-	fmt::print("started timer for wushu construction\n");
-	timer.start();
-
 	idx m = LL.size();	// number of lagrangian nodes
 
+	timer.start();
 	loopTimer.start();
 	// Calculate row capacities of hM
 	const idx support = 5; // search in this support
@@ -290,7 +290,6 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 
 	loopTimer.stop();
 	time_loop_Hm_Capacities = loopTimer.getRealTime();
-	fmt::print("------- matrix M row capacities time: {}\n", time_loop_Hm_Capacities);
 
 	ws_tnl_hM.setRowCapacities(hM_row_capacities);
 
@@ -327,7 +326,6 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	loopTimer.stop();
 	time_loop_Hm_Construct = loopTimer.getRealTime();
 	time_loop_Hm = time_loop_Hm_Capacities + time_loop_Hm_Construct;
-	fmt::print("------- matrix M construction time: {}\n", time_loop_Hm_Construct);
 
 	// Transpose matrix M
 	loopTimer.reset();
@@ -384,7 +382,6 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 
 	loopTimer.stop();
 	time_loop_Ha_Capacities = loopTimer.getRealTime();
-	fmt::print("------- matrix A row capacities time: {}\n", time_loop_Ha_Capacities);
 	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
 
@@ -427,7 +424,6 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	}
 	loopTimer.stop();
 	time_loop_Ha = loopTimer.getRealTime();
-	fmt::print("------- matrix A construction time: {}\n", time_loop_Ha);
 
 
 	// Update the preconditioner
@@ -448,17 +444,19 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	// Update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
-
-	loopTimer.reset();
-	loopTimer.start();
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
-	TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
-	loopTimer.stop();
-	time_write1 = loopTimer.getRealTime();
 	#endif
 
+	if (mtx_output)
+	{
+		loopTimer.reset();
+		loopTimer.start();
+		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
+		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
+		loopTimer.stop();
+		time_write1 = loopTimer.getRealTime();
+	}
+
 	timer.stop();
-	fmt::print("-------wuShuTnl final timer time: {}\n",timer.getRealTime());
 	time_total = timer.getRealTime();
 	cpu_time_total = timer.getCPUTime();
 	nlohmann::json j;
@@ -473,8 +471,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	j["time_Hm_transpose"] = time_Hm_transpose;
 	j["time_write1"] = time_write1;
 	j["time_matrixCopy"] = time_matrixCopy;
-	std::string jsonOutput = j.dump();
-	fmt::print("--outputJSON;{}\n",jsonOutput);
+	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
 
 template< typename LBM >
@@ -516,6 +513,8 @@ void Lagrange3D<LBM>::allocateMatricesGPU()
 template< typename LBM >
 void Lagrange3D<LBM>::constructMatricesGPU()
 {
+	auto ibm_logger = spdlog::get("ibm");
+
 	// Start timer to measure WuShu construction time
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
@@ -531,13 +530,9 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	double cpu_time_total = 0;
 	double time_Hm_transpose = 0;
 
-	fmt::print("started timer for wushu construction\n");
-	timer.start();
-
 	idx m = LL.size();	// number of lagrangian nodes
 
-
-	loopTimer.reset();
+	timer.start();
 	loopTimer.start();
 	// Calculate row capacities of matrix M
 	TNL::Backend::LaunchConfiguration dM_config;
@@ -551,7 +546,6 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 
 	loopTimer.stop();
 	time_loop_Hm_Capacities = loopTimer.getRealTime();
-	fmt::print("------- matrix M row capacities time: {}\n", time_loop_Hm_Capacities);
 
 	ws_tnl_dM.setRowCapacities(dM_row_capacities);
 
@@ -576,7 +570,6 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	loopTimer.stop();
 	time_loop_Hm_Construct = loopTimer.getRealTime();
 	time_loop_Hm = time_loop_Hm_Capacities + time_loop_Hm_Construct;
-	fmt::print("------- matrix M construction time: {}\n", time_loop_Hm_Construct);
 
 	// Transpose matrix M
 	loopTimer.reset();
@@ -601,7 +594,6 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 
 	loopTimer.stop();
 	time_loop_Ha_Capacities = loopTimer.getRealTime();
-	fmt::print("------- matrix A row capacities time: {}\n", time_loop_Ha_Capacities);
 	ws_tnl_dA->setRowCapacities(dA_row_capacities);
 
 
@@ -621,22 +613,23 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 
 	loopTimer.stop();
 	time_loop_Ha = loopTimer.getRealTime();
-	fmt::print("------- matrix A construction time: {}\n", time_loop_Ha);
 
 
 	// Update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
 
-	loopTimer.reset();
-	loopTimer.start();
-	TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( "ws_tnl_dM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_dM );
-	TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( "ws_tnl_dA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_dA );
-	loopTimer.stop();
-	time_write1 = loopTimer.getRealTime();
+	if (mtx_output)
+	{
+		loopTimer.reset();
+		loopTimer.start();
+		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( "ws_tnl_dM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_dM );
+		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( "ws_tnl_dA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_dA );
+		loopTimer.stop();
+		time_write1 = loopTimer.getRealTime();
+	}
 
 	timer.stop();
-	fmt::print("-------wuShuTnl final timer time: {}\n",timer.getRealTime());
 	time_total = timer.getRealTime();
 	cpu_time_total = timer.getCPUTime();
 	nlohmann::json j;
@@ -651,8 +644,7 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	j["time_Hm_transpose"] = time_Hm_transpose;
 	j["time_write1"] = time_write1;
 	j["time_matrixCopy"] = time_matrixCopy;
-	std::string jsonOutput = j.dump();
-	fmt::print("--outputJSON;{}\n", jsonOutput);
+	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
 
 template< typename Matrix, typename Vector >
@@ -706,7 +698,8 @@ void Lagrange3D<LBM>::computeForces(real time)
 			constructed = true;
 			break;
 	}
-	spdlog::info("computing forces using ws_compute={}", compute_desc);
+	auto ibm_logger = spdlog::get("ibm");
+	ibm_logger->info("computing forces using ws_compute={}", compute_desc);
 
 	TNL::Timer timer;
 	timer.start();
@@ -744,7 +737,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
 			}
 			const auto x1 = ws_tnl_dx[0].getConstView();
 			const auto x2 = ws_tnl_dx[1].getConstView();
@@ -779,7 +772,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// copy to GPU
 			for (int k=0;k<3;k++) ws_tnl_dx[k] = ws_tnl_hx[k];
@@ -815,7 +808,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// continue on GPU
 			const auto x1 = ws_tnl_hxz[0].getConstView();
@@ -850,7 +843,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			auto kernel = [&] (idx i) mutable
 			{
@@ -871,7 +864,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 		}
 		default:
-			fmt::print(stderr, "lagrange_3D: Wu Shu compute flag {} unrecognized.\n", ws_compute);
+			spdlog::error("lagrange_3D: Wu Shu compute flag {} unrecognized.", ws_compute);
 			break;
 	}
 	timer.stop();
@@ -879,38 +872,19 @@ void Lagrange3D<LBM>::computeForces(real time)
 	double cpu_time_total = timer.getCPUTime();
 
 	nlohmann::json j;
-	j["threads"]= omp_get_max_threads();
+	j["threads"] = omp_get_max_threads();
 	j["time_total"] = time_total;
 	j["cpu_time_total"] = cpu_time_total;
-	j["object_id"]=obj_id+1;
-
-	std::string jsonOutput = j.dump();
-	fmt::print("--outputCalculationJSON;{}\n",jsonOutput);
+	j["object_id"] = obj_id;
+	ibm_logger->info("computeForcesJSON: {}", j.dump());
 }
 
 template< typename LBM >
-template< typename... ARGS >
-void Lagrange3D<LBM>::log(const char* fmts, ARGS... args)
+Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& state_id, int obj_id) : lbm(inputLBM)
 {
-	FILE* f = fopen(logfile.c_str(), "at"); // append information
-	if (f==0) {
-		fmt::print(stderr, "unable to create/access file {}\n", logfile);
-		return;
-	}
-	// insert time stamp
-	fmt::print(f, "{} ", timestamp());
-	fmt::print(f, fmts, args...);
-	fmt::print(f, "\n");
-	fclose(f);
+	if (!spdlog::get("ibm"))
+		init_file_logger("ibm", state_id, inputLBM.communicator);
 
-	//fmt::print(fmts, args...);
-	//fmt::print("\n");
-}
-
-template< typename LBM >
-Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir,int obj_id) : lbm(inputLBM)
-{
-	logfile = fmt::format("{}/ibm_solver.log", resultsDir);
 	this->obj_id = obj_id;
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
