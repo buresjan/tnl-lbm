@@ -107,11 +107,10 @@ struct LagrangePoint3D
 };
 
 enum class DiracMethod //Enum for deciding which method is used for calculation
-	{
-
-		MODIFIED = 0,
-		ORIGINAL = 1,
-	};
+{
+	MODIFIED = 0,
+	ORIGINAL = 1,
+};
 
 template< typename LBM >
 struct Lagrange3D
@@ -177,23 +176,17 @@ struct Lagrange3D
 
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
-	/*
-	bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex);
-	real calculate3Dirac(int rDirac, int colIndex, int rowIndex); // this function calculates ddd for use in WuShu matrix construction*/
+
 	void constructWuShuMatricesSparse_TNL();
 	void constructWuShuMatricesSparseGPU_TNL();
 	void computeWuShuForcesSparse(real time);
 
 	bool ws_constructed=false;	// Wu Shu matrices constructed?
 
-	bool implicitWuShuForcing=true; // use implicit WuShu Forcing (= run extra kernels etc...)
-
 	real maxDist;			// maximal distance between points
 	real minDist;			// minimal distance between points
 	int diracDeltaTypeEL=2;
 	int diracDeltaTypeLL=1;
-
-	inline int N() { return LL.size(); }	// return the amount of points in the filament
 
 	CyclicVector<LagrangePoint3D<real>> LL;
 
@@ -204,13 +197,12 @@ struct Lagrange3D
 
 	using HLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
 	//TODO: Change real type here during testing
-	//using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
 	using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<dreal>,TNL::Devices::Host>;
+	//using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
+
 	// accessors for macroscopic quantities as a 1D vector
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
 	dVectorView dmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
-
-
 
 	real dist(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x - B.x, A.y - B.y, A.z - B.z ); }
 

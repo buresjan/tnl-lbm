@@ -20,8 +20,7 @@ template< typename NSE >
 void State<NSE>::computeAllLagrangeForces()
 {
 	for (std::size_t i=0;i<FF.size();i++)
-		if (FF[i].implicitWuShuForcing)
-			FF[i].computeWuShuForcesSparse(nse.physTime());
+		FF[i].computeWuShuForcesSparse(nse.physTime());
 }
 
 template< typename NSE >
@@ -1359,7 +1358,6 @@ void State<NSE>::SimUpdate()
 	{
 		doComputeLagrangePhysics=true;
 		for (std::size_t i=0;i<FF.size();i++)
-		if (FF[i].implicitWuShuForcing)
 		{
 			doComputeVelocitiesStar=true;
 			switch (FF[i].ws_compute)
