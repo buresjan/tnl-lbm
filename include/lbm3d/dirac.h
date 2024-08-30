@@ -62,11 +62,11 @@ CUDA_HOSTDEV real diracDelta(int i, real r)
 template< typename LLVectorType>
 CUDA_HOSTDEV bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL)
 {
-	if (isDDNonZero(rDirac, LL[rowIndex].x - LL[colIndex].x))
+	if (isDDNonZero(rDirac, LL[rowIndex].x() - LL[colIndex].x()))
 	{
-		if (isDDNonZero(rDirac, LL[rowIndex].y - LL[colIndex].y))
+		if (isDDNonZero(rDirac, LL[rowIndex].y() - LL[colIndex].y()))
 		{
-			if (isDDNonZero(rDirac, LL[rowIndex].z - LL[colIndex].z))
+			if (isDDNonZero(rDirac, LL[rowIndex].z() - LL[colIndex].z()))
 			{
 				return true;
 			}
@@ -78,11 +78,11 @@ CUDA_HOSTDEV bool is3DiracNonZero(int rDirac, int colIndex, int rowIndex,const L
 
 // NOTE: it is assumed that is3DiracNonZero is called explicitly outside this function, it is not checked again in calculate3Dirac
 template< typename LLVectorType >
-CUDA_HOSTDEV typename LLVectorType::ValueType::Real calculate3Dirac(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL)
+CUDA_HOSTDEV typename LLVectorType::ValueType::RealType calculate3Dirac(int rDirac, int colIndex, int rowIndex,const LLVectorType& LL)
 {
-	using real = typename LLVectorType::ValueType::Real;
-	real d1 = diracDelta(rDirac, LL[rowIndex].x - LL[colIndex].x);
-	real d2 = diracDelta(rDirac, LL[rowIndex].y - LL[colIndex].y);
-	real d3 = diracDelta(rDirac, LL[rowIndex].z - LL[colIndex].z);
+	using real = typename LLVectorType::ValueType::RealType;
+	real d1 = diracDelta(rDirac, LL[rowIndex].x() - LL[colIndex].x());
+	real d2 = diracDelta(rDirac, LL[rowIndex].y() - LL[colIndex].y());
+	real d3 = diracDelta(rDirac, LL[rowIndex].z() - LL[colIndex].z());
 	return d1*d2*d3;
 }

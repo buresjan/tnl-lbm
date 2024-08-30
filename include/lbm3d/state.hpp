@@ -190,6 +190,9 @@ void State<NSE>::writeVTK_Surface(const char* name, real time, int cycle, Lagran
 template< typename NSE >
 void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil)
 {
+	if (!fil.allocated)
+		fil.convertLagrangianPoints();
+
 	VTKWriter vtk;
 
 	const std::string fname = fmt::format("results_{}/vtk3D/rank{:03d}_{}.vtk", id, nse.rank, name);
@@ -203,9 +206,10 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrang
 	fprintf(fp, "POINTS %lu float\n", fil.LL.size());
 	for (std::size_t i=0;i<fil.LL.size();i++)
 	{
-		vtk.writeFloat(fp, fil.LL[i].x);
-		vtk.writeFloat(fp, fil.LL[i].y);
-		vtk.writeFloat(fp, fil.LL[i].z);
+		const point_t phys = nse.lat.lbm2physPoint(fil.hLL_lat[i]);
+		vtk.writeFloat(fp, phys.x());
+		vtk.writeFloat(fp, phys.y());
+		vtk.writeFloat(fp, phys.z());
 	}
 	vtk.writeBuffer(fp);
 	fclose(fp);

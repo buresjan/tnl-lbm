@@ -78,32 +78,6 @@ struct LagrangePoint3D
 	REAL x=0,y=0,z=0;
 	// Lagrangian coordinates of the surface (as a grid)
 	int lag_x, lag_y;
-
-	CUDA_HOSTDEV LagrangePoint3D<REAL> operator/(REAL r) const
-	{
-		LagrangePoint3D<REAL> p;
-		p.x = x/r;
-		p.y = y/r;
-		p.z = z/r;
-		return p;
-	}
-	CUDA_HOSTDEV LagrangePoint3D<REAL>&operator/=(REAL r)
-	{
-		this->x/=r;
-		this->y/=r;
-		this->z/=r;
-		return *this;
-	}
-	template <typename T>
-	CUDA_HOSTDEV LagrangePoint3D<REAL>&operator=(LagrangePoint3D<T> other)
-	{
-		this->x=(REAL)other.x;
-		this->y=(REAL)other.y;
-		this->z=(REAL)other.z;
-		this->lag_x = other.lag_x;
-		this->lag_y = other.lag_y;
-		return *this;
-	}
 };
 
 enum class DiracMethod //Enum for deciding which method is used for calculation
@@ -185,6 +159,7 @@ struct Lagrange3D
 	bool allocated = false;
 	bool constructed = false;
 
+	void convertLagrangianPoints();
 	void allocateMatricesCPU();
 	void allocateMatricesGPU();
 	void constructMatricesCPU();
@@ -198,15 +173,8 @@ struct Lagrange3D
 
 	CyclicVector<LagrangePoint3D<real>> LL;
 
-	using DLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Cuda>;
-	//TODO: Change real type here during testing
-	using DLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<dreal>,TNL::Devices::Cuda>;
-	//using DLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Cuda>;
-
-	using HLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
-	//TODO: Change real type here during testing
-	using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<dreal>,TNL::Devices::Host>;
-	//using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
+	using DLPVECTOR_DREAL = TNL::Containers::Vector<TNL::Containers::StaticVector<3,dreal>,TNL::Devices::Cuda>;
+	using HLPVECTOR_DREAL = TNL::Containers::Vector<TNL::Containers::StaticVector<3,dreal>,TNL::Devices::Host>;
 
 	HLPVECTOR_DREAL hLL_lat;
 	DLPVECTOR_DREAL dLL_lat;

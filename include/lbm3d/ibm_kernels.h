@@ -15,7 +15,7 @@ __global__ void dM_row_capacities_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
 
 	const idx support = 5; // search in this support
 
@@ -25,9 +25,9 @@ __global__ void dM_row_capacities_kernel(
 
 	idx rowCapacity = 0;
 
-	idx fi_x = floor(LL[i].x);
-	idx fi_y = floor(LL[i].y);
-	idx fi_z = floor(LL[i].z);
+	idx fi_x = floor(LL[i].x() - (real)0.5);
+	idx fi_y = floor(LL[i].y() - (real)0.5);
+	idx fi_z = floor(LL[i].z() - (real)0.5);
 
 	// FIXME: iterate over LBM blocks
 	for (idx gz=MAX(0, fi_z - support); gz < MIN(lbmBlockLocal.z(), fi_z + support); gz++)
@@ -35,9 +35,9 @@ __global__ void dM_row_capacities_kernel(
 	for (idx gx=MAX(0, fi_x - support); gx < MIN(lbmBlockLocal.x(), fi_x + support); gx++)
 	{
 		if (
-			isDDNonZero(diracDeltaTypeEL, (real)(gx + 0.5) - LL[i].x) &&
-			isDDNonZero(diracDeltaTypeEL, (real)(gy + 0.5) - LL[i].y) &&
-			isDDNonZero(diracDeltaTypeEL, (real)(gz + 0.5) - LL[i].z)
+			isDDNonZero(diracDeltaTypeEL, gx - LL[i].x()) &&
+			isDDNonZero(diracDeltaTypeEL, gy - LL[i].y()) &&
+			isDDNonZero(diracDeltaTypeEL, gz - LL[i].z())
 		)
 		{
 			rowCapacity++;
@@ -64,7 +64,7 @@ __global__ void dM_construction_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
 
 	const idx support = 5; // search in this support
 
@@ -72,9 +72,9 @@ __global__ void dM_construction_kernel(
 	if (i >= LL.getSize())
 		return;
 
-	idx fi_x = floor(LL[i].x);
-	idx fi_y = floor(LL[i].y);
-	idx fi_z = floor(LL[i].z);
+	idx fi_x = floor(LL[i].x() - (real)0.5);
+	idx fi_y = floor(LL[i].y() - (real)0.5);
+	idx fi_z = floor(LL[i].z() - (real)0.5);
 
 	// FIXME: iterate over LBM blocks
 	for (idx gz=MAX(0, fi_z - support); gz < MIN(lbmBlockLocal.z(), fi_z + support); gz++)
@@ -82,15 +82,15 @@ __global__ void dM_construction_kernel(
 	for (idx gx=MAX(0, fi_x - support); gx < MIN(lbmBlockLocal.x(), fi_x + support); gx++)
 	{
 		if (
-			isDDNonZero(diracDeltaTypeEL, (real)(gx + 0.5) - LL[i].x) &&
-			isDDNonZero(diracDeltaTypeEL, (real)(gy + 0.5) - LL[i].y) &&
-			isDDNonZero(diracDeltaTypeEL, (real)(gz + 0.5) - LL[i].z)
+			isDDNonZero(diracDeltaTypeEL, gx - LL[i].x()) &&
+			isDDNonZero(diracDeltaTypeEL, gy - LL[i].y()) &&
+			isDDNonZero(diracDeltaTypeEL, gz - LL[i].z())
 		)
 		{
 			real dd =
-				diracDelta(diracDeltaTypeEL, (real)(gx + 0.5) - LL[i].x) *
-				diracDelta(diracDeltaTypeEL, (real)(gy + 0.5) - LL[i].y) *
-				diracDelta(diracDeltaTypeEL, (real)(gz + 0.5) - LL[i].z);
+				diracDelta(diracDeltaTypeEL, gx - LL[i].x()) *
+				diracDelta(diracDeltaTypeEL, gy - LL[i].y()) *
+				diracDelta(diracDeltaTypeEL, gz - LL[i].z());
 			idx index = dmap.getStorageIndex(gx,gy,gz);
 			ws_tnl_dM.setElement(i,index,dd);
 		}
@@ -110,7 +110,7 @@ __global__ void dA_row_capacities_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
 
 	idx index_row = blockIdx.x * blockDim.x + threadIdx.x;
 	idx m = LL.getSize();
@@ -161,7 +161,7 @@ __global__ void dA_construction_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::Real;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
 
 	idx index_row = blockIdx.x * blockDim.x + threadIdx.x;
 	idx m = LL.getSize();

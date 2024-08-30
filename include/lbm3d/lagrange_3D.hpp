@@ -168,6 +168,33 @@ int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
 
 
 template< typename LBM >
+void Lagrange3D<LBM>::convertLagrangianPoints()
+{
+	using HLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
+	HLPVECTOR_REAL tempLL;
+	tempLL = LL;
+
+	hLL_lat.setSize(LL.size());
+
+	TNL::Algorithms::parallelFor< TNL::Devices::Host >(
+		(idx) 0,
+		(idx) LL.size(),
+		[] (
+			idx i,
+			typename HLPVECTOR_DREAL::ViewType hLL_lat,
+			typename HLPVECTOR_REAL::ConstViewType tempLL,
+			typename LBM::lat_t lat
+		) mutable
+		{
+			hLL_lat[i] = lat.phys2lbmPoint({tempLL[i].x, tempLL[i].y, tempLL[i].z});
+		},
+		hLL_lat.getView(),
+		tempLL.getConstView(),
+		lbm.lat
+	);
+}
+
+template< typename LBM >
 void Lagrange3D<LBM>::allocateMatricesCPU()
 {
 	idx m = LL.size();	// number of lagrangian nodes
@@ -175,11 +202,8 @@ void Lagrange3D<LBM>::allocateMatricesCPU()
 
 	spdlog::info("number of Lagrangian points: {}", m);
 
-	// Convert Lagrangian points to lattice coordinates and to dreal
-	HLPVECTOR_REAL tempLL;
-	tempLL = LL;
-	tempLL /= lbm.lat.physDl;
-	hLL_lat = tempLL;
+	// Convert Lagrangian points to lattice coordinates and to StaticVector with dreal
+	convertLagrangianPoints();
 
 	// Allocate matrices
 	ws_tnl_hM.setDimensions(m, n);
@@ -242,20 +266,19 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	{
 		idx rowCapacity = 0;
 
-		idx fi_x = floor(hLL_lat[i].x);
-		idx fi_y = floor(hLL_lat[i].y);
-		idx fi_z = floor(hLL_lat[i].z);
+		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
+		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
+		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
 
 		// FIXME: iterate over LBM blocks
 		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
 		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
 		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
 		{
-			using real = typename Lagrange3D<LBM>::HLPVECTOR_DREAL::RealType::Real;
 			if (
-				isDDNonZero(diracDeltaTypeEL, (real)(gx + 0.5) - hLL_lat[i].x) &&
-				isDDNonZero(diracDeltaTypeEL, (real)(gy + 0.5) - hLL_lat[i].y) &&
-				isDDNonZero(diracDeltaTypeEL, (real)(gz + 0.5) - hLL_lat[i].z)
+				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
+				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
+				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
 			)
 			{
 				rowCapacity++;
@@ -277,26 +300,26 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	#pragma omp parallel for schedule(static)
 	for (idx i = 0; i < m; i++)
 	{
-		idx fi_x = floor(hLL_lat[i].x);
-		idx fi_y = floor(hLL_lat[i].y);
-		idx fi_z = floor(hLL_lat[i].z);
+		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
+		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
+		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
 
 		// FIXME: iterate over LBM blocks
 		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
 		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
 		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
 		{
-			using real = typename Lagrange3D<LBM>::HLPVECTOR_DREAL::RealType::Real;
+			using real = typename Lagrange3D<LBM>::HLPVECTOR_DREAL::RealType::RealType;
 			if (
-				isDDNonZero(diracDeltaTypeEL, (real)(gx + 0.5) - hLL_lat[i].x) &&
-				isDDNonZero(diracDeltaTypeEL, (real)(gy + 0.5) - hLL_lat[i].y) &&
-				isDDNonZero(diracDeltaTypeEL, (real)(gz + 0.5) - hLL_lat[i].z)
+				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
+				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
+				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
 			)
 			{
 				real dd =
-					diracDelta(diracDeltaTypeEL, (real)(gx + 0.5) - hLL_lat[i].x) *
-					diracDelta(diracDeltaTypeEL, (real)(gy + 0.5) - hLL_lat[i].y) *
-					diracDelta(diracDeltaTypeEL, (real)(gz + 0.5) - hLL_lat[i].z);
+					diracDelta(diracDeltaTypeEL, gx - hLL_lat[i].x()) *
+					diracDelta(diracDeltaTypeEL, gy - hLL_lat[i].y()) *
+					diracDelta(diracDeltaTypeEL, gz - hLL_lat[i].z());
 				ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
 			}
 		}
@@ -462,11 +485,9 @@ void Lagrange3D<LBM>::allocateMatricesGPU()
 
 	spdlog::info("number of Lagrangian points: {}", m);
 
-	// Convert Lagrangian points to lattice coordinates and to dreal
-	DLPVECTOR_REAL tempLL;
-	tempLL = LL;
-	tempLL /= lbm.lat.physDl;
-	dLL_lat = tempLL;
+	// Convert Lagrangian points to lattice coordinates and to StaticVector with dreal
+	convertLagrangianPoints();
+	dLL_lat = hLL_lat;
 
 	// Allocate matrices
 	ws_tnl_dM.setDimensions(m, n);
