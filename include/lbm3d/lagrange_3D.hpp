@@ -306,46 +306,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	loopTimer.reset();
 	loopTimer.start();
 	// Calculate row capacities of matrix A
-#ifndef HA_CAPACITY_VARIANT
-#define HA_CAPACITY_VARIANT 1
-#endif
-#if HA_CAPACITY_VARIANT == 1
-	#pragma omp parallel for schedule(static) num_threads(threads) collapse(2)
-	for (int index_col = 0; index_col < m; index_col++)
-	{
-		for (int index_row = 0; index_row < m; index_row++)
-		{
-			if (methodVariant==DiracMethod::MODIFIED)
-			{
-				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, rLL))
-				{
-					#pragma omp atomic
-					hA_row_capacities[index_row]++;
-				}
-			}
-			else
-			{
-				real val=0;
-				auto row1 = ws_tnl_hM.getRow(index_row);
-				auto row2 = ws_tnl_hM.getRow(index_col);
-				for (idx in1=0; in1 < row1.getSize(); in1++)
-				{
-					for (idx in2=0; in2 < row2.getSize(); in2++)
-					{
-						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
-						{
-							val += row1.getValue(in1) * row2.getValue(in2);
-							break;
-						}
-					}
-				}
-				if (val > 0)
-					#pragma omp atomic
-					hA_row_capacities[index_row]++;
-			}
-		}
-	}
-#elif HA_CAPACITY_VARIANT == 2
 	#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	for (idx index_row = 0; index_row < m; index_row++)
 	{
@@ -381,9 +341,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		}
 		hA_row_capacities[index_row] = rowCapacity;
 	}
-#else
-	#error Unsupported HA_CAPACITIES Variant
-#endif
 
 
 	loopTimer.stop();
@@ -511,7 +468,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	j["time_write1"] = time_write1;
 	j["time_matrixCopy"] = time_matrixCopy;
 	j["time_LL_division"] = time_LL_division;
-	j["variant_Ha_capacities"] = HA_CAPACITY_VARIANT;
 	std::string jsonOutput = j.dump();
 	fmt::print("--outputJSON;{}\n",jsonOutput);
 }
