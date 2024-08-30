@@ -450,8 +450,10 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	{
 		loopTimer.reset();
 		loopTimer.start();
-		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_hM );
-		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( "ws_tnl_hA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_hA );
+		const std::string output_M = fmt::format("ibm_CPU_matrix-M_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_CPU_matrix-A_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_M, ws_tnl_hM );
+		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_A, *ws_tnl_hA );
 		loopTimer.stop();
 		time_write1 = loopTimer.getRealTime();
 	}
@@ -623,8 +625,10 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	{
 		loopTimer.reset();
 		loopTimer.start();
-		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( "ws_tnl_dM_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", ws_tnl_dM );
-		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( "ws_tnl_dA_method-"+std::to_string((int)methodVariant)+"_dirac-"+std::to_string(diracDeltaTypeEL)+".mtx", *ws_tnl_dA );
+		const std::string output_M = fmt::format("ibm_GPU_matrix-M_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_GPU_matrix-A_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_M, ws_tnl_dM );
+		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_A, *ws_tnl_dA );
 		loopTimer.stop();
 		time_write1 = loopTimer.getRealTime();
 	}

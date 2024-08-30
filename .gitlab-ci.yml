@@ -28,10 +28,9 @@ build_Release:
             -DCMAKE_BUILD_TYPE=Release
             -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
     - cmake --build build
-    # CPU
-    - ./compareScriptCPU.sh
-    # GPU
-    - ./compareScriptGPU.sh
+    # regression tests for LBM-IBM
+    - ./tests/compare-IBM-matrices-CPU.sh
+    - ./tests/compare-IBM-matrices-GPU.sh
   tags:
     - docker
     - nvidia
