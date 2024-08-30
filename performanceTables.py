@@ -13,8 +13,8 @@ def run_sim(compute,diracmin=1,diracmax=4):
     variantString=""
     for dirac in range(diracmin,diracmax+1):
         print("Running simulation for Dirac",dirac)
-        runResult = subprocess.run(["./build/sim_NSE/sim_5","0",str(dirac),"100","0","5",str(compute)], check=True, capture_output=True,encoding="UTF-8")
-        #runResult = subprocess.run(["./build/sim_NSE/sim_5","0",str(dirac),"100","0","2",str(compute)], check=True, capture_output=True,encoding="UTF-8")
+        runResult = subprocess.run(["./build/sim_NSE/sim_IBM3","0",str(dirac),"100","0","5",str(compute)], check=True, capture_output=True,encoding="UTF-8")
+        #runResult = subprocess.run(["./build/sim_NSE/sim_IBM3","0",str(dirac),"100","0","2",str(compute)], check=True, capture_output=True,encoding="UTF-8")
         print(runResult.stdout)
         print("return code",runResult.returncode)
         lines = runResult.stdout.splitlines()

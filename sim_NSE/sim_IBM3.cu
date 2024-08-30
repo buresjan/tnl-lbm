@@ -2,16 +2,9 @@
 #include "lbm3d/lagrange_3D.h"
 
 // ball in 3D
-// ibmlbm
-// This simulation is used to verify matrix match between new and old LBM versions
-// This simulation is based on sim_4.cu
-
-// filament varianty
-enum { NIC, NORMAL, MIRROR, FLIP, MIRRORFLIP };
-
-//const int DOMAIN_INNER = -1;
-//const int DOMAIN_OUTER = -2;
-//const int DOMAIN_BNDRY = -3;
+// IBM-LBM
+// This simulation is used for regression tests of IBM matrix construction
+// This simulation is based on sim_IBM2.cu
 
 template < typename TRAITS >
 struct MacroLocal : D3Q27_MACRO_Base< TRAITS >
@@ -67,17 +60,12 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	dreal lbm_input_velocity=0.07;
-//	dreal start_velocity;
-//	dreal target_velocity;
-//	real init_time;
+	dreal lbm_inflow_vx = 0;
 	bool firstrun=true;
-//	bool firstplot=true;
 	int FIL_INDEX=-1;
 	real ball_diameter=0.01;
 	real ball_c[3];
 
-	// virtualize
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
 		int k=0;
@@ -123,135 +111,30 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void statReset()
-	{
-	}
-
-	virtual void probe1()
-	{
-		// compute drag
-		real Fx=0, Fy=0, Fz=0, dV=nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
-		real rho = 1.0;//nse.physFluidDensity;
-		real target_velocity = nse.lat.lbm2physVelocity(lbm_input_velocity);
-		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f}", lbm_input_velocity*ball_diameter/nse.lat.physDl/nse.lat.lbmViscosity(), lbm_input_velocity, nse.lat.lbm2physVelocity(lbm_input_velocity));
-
-		// FIXME: MPI !!!
-		// todo: compute C_D: integrate over the whole domain
-		for (int x=0; x<nse.lat.global.x(); x++)
-		for (int y=0; y<nse.lat.global.y(); y++)
-		for (int z=0; z<nse.lat.global.z(); z++)
-		{
-			// test if outside the ball
-//			if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) > 2.0*ball_diameter/2.0)
-//			if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) > ball_diameter/2.0)
-			{
-				Fx += nse.blocks.front().hmacro(MACRO::e_fx,x,y,z);
-				Fy += nse.blocks.front().hmacro(MACRO::e_fy,x,y,z);
-				Fz += nse.blocks.front().hmacro(MACRO::e_fz,x,y,z);
-			}
-		}
-
-		real lbm_cd_full=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
-		real phys_cd_full=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
-			if (!nse.terminate)
-				spdlog::error("nan detected");
-			nse.terminate=true;
-		}
-		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
-
-// not used for evaluation of the results
-//		// FIXME: MPI !!!
-//		for (int x=0; x<nse.lat.global.x(); x++)
-//		for (int y=0; y<nse.lat.global.y(); y++)
-//		for (int z=0; z<nse.lat.global.z(); z++)
-//		{
-//			// test if outside the ball
-////			if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) < 2.0*ball_diameter/2.0)
-//			if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) > ball_diameter/2.0)
-//			{
-//				Fx += nse.blocks.front().hmacro(MACRO::e_fx,x,y,z);
-//				Fy += nse.blocks.front().hmacro(MACRO::e_fy,x,y,z);
-//				Fz += nse.blocks.front().hmacro(MACRO::e_fz,x,y,z);
-//			}
-//		}
-//		real lbm_cd=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
-//		real phys_cd=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
-//		spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-////		spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}", 0.07*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
-
-// not used for evaluation of the results
-////		real fil_fx=0,fil_fy=0,fil_fz=0;
-//		Fx=Fy=Fz=0;
-////		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
-////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*ball_diameter*ball_diameter/(real)FF[FIL_INDEX].LL.size());
-//		real lbm_cd_lagr=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
-//		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
-//		spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
-
-
-		// empty files
-		const char* iotype = (firstrun) ? "wt" : "at";
-		firstrun=false;
-		// output
-		FILE* f;
-		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
-		const std::string dir = fmt::format("results_{}/probes", id);
-		mkdir_p(dir.c_str(), 0755);
-
-		std::string str = fmt::format("{}/probe_cd_full", dir);
-		f = fopen(str.c_str(), iotype);
-		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_full);
-		fclose(f);
-
-//		str = fmt::format("{}/probe_cd", dir);
-//		f = fopen(str.c_str(), iotype);
-//		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd);
-//		fclose(f);
-
-//		str = fmt::format("{}/probe_cd_lagr", dir);
-//		f = fopen(str.c_str(), iotype);
-//		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_lagr);
-//		fclose(f);
-
-//		str = fmt::format("{}/probe_cd_all", dir);
-//		f = fopen(str.c_str(), iotype);
-//		fprintf(f, "%e\t%e\t%e\t%e\n", nse.physTime(), lbm_cd_full, lbm_cd, lbm_cd_lagr);
-//		fclose(f);
-	}
-
 	virtual void updateKernelVelocities()
 	{
 		for (auto& block : nse.blocks)
 		{
-			block.data.inflow_vx = lbm_input_velocity;
-//			block.data.inflow_vx = nse.lat.phys2lbmVelocity(target_velocity);
+			block.data.inflow_rho = 1;
+			block.data.inflow_vx = lbm_inflow_vx;
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
 		}
 	}
 
 	virtual void setupBoundaries()
 	{
-		nse.setBoundaryZ(0, BC::GEO_INFLOW);// top
-		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_INFLOW);// bottom
-		nse.setBoundaryY(0, BC::GEO_INFLOW); // back
-		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_INFLOW);// front
 		nse.setBoundaryX(0, BC::GEO_INFLOW); // left
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
+		nse.setBoundaryY(0, BC::GEO_INFLOW); // back
+		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_INFLOW);// front
+		nse.setBoundaryZ(0, BC::GEO_INFLOW);// top
+		nse.setBoundaryZ(nse.lat.global.z()-1, BC::GEO_INFLOW);// bottom
 	}
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 		: State<NSE>(id, communicator, lat)
-	{
-		for (auto& block : nse.blocks)
-		{
-			block.data.inflow_rho = no1;
-			block.data.inflow_vx = 0;
-			block.data.inflow_vy = 0;
-			block.data.inflow_vz = 0;
-		}
-	}
+	{}
 };
 
 // ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
@@ -346,8 +229,6 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	real PHYS_VISCOSITY = i_PHYS_VISCOSITY;//0.00001;// [m^2/s] fluid viscosity of water
 	real Re=i_Re;//200;
 
-//	real PHYS_TARGET_VELOCITY = i_PHYS_VELOCITY;//2.0*Re*PHYS_VISCOSITY/BALL_DIAMETER; // [m/s]
-//	real PHYS_START_VELOCITY = PHYS_TARGET_VELOCITY; // [m/s]
 //	real INIT_TIME = 1.0; // [s]
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 
@@ -359,20 +240,18 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	lat.physDt = PHYS_DT;
 	lat.physViscosity = PHYS_VISCOSITY;
 
-	const std::string state_id = fmt::format("sim_5_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
+	const std::string state_id = fmt::format("sim_IBM3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
 	//if (state.isMark())
 	//	return 0;
 
-	state.lbm_input_velocity = i_LBM_VELOCITY;
+	state.lbm_inflow_vx = i_LBM_VELOCITY;
 	state.nse.physCharLength = BALL_DIAMETER; // [m]
 	state.ball_diameter = BALL_DIAMETER; // [m]
 	//state.nse.physFluidDensity = 1000.0; // [kg/m^3]
 
 	state.cnt[PRINT].period = 0.1;
-	state.cnt[PROBE1].period = 0.1;
-	state.cnt[STAT_RESET].period = 500.0;
 	state.nse.physFinalTime = 0.0;
 
 //	state.cnt[VTK3D].period = 1.0;
@@ -396,15 +275,11 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.add2Dcut_Y(LBM_Y/2,"cut_Y");
 	state.add2Dcut_Z(LBM_Z/2,"cut_Z");
 
-	state.ball_c[0] = 2*state.ball_diameter;
+	state.ball_c[0] = 5.5*state.ball_diameter;
 	state.ball_c[1] = 5.5*state.ball_diameter;
 	state.ball_c[2] = 5.5*state.ball_diameter;
 	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	state.FIL_INDEX = drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma, method, dirac_delta, ws_compute);
-
-	// 2nd ball
-	state.ball_c[0] = 5.5*state.ball_diameter;
 	state.FIL_INDEX = drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma, method, dirac_delta, ws_compute);
 
 	execute(state);
