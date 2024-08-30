@@ -213,13 +213,14 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// Calculate row capacities of hM
 	ws_tnl_hM.setDimensions(m, n);
 	typename hEllpack::RowCapacitiesType hM_row_capacities( m );
-	hM_row_capacities.setValue(0);
 
 	const idx support = 5; // search in this support
 
 	#pragma omp parallel for schedule(static)
 	for (idx i = 0; i < m; i++)
 	{
+		idx rowCapacity = 0;
+
 		idx fi_x = floor(rLL[i].x);
 		idx fi_y = floor(rLL[i].y);
 		idx fi_z = floor(rLL[i].z);
@@ -236,9 +237,11 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 				isDDNonZero(diracDeltaTypeEL, (real)(gz + 0.5) - rLL[i].z)
 			)
 			{
-				hM_row_capacities[i]++;
+				rowCapacity++;
 			}
 		}
+
+		hM_row_capacities[i] = rowCapacity;
 	}
 
 	loopTimer.stop();
@@ -292,10 +295,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 	// Allocate matrix A
 	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
-
-	// Initialise rowCapacities
 	typename hEllpack::RowCapacitiesType hA_row_capacities( m );
-	hA_row_capacities.setValue(0);
 
 	int threads = omp_get_max_threads();
 	// TODO: find the correct threshold for this condition
@@ -518,7 +518,6 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	// Calculate row capacities of matrix M
 	ws_tnl_dM.setDimensions(m, n);
 	typename dEllpack::RowCapacitiesType dM_row_capacities( m );
-	dM_row_capacities.setValue(0);
 
 	TNL::Backend::LaunchConfiguration dM_config;
 	dM_config.blockSize.x = 256;
@@ -568,10 +567,7 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparseGPU_TNL()
 	// Allocate matrix A
 	ws_tnl_dA = std::make_shared< dEllpack >();
 	ws_tnl_dA->setDimensions(m, m);
-
-	// Initialise rowCapacities
 	typename dEllpack::RowCapacitiesType dA_row_capacities( m );
-	dA_row_capacities.setValue(0);
 
 	loopTimer.reset();
 	loopTimer.start();

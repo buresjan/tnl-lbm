@@ -23,6 +23,8 @@ __global__ void dM_row_capacities_kernel(
 	if (i >= LL.getSize())
 		return;
 
+	idx rowCapacity = 0;
+
 	idx fi_x = floor(LL[i].x);
 	idx fi_y = floor(LL[i].y);
 	idx fi_z = floor(LL[i].z);
@@ -38,9 +40,11 @@ __global__ void dM_row_capacities_kernel(
 			isDDNonZero(diracDeltaTypeEL, (real)(gz + 0.5) - LL[i].z)
 		)
 		{
-			dM_row_capacities[i]++;
+			rowCapacity++;
 		}
 	}
+
+	dM_row_capacities[i] = rowCapacity;
 #endif
 }
 
