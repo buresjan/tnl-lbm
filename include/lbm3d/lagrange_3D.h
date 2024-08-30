@@ -142,6 +142,9 @@ struct Lagrange3D
 	hEllpack ws_tnl_hMT; // matrix realizing projection of uB from lagrange desc. to Euler desc. .... basially transpose of M
 	hVector ws_tnl_hx[3], ws_tnl_hb[3];
 
+	typename hEllpack::RowCapacitiesType hM_row_capacities;
+	typename hEllpack::RowCapacitiesType hA_row_capacities;
+
 	using hSolver = TNL::Solvers::Linear::CG< hEllpack >;
 	using hPreconditioner = TNL::Solvers::Linear::Preconditioners::Diagonal< hEllpack >;
 //	using hPreconditioner = TNL::Solvers::Linear::Preconditioners::ILU0< hEllpack >;
@@ -157,13 +160,15 @@ struct Lagrange3D
 	using hVectorPinned = TNL::Containers::Vector< dreal, TNL::Devices::Host, idx, TNL::Allocators::CudaHost<dreal> >;
 	hVectorPinned ws_tnl_hxz[3], ws_tnl_hbz[3];
 
+	typename dEllpack::RowCapacitiesType dM_row_capacities;
+	typename dEllpack::RowCapacitiesType dA_row_capacities;
+
 	using dSolver = TNL::Solvers::Linear::CG< dEllpack >;
 	using dPreconditioner = TNL::Solvers::Linear::Preconditioners::Diagonal< dEllpack >;
 //	using dPreconditioner = TNL::Solvers::Linear::Preconditioners::ILU0< dEllpack >;
 	dSolver ws_tnl_dsolver;
 	typename std::shared_ptr< dPreconditioner > ws_tnl_dprecond;
 	#endif
-	bool ws_tnl_constructed=false;
 
 	bool indexed=false; // is i,j lagrangian index created?
 	int **index_array=0;
@@ -177,11 +182,14 @@ struct Lagrange3D
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
 
-	void constructWuShuMatricesSparse_TNL();
-	void constructWuShuMatricesSparseGPU_TNL();
-	void computeWuShuForcesSparse(real time);
+	bool allocated = false;
+	bool constructed = false;
 
-	bool ws_constructed=false;	// Wu Shu matrices constructed?
+	void allocateMatricesCPU();
+	void allocateMatricesGPU();
+	void constructMatricesCPU();
+	void constructMatricesGPU();
+	void computeForces(real time);
 
 	real maxDist;			// maximal distance between points
 	real minDist;			// minimal distance between points
@@ -199,6 +207,9 @@ struct Lagrange3D
 	//TODO: Change real type here during testing
 	using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<dreal>,TNL::Devices::Host>;
 	//using HLPVECTOR_DREAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
+
+	HLPVECTOR_DREAL hLL_lat;
+	DLPVECTOR_DREAL dLL_lat;
 
 	// accessors for macroscopic quantities as a 1D vector
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N

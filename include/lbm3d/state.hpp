@@ -20,7 +20,7 @@ template< typename NSE >
 void State<NSE>::computeAllLagrangeForces()
 {
 	for (std::size_t i=0;i<FF.size();i++)
-		FF[i].computeWuShuForcesSparse(nse.physTime());
+		FF[i].computeForces(nse.physTime());
 }
 
 template< typename NSE >
