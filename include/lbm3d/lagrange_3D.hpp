@@ -244,16 +244,13 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm = 0;
-	double time_loop_Hm_Capacities = 0;
-	double time_loop_Hm_Construct = 0;
-	double time_loop_Ha_Capacities = 0;
-	double time_loop_Ha = 0;
-	double time_write1 = 0;
+	double time_M_capacities = 0;
+	double time_M_construct = 0;
+	double time_M_transpose = 0;
+	double time_A_capacities = 0;
+	double time_A_construct = 0;
+	double time_matrixWrite = 0;
 	double time_matrixCopy = 0;
-	double time_total = 0;
-	double cpu_time_total = 0;
-	double time_Hm_transpose = 0;
 
 	idx m = LL.size();	// number of lagrangian nodes
 
@@ -289,7 +286,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	}
 
 	loopTimer.stop();
-	time_loop_Hm_Capacities = loopTimer.getRealTime();
+	time_M_capacities = loopTimer.getRealTime();
 
 	ws_tnl_hM.setRowCapacities(hM_row_capacities);
 
@@ -327,15 +324,14 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		}
 	}
 	loopTimer.stop();
-	time_loop_Hm_Construct = loopTimer.getRealTime();
-	time_loop_Hm = time_loop_Hm_Capacities + time_loop_Hm_Construct;
+	time_M_construct = loopTimer.getRealTime();
 
 	// Transpose matrix M
 	loopTimer.reset();
 	loopTimer.start();
     ws_tnl_hMT.getTransposition(ws_tnl_hM);
 	loopTimer.stop();
-	time_Hm_transpose = loopTimer.getRealTime();
+	time_M_transpose = loopTimer.getRealTime();
 
 	int threads = omp_get_max_threads();
 	// TODO: find the correct threshold for this condition
@@ -384,7 +380,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 
 
 	loopTimer.stop();
-	time_loop_Ha_Capacities = loopTimer.getRealTime();
+	time_A_capacities = loopTimer.getRealTime();
 	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
 
@@ -433,7 +429,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		}
 	}
 	loopTimer.stop();
-	time_loop_Ha = loopTimer.getRealTime();
+	time_A_construct = loopTimer.getRealTime();
 
 
 	// Update the preconditioner
@@ -465,23 +461,19 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_M, ws_tnl_hM );
 		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_A, *ws_tnl_hA );
 		loopTimer.stop();
-		time_write1 = loopTimer.getRealTime();
+		time_matrixWrite = loopTimer.getRealTime();
 	}
 
 	timer.stop();
-	time_total = timer.getRealTime();
-	cpu_time_total = timer.getCPUTime();
 	nlohmann::json j;
 	j["threads"] = omp_get_max_threads();
-	j["time_total"] = time_total;
-	j["cpu_time_total"] = cpu_time_total;
-	j["time_loop_Hm"] = time_loop_Hm;
-	j["time_loop_Ha"] = time_loop_Ha;
-	j["time_loop_Ha_capacities"] = time_loop_Ha_Capacities;
-	j["time_loop_Hm_capacities"] = time_loop_Hm_Capacities;
-	j["time_loop_Hm_construct"] = time_loop_Hm_Construct;
-	j["time_Hm_transpose"] = time_Hm_transpose;
-	j["time_write1"] = time_write1;
+	j["time_total"] = timer.getRealTime();
+	j["time_A_capacities"] = time_A_capacities;
+	j["time_A_construct"] = time_A_construct;
+	j["time_M_capacities"] = time_M_capacities;
+	j["time_M_construct"] = time_M_construct;
+	j["time_M_transpose"] = time_M_transpose;
+	j["time_matrixWrite"] = time_matrixWrite;
 	j["time_matrixCopy"] = time_matrixCopy;
 	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
@@ -531,16 +523,13 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	TNL::Timer timer;
 	TNL::Timer loopTimer;
 
-	double time_loop_Hm = 0;
-	double time_loop_Hm_Capacities = 0;
-	double time_loop_Hm_Construct = 0;
-	double time_loop_Ha_Capacities = 0;
-	double time_loop_Ha = 0;
-	double time_write1 = 0;
+	double time_M_capacities = 0;
+	double time_M_construct = 0;
+	double time_M_transpose = 0;
+	double time_A_capacities = 0;
+	double time_A_construct = 0;
+	double time_matrixWrite = 0;
 	double time_matrixCopy = 0;
-	double time_total = 0;
-	double cpu_time_total = 0;
-	double time_Hm_transpose = 0;
 
 	idx m = LL.size();	// number of lagrangian nodes
 
@@ -557,7 +546,7 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 		diracDeltaTypeEL);
 
 	loopTimer.stop();
-	time_loop_Hm_Capacities = loopTimer.getRealTime();
+	time_M_capacities = loopTimer.getRealTime();
 
 	ws_tnl_dM.setRowCapacities(dM_row_capacities);
 
@@ -580,15 +569,14 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 		diracDeltaTypeEL);
 
 	loopTimer.stop();
-	time_loop_Hm_Construct = loopTimer.getRealTime();
-	time_loop_Hm = time_loop_Hm_Capacities + time_loop_Hm_Construct;
+	time_M_construct = loopTimer.getRealTime();
 
 	// Transpose matrix M
 	loopTimer.reset();
 	loopTimer.start();
     ws_tnl_dMT.getTransposition(ws_tnl_dM);
 	loopTimer.stop();
-	time_Hm_transpose = loopTimer.getRealTime();
+	time_M_transpose = loopTimer.getRealTime();
 
 	loopTimer.reset();
 	loopTimer.start();
@@ -605,7 +593,7 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 		);
 
 	loopTimer.stop();
-	time_loop_Ha_Capacities = loopTimer.getRealTime();
+	time_A_capacities = loopTimer.getRealTime();
 	ws_tnl_dA->setRowCapacities(dA_row_capacities);
 
 
@@ -624,7 +612,7 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 		);
 
 	loopTimer.stop();
-	time_loop_Ha = loopTimer.getRealTime();
+	time_A_construct = loopTimer.getRealTime();
 
 
 	// Update the preconditioner
@@ -640,23 +628,19 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_M, ws_tnl_dM );
 		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_A, *ws_tnl_dA );
 		loopTimer.stop();
-		time_write1 = loopTimer.getRealTime();
+		time_matrixWrite = loopTimer.getRealTime();
 	}
 
 	timer.stop();
-	time_total = timer.getRealTime();
-	cpu_time_total = timer.getCPUTime();
 	nlohmann::json j;
 	j["threads"] = omp_get_max_threads();
-	j["time_total"] = time_total;
-	j["cpu_time_total"] = cpu_time_total;
-	j["time_loop_Hm"] = time_loop_Hm;
-	j["time_loop_Ha"] = time_loop_Ha;
-	j["time_loop_Ha_capacities"] = time_loop_Ha_Capacities;
-	j["time_loop_Hm_capacities"] = time_loop_Hm_Capacities;
-	j["time_loop_Hm_construct"] = time_loop_Hm_Construct;
-	j["time_Hm_transpose"] = time_Hm_transpose;
-	j["time_write1"] = time_write1;
+	j["time_total"] = timer.getRealTime();
+	j["time_A_capacities"] = time_A_capacities;
+	j["time_A_construct"] = time_A_construct;
+	j["time_M_capacities"] = time_M_capacities;
+	j["time_M_construct"] = time_M_construct;
+	j["time_M_transpose"] = time_M_transpose;
+	j["time_matrixWrite"] = time_matrixWrite;
 	j["time_matrixCopy"] = time_matrixCopy;
 	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
@@ -882,14 +866,10 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 	}
 	timer.stop();
-	double time_total = timer.getRealTime();
-	double cpu_time_total = timer.getCPUTime();
 
 	nlohmann::json j;
 	j["threads"] = omp_get_max_threads();
-	j["time_total"] = time_total;
-	j["cpu_time_total"] = cpu_time_total;
-	j["object_id"] = obj_id;
+	j["time_total"] = timer.getRealTime();
 	ibm_logger->info("computeForcesJSON: {}", j.dump());
 }
 
