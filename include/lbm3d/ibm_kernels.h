@@ -72,6 +72,9 @@ __global__ void dM_construction_kernel(
 	if (i >= LL.getSize())
 		return;
 
+	auto row = ws_tnl_dM.getRow(i);
+	idx element_idx = 0;
+
 	idx fi_x = floor(LL[i].x() - (real)0.5);
 	idx fi_y = floor(LL[i].y() - (real)0.5);
 	idx fi_z = floor(LL[i].z() - (real)0.5);
@@ -92,7 +95,7 @@ __global__ void dM_construction_kernel(
 				diracDelta(diracDeltaTypeEL, gy - LL[i].y()) *
 				diracDelta(diracDeltaTypeEL, gz - LL[i].z());
 			idx index = dmap.getStorageIndex(gx,gy,gz);
-			ws_tnl_dM.setElement(i,index,dd);
+			row.setElement(element_idx++, index, dd);
 		}
 	}
 #endif
@@ -168,6 +171,9 @@ __global__ void dA_construction_kernel(
 	if (index_row >= m)
 		return;
 
+	auto row = ws_tnl_dA.getRow(index_row);
+	idx element_idx = 0;
+
 	for (idx index_col = 0; index_col < m; index_col++)
 	{
 		if (methodVariant == DiracMethod::MODIFIED)
@@ -175,7 +181,9 @@ __global__ void dA_construction_kernel(
 			if (is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, LL))
 			{
 				real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row, LL);
-				ws_tnl_dA.setElement(index_row, index_col, ddd);
+				row.setElement(element_idx++, index_col, ddd);
+				if (element_idx == row.getSize())
+					break;
 			}
 		}
 		else
@@ -194,7 +202,9 @@ __global__ void dA_construction_kernel(
 			}
 			if (val > 0)
 			{
-				ws_tnl_dA.setElement(index_row, index_col, val);
+				row.setElement(element_idx++, index_col, val);
+				if (element_idx == row.getSize())
+					break;
 			}
 		}
 	}

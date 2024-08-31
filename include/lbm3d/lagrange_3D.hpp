@@ -299,6 +299,9 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	#pragma omp parallel for schedule(static)
 	for (idx i = 0; i < m; i++)
 	{
+		auto row = ws_tnl_hM.getRow(i);
+		idx element_idx = 0;
+
 		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
 		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
 		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
@@ -308,18 +311,18 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
 		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
 		{
-			using real = typename Lagrange3D<LBM>::HLPVECTOR_DREAL::RealType::RealType;
 			if (
 				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
 				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
 				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
 			)
 			{
-				real dd =
+				dreal dd =
 					diracDelta(diracDeltaTypeEL, gx - hLL_lat[i].x()) *
 					diracDelta(diracDeltaTypeEL, gy - hLL_lat[i].y()) *
 					diracDelta(diracDeltaTypeEL, gz - hLL_lat[i].z());
-				ws_tnl_hM.setElement(i,lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz),dd);
+				idx index = lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz);
+				row.setElement(element_idx++, index, dd);
 			}
 		}
 	}
@@ -391,18 +394,23 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	#pragma omp parallel for schedule(dynamic) num_threads(threads)
 	for (idx index_row=0;index_row<m;index_row++)
 	{
+		auto row = ws_tnl_hA->getRow(index_row);
+		idx element_idx = 0;
+
 		for (idx index_col=0;index_col<m;index_col++)
 		{
 			if (methodVariant==DiracMethod::MODIFIED)
 			{
 				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
 				{
-					real ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row, hLL_lat);
-					ws_tnl_hA->setElement(index_row, index_col, ddd);
+					dreal ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row, hLL_lat);
+					row.setElement(element_idx++, index_col, ddd);
+					if (element_idx == row.getSize())
+						break;
 				}
 			} else
 			{
-				real val=0;
+				dreal val=0;
 				auto row1 = ws_tnl_hM.getRow(index_row);
 				auto row2 = ws_tnl_hM.getRow(index_col);
 				for (idx in1=0; in1 < row1.getSize(); in1++)
@@ -417,7 +425,9 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 					}
 				}
 				if (val > 0) {
-					ws_tnl_hA->setElement(index_row, index_col, val);
+					row.setElement(element_idx++, index_col, val);
+					if (element_idx == row.getSize())
+						break;
 				}
 			}
 		}
