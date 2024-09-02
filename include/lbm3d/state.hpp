@@ -133,53 +133,6 @@ bool State<NSE>::isMark()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //
-// VTK SURFACE
-//                                                                                                                                                                                                                //
-//                                                                                                                                                                                                                //
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-template< typename NSE >
-void State<NSE>::writeVTK_Surface(const char* name, real time, int cycle, Lagrange3D &fil)
-{
-	VTKWriter vtk;
-
-	const std::string fname = fmt::format("results_{}/vtk3D/rank{:03d}_{}.vtk", id, nse.rank, name);
-	create_file(fname.c_str());
-
-	FILE* fp = fopen(fname.c_str(), "w+");
-	vtk.writeHeader(fp);
-
-	fprintf(fp, "DATASET POLYDATA\n");
-
-	fprintf(fp, "POINTS %d float\n", fil.LL.size());
-	for (std::size_t i=0;i<fil.LL.size();i++)
-	{
-		vtk.writeFloat(fp, fil.LL[i].x);
-		vtk.writeFloat(fp, fil.LL[i].y);
-		vtk.writeFloat(fp, fil.LL[i].z);
-	}
-	vtk.writeBuffer(fp);
-
-	fprintf(fp, "POLYGONS %d %d\n", (fil.lag_X-1)*fil.lag_Y , 5*(fil.lag_X-1)*fil.lag_Y ); // first number: number of polygons, second number: total integers describing the list
-	for (int i=0;i<fil.lag_X-1;i++)
-	for (int j=0;j<fil.lag_Y;j++)
-	{
-		int ip = i+1;
-		int jp = (j==fil.lag_Y-1) ? 0 : j+1;
-		vtk.writeInt(fp,4);
-		vtk.writeInt(fp,fil.findIndex(i,j));
-		vtk.writeInt(fp,fil.findIndex(ip,j));
-		vtk.writeInt(fp,fil.findIndex(ip,jp));
-		vtk.writeInt(fp,fil.findIndex(i,jp));
-	}
-	fclose(fp);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                                                                                                                                //
-//                                                                                                                                                                                                                //
 // VTK POINTS
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //

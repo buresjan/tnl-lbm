@@ -108,8 +108,6 @@ struct State
 	int addLagrange3D();				// add a filament into the array and returns its index
 	void computeAllLagrangeForces();
 
-	// vtk surface rotational
-	void writeVTK_Surface(const char* name, real time, int cycle, Lagrange3D &fil);
 	void writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil);
 
 	// how often to probe/print/write/stat

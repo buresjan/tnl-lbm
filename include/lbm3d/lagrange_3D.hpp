@@ -104,70 +104,6 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename L
 
 
 template< typename LBM >
-void Lagrange3D<LBM>::computeMaxMinDist()
-{
-	maxDist=-1e10;
-	minDist=1e10;
-	if (lag_X<=0 || lag_Y<=0) return;
-	for (int i=0;i<lag_X-1;i++)
-	for (int j=0;j<lag_Y-1;j++)
-	{
-		int index = findIndex(i,j);
-		for (int i1=0;i1<=1;i1++)
-		for (int j1=0;j1<=1;j1++)
-		if (j1!=0 || i1!=0)
-		{
-			int index1 = findIndex(i+i1,j+j1);
-//			int index1 = findIndex(i+i1,j);
-			real d = dist(LL[index1],LL[index]);
-			if (d>maxDist) maxDist=d;
-			if (d<minDist) minDist=d;
-		}
-	}
-}
-
-
-template< typename LBM >
-int Lagrange3D<LBM>::createIndexArray()
-{
-	if (lag_X<=0 || lag_Y<=0) return 0;
-	index_array = new int*[lag_X];
-	for (int i=0;i<lag_X;i++) index_array[i] = new int[lag_Y];
-	for (std::size_t k=0;k<LL.size();k++) index_array[LL[k].lag_x][LL[k].lag_y] = k;
-	indexed=true;
-	return 1;
-}
-
-
-template< typename LBM >
-int Lagrange3D<LBM>::findIndex(int i, int j)
-{
-	if (!indexed) createIndexArray();
-	if (!indexed) return 0;
-	return index_array[i][j];
-	// brute force
-//	for (std::size_t k=0;k<LL.size();k++) if (LL[k].lag_x == i && LL[k].lag_y == j) return k;
-//	fmt::print("findIndex({},{}): not found\n",i,j);
-//	return 0;
-}
-
-template< typename LBM >
-int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
-{
-	int imin=0;
-	real xmindist=fabs(LL[imin].x-x);
-	// brute force
-	for (std::size_t k=1;k<LL.size();k++)
-	if (fabs(LL[k].x - x) < xmindist)
-	{
-		imin=k;
-		xmindist = fabs(LL[imin].x-x);
-	}
-	return imin;
-}
-
-
-template< typename LBM >
 void Lagrange3D<LBM>::convertLagrangianPoints()
 {
 	using HLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
@@ -890,14 +826,4 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& state_id, int obj_
 	ws_tnl_dprecond = std::make_shared< dPreconditioner >();
 //	ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
 	#endif
-}
-
-template< typename LBM >
-Lagrange3D<LBM>::~Lagrange3D()
-{
-	if (index_array)
-	{
-		for (int i=0;i<lag_X;i++) delete [] index_array[i];
-		delete [] index_array;
-	}
 }

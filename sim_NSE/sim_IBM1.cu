@@ -319,14 +319,9 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 		fp3.x = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
 		fp3.y = dm + i * dx;
 		fp3.z = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
-		// Lagrangian coordinates
-		fp3.lag_x = i;
-		fp3.lag_y = j;
 		state.FF[INDEX].LL.push_back(fp3);
 		points++;
 	}
-	state.FF[INDEX].lag_X = N1;
-	state.FF[INDEX].lag_Y = N2;
 	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
 	state.FF[INDEX].diracDeltaTypeEL = dirac_delta;
 	state.FF[INDEX].methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
@@ -334,12 +329,12 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 	spdlog::info("added {} lagrangian points", points);
 
 	// compute sigma: take lag grid into account
-	state.FF[INDEX].computeMaxMinDist();
-	real sigma_min = state.FF[INDEX].minDist;
-	real sigma_max = state.FF[INDEX].maxDist;
+	//state.FF[INDEX].computeMaxMinDist();
+	//real sigma_min = state.FF[INDEX].minDist;
+	//real sigma_max = state.FF[INDEX].maxDist;
 
-//	real sigma_min = state.FF[INDEX].computeMinDist();
-//	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
+	real sigma_min = state.FF[INDEX].computeMinDist();
+	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
 
 	spdlog::info("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
 //	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);

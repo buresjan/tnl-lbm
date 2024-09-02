@@ -76,8 +76,6 @@ struct LagrangePoint3D
 	using Real = REAL;
 
 	REAL x=0,y=0,z=0;
-	// Lagrangian coordinates of the surface (as a grid)
-	int lag_x, lag_y;
 };
 
 enum class DiracMethod //Enum for deciding which method is used for calculation
@@ -144,13 +142,6 @@ struct Lagrange3D
 	typename std::shared_ptr< dPreconditioner > ws_tnl_dprecond;
 	#endif
 
-	bool indexed=false; // is i,j lagrangian index created?
-	int **index_array=0;
-
-	// Lagrange surface dimensions
-	int lag_X=-1; // size
-	int lag_Y=-1; // size
-
 	int obj_id = 0;
 
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
@@ -185,11 +176,6 @@ struct Lagrange3D
 
 	real dist(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x - B.x, A.y - B.y, A.z - B.z ); }
 
-	int findIndex(int i, int j);
-	int createIndexArray();
-	int findIndexOfNearestX(real x);
-
-	void computeMaxMinDist();	// computes min and max distance between neinghboring nodes
 	real computeMinDist();		// computes min and max distance between neinghboring nodes
 	real computeMaxDistFromMinDist(real mindist);		// computes min and max distance between neighboring nodes
 //	void integrateForce(real &Fx, real &Fy, real &Fz, real surface_element_size) { printf("integrateForce not implemented yet."); }
@@ -199,7 +185,6 @@ struct Lagrange3D
 
 	// constructors
 	Lagrange3D(LBM &inputLBM, const std::string& state_id, int obj_id);
-	~Lagrange3D();
 
 	// disable copy-constructor and copy-assignment, leave only move-constructor and move-assignment
 	// (because this class has a "LBM &lbm;" member)
