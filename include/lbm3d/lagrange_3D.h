@@ -105,8 +105,6 @@ struct Lagrange3D
 	typename std::shared_ptr< dPreconditioner > ws_tnl_dprecond;
 	#endif
 
-	int obj_id = 0;
-
 	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
 	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
 
@@ -145,7 +143,7 @@ struct Lagrange3D
 	bool mtx_output = false;
 
 	// constructors
-	Lagrange3D(LBM &inputLBM, const std::string& state_id, int obj_id);
+	Lagrange3D(LBM &inputLBM, const std::string& state_id);
 
 	// disable copy-constructor and copy-assignment, leave only move-constructor and move-assignment
 	// (because this class has a "LBM &lbm;" member)

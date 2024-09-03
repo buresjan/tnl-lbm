@@ -9,20 +9,6 @@
 #include "lbm_common/timeutils.h"
 
 template< typename NSE >
-int State<NSE>::addLagrange3D()
-{
-	FF.emplace_back(nse, id, FF.size());
-	return FF.size()-1;
-}
-
-template< typename NSE >
-void State<NSE>::computeAllLagrangeForces()
-{
-	for (std::size_t i=0;i<FF.size();i++)
-		FF[i].computeForces(nse.physTime());
-}
-
-template< typename NSE >
 bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
 {
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
@@ -1309,25 +1295,22 @@ void State<NSE>::SimUpdate()
 	// determine global flags
 	// NOTE: all Lagrangian points are assumed to be on the first GPU
 	// TODO
-//	if (nse.data.rank == 0 && FF.size() > 0)
-	if (FF.size() > 0)
+//	if (nse.data.rank == 0 && ibm.LL.size() > 0)
+	if (ibm.LL.size() > 0)
 	{
 		doComputeLagrangePhysics=true;
-		for (std::size_t i=0;i<FF.size();i++)
+		doComputeVelocitiesStar=true;
+		switch (ibm.ws_compute)
 		{
-			doComputeVelocitiesStar=true;
-			switch (FF[i].ws_compute)
-			{
-				case ws_computeCPU_TNL:
-					doCopyQuantitiesStarToHost=true;
-					doZeroForceOnHost=true;
-					break;
-				case ws_computeGPU_TNL:
-				case ws_computeHybrid_TNL:
-				case ws_computeHybrid_TNL_zerocopy:
-					doZeroForceOnDevice=true;
-					break;
-			}
+			case ws_computeCPU_TNL:
+				doCopyQuantitiesStarToHost=true;
+				doZeroForceOnHost=true;
+				break;
+			case ws_computeGPU_TNL:
+			case ws_computeHybrid_TNL:
+			case ws_computeHybrid_TNL_zerocopy:
+				doZeroForceOnDevice=true;
+				break;
 		}
 	}
 
@@ -1373,7 +1356,7 @@ void State<NSE>::SimUpdate()
 
 	if (doComputeLagrangePhysics)
 	{
-		computeAllLagrangeForces();
+		ibm.computeForces(nse.physTime());
 	}
 
 

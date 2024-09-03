@@ -797,12 +797,11 @@ void Lagrange3D<LBM>::computeForces(real time)
 }
 
 template< typename LBM >
-Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& state_id, int obj_id) : lbm(inputLBM)
+Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& state_id) : lbm(inputLBM)
 {
 	if (!spdlog::get("ibm"))
 		init_file_logger("ibm", state_id, inputLBM.communicator);
 
-	this->obj_id = obj_id;
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
 	ws_tnl_hprecond = std::make_shared< hPreconditioner >();

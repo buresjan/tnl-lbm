@@ -76,9 +76,9 @@ struct StateLocal : State<NSE>
 	using BLOCK = LBM_BLOCK< NSE >;
 
 	using State<NSE>::nse;
+	using State<NSE>::ibm;
 	using State<NSE>::vtk_helper;
 	using State<NSE>::id;
-	using State<NSE>::FF;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -93,7 +93,6 @@ struct StateLocal : State<NSE>
 //	real init_time;
 	bool firstrun=true;
 //	bool firstplot=true;
-	int FIL_INDEX=-1;
 	real cylinder_diameter=0.01;
 	real cylinder_c[3];
 
@@ -205,7 +204,7 @@ struct StateLocal : State<NSE>
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
 //		Fx=Fy=Fz=0;
 //		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
-////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)FF[FIL_INDEX].LL.size());
+////		if (FIL_INDEX>=0) ibm.integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)ibm.LL.size());
 //		real lbm_cd_lagr=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
@@ -295,7 +294,7 @@ struct StateLocal : State<NSE>
 
 // ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
 template < typename STATE >
-int setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_TNL)
+void setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma)
 {
 	using real = typename STATE::TRAITS::real;
 	using point_t = typename STATE::TRAITS::point_t;
@@ -312,39 +311,33 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 
 	// compute the amount of N for the lowest radius such that min_dist
 	int points=0;
-	point_t fp3;
-	int INDEX = state.addLagrange3D();
 	for (int i=0;i<N1;i++) // y-direction
 	for (int j=0;j<N2;j++)
 	{
+		point_t fp3;
 		fp3.x() = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
 		fp3.y() = dm + i * dx;
 		fp3.z() = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
-		state.FF[INDEX].LL.push_back(fp3);
+		state.ibm.LL.push_back(fp3);
 		points++;
 	}
-	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
-	state.FF[INDEX].diracDeltaTypeEL = dirac_delta;
-	state.FF[INDEX].methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
-	state.FIL_INDEX=INDEX;
 	spdlog::info("added {} lagrangian points", points);
 
 	// compute sigma: take lag grid into account
-	//state.FF[INDEX].computeMaxMinDist();
-	//real sigma_min = state.FF[INDEX].minDist;
-	//real sigma_max = state.FF[INDEX].maxDist;
+	//state.ibm.computeMaxMinDist();
+	//real sigma_min = state.ibm.minDist;
+	//real sigma_max = state.ibm.maxDist;
 
-	real sigma_min = state.FF[INDEX].computeMinDist();
-	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
+	real sigma_min = state.ibm.computeMinDist();
+	real sigma_max = state.ibm.computeMaxDistFromMinDist(sigma_min);
 
 	spdlog::info("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
 //	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
-//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
+//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.ibm.WuShuCompute, (state.ibm.ws_regularDirac)?"true":"false");
 	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
 	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
 
-	state.writeVTK_Points("cylinder",0,0,state.FF[INDEX]);
-	return INDEX;
+	state.writeVTK_Points("cylinder",0,0,state.ibm);
 }
 
 
@@ -398,7 +391,6 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 
 	state.cnt[PRINT].period = 0.1;
 	state.cnt[PROBE1].period = 0.1;
-	state.cnt[STAT_RESET].period = 500.0;
 	state.nse.physFinalTime = 10.0;
 
 //	state.cnt[VTK3D].period = 1.0;
@@ -427,7 +419,12 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.cylinder_c[2] = 0.20; //[m]
 	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	state.FIL_INDEX = setupCylinder(state, state.cylinder_c[0], state.cylinder_c[2], state.cylinder_diameter, sigma, method, dirac_delta, ws_compute);
+	setupCylinder(state, state.cylinder_c[0], state.cylinder_c[2], state.cylinder_diameter, sigma);
+
+	// configure IBM
+	state.ibm.ws_compute = ws_compute;
+	state.ibm.diracDeltaTypeEL = dirac_delta;
+	state.ibm.methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
 
 	execute(state);
 

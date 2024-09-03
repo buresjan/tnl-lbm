@@ -48,9 +48,9 @@ struct StateLocal : State<NSE>
 	using BLOCK = LBM_BLOCK< NSE >;
 
 	using State<NSE>::nse;
+	using State<NSE>::ibm;
 	using State<NSE>::vtk_helper;
 	using State<NSE>::id;
-	using State<NSE>::FF;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -60,7 +60,6 @@ struct StateLocal : State<NSE>
 
 	dreal lbm_inflow_vx = 0;
 	bool firstrun=true;
-	int FIL_INDEX=-1;
 	dreal ball_diameter=0.01;
 	dreal ball_c[3];
 	dreal ball_amplitude = 0;
@@ -115,7 +114,7 @@ struct StateLocal : State<NSE>
 	{
 		static idx cycle = 0;
 		const std::string basename = fmt::format("ball_{:d}", cycle);
-		this->writeVTK_Points(basename.c_str(), nse.physTime(), cycle++, FF[FIL_INDEX]);
+		this->writeVTK_Points(basename.c_str(), nse.physTime(), cycle++, ibm);
 	}
 
 	virtual void computeBeforeLBMKernel()
@@ -124,9 +123,9 @@ struct StateLocal : State<NSE>
 		const dreal velocity_amplitude = 2 * ball_amplitude / ball_period;
 		const dreal vz = TNL::sign( cos(2*TNL::pi*nse.iterations/ball_period) ) * velocity_amplitude;
 		const dreal dz = vz;  // *Delta t
-		FF[FIL_INDEX].hLL_lat += point_t{0,0,dz};
-		FF[FIL_INDEX].dLL_lat += point_t{0,0,dz};
-		FF[FIL_INDEX].constructed = false;
+		ibm.hLL_lat += point_t{0,0,dz};
+		ibm.dLL_lat += point_t{0,0,dz};
+		ibm.constructed = false;
 	}
 
 	virtual void updateKernelVelocities()
@@ -157,7 +156,7 @@ struct StateLocal : State<NSE>
 
 // ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
 template < typename STATE >
-int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_TNL)
+void drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius, double sigma)
 {
 	using real = typename STATE::TRAITS::real;
 	using point_t = typename STATE::TRAITS::point_t;
@@ -171,9 +170,6 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 	real count = surface/wanted_unit_area;
 	int N = ceil(count);
 
-	point_t fp;
-	real theta, phi;
-	int INDEX = state.addLagrange3D();
 	int points=0;
 //	real a = 4.0*PI*radius*radius/(real)N;
 	real a = 4.0*PI/(real)N;
@@ -185,35 +181,32 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 	for (int m = 0; m < Mtheta; m++)
 	{
 		// for a given phi and theta:
-		theta = PI*(m+0.5)/(real)Mtheta;
+		real theta = PI*(m+0.5)/(real)Mtheta;
 //		int Mphi = (int)(2.0*PI*sin(theta)/dphi);
 		int Mphi = floor(2.0*PI*sin(theta)/dphi);
 		for (int n = 0; n<Mphi; n++)
 		{
-			phi = 2.0*PI*n/(real)Mphi;
+			real phi = 2.0*PI*n/(real)Mphi;
+			point_t fp;
 			fp.x() = cx + radius * cos( phi ) * sin( theta );
 			fp.y() = cy + radius * sin( phi ) * sin( theta );
 			fp.z() = cz + radius * cos( theta );
-			state.FF[INDEX].LL.push_back(fp);
+			state.ibm.LL.push_back(fp);
 			points++;
 		}
 	}
-	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
-	state.FF[INDEX].diracDeltaTypeEL = dirac_delta;
-	state.FF[INDEX].methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
-	state.FIL_INDEX=INDEX;
 	spdlog::info("added {} lagrangian points", points);
 
-	real sigma_min = state.FF[INDEX].computeMinDist();
-	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
+	real sigma_min = state.ibm.computeMinDist();
+	real sigma_max = state.ibm.computeMaxDistFromMinDist(sigma_min);
 
 	spdlog::info("Ball surface: wanted sigma {:e} ({:f} i.e. {:d} points), wanted_unit_area {:e}, sigma_min {:e}, sigma_max {:e}", sigma, count, N, wanted_unit_area, sigma_min, sigma_max);
 //	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}",points, N, a);
-//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
+//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.ibm.WuShuCompute, (state.ibm.ws_regularDirac)?"true":"false");
 	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
 	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
 
-	return INDEX;
+	state.writeVTK_Points("ball.vtk",0,0,state.ibm);
 }
 
 template < typename NSE >
@@ -299,7 +292,12 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.ball_c[2] = 5.5*state.ball_diameter;
 	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	state.FIL_INDEX = drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma, method, dirac_delta, ws_compute);
+	drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma);
+
+	// configure IBM
+	state.ibm.ws_compute = ws_compute;
+	state.ibm.diracDeltaTypeEL = dirac_delta;
+	state.ibm.methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
 
 	execute(state);
 
