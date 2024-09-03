@@ -7,7 +7,7 @@
 
 template < typename LBM >
 __global__ void dM_row_capacities_kernel(
-	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
+	typename Lagrange3D<LBM>::DLPVECTOR::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::RowCapacitiesType::ViewType dM_row_capacities,
 	typename LBM::TRAITS::idx3d lbmBlockLocal,
 	int diracDeltaTypeEL
@@ -15,7 +15,7 @@ __global__ void dM_row_capacities_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR::RealType::RealType;
 
 	const idx support = 5; // search in this support
 
@@ -51,7 +51,7 @@ __global__ void dM_row_capacities_kernel(
 
 template < typename LBM>
 __global__ void dM_construction_kernel(
-	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
+	typename Lagrange3D<LBM>::DLPVECTOR::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::ViewType ws_tnl_dM,
 	typename LBM::TRAITS::idx3d lbmBlockLocal,
 	#ifdef HAVE_MPI
@@ -64,7 +64,7 @@ __global__ void dM_construction_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR::RealType::RealType;
 
 	const idx support = 5; // search in this support
 
@@ -104,7 +104,7 @@ __global__ void dM_construction_kernel(
 
 template < typename LBM>
 __global__ void dA_row_capacities_kernel(
-	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
+	typename Lagrange3D<LBM>::DLPVECTOR::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::RowCapacitiesType::ViewType dA_row_capacities,
 	typename Lagrange3D<LBM>::dEllpack::ConstViewType ws_tnl_dM,
 	int diracDeltaTypeLL,
@@ -113,7 +113,7 @@ __global__ void dA_row_capacities_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR::RealType::RealType;
 
 	idx index_row = blockIdx.x * blockDim.x + threadIdx.x;
 	idx m = LL.getSize();
@@ -155,7 +155,7 @@ __global__ void dA_row_capacities_kernel(
 
 template < typename LBM>
 __global__ void dA_construction_kernel(
-	typename Lagrange3D<LBM>::DLPVECTOR_DREAL::ConstViewType LL,
+	typename Lagrange3D<LBM>::DLPVECTOR::ConstViewType LL,
 	typename Lagrange3D<LBM>::dEllpack::ViewType ws_tnl_dA,
 	typename Lagrange3D<LBM>::dEllpack::ConstViewType ws_tnl_dM,
 	int diracDeltaTypeLL,
@@ -164,7 +164,7 @@ __global__ void dA_construction_kernel(
 {
 #ifdef __CUDACC__
 	using idx = typename LBM::TRAITS::idx;
-	using real = typename Lagrange3D<LBM>::DLPVECTOR_DREAL::RealType::RealType;
+	using real = typename Lagrange3D<LBM>::DLPVECTOR::RealType::RealType;
 
 	idx index_row = blockIdx.x * blockDim.x + threadIdx.x;
 	idx m = LL.getSize();

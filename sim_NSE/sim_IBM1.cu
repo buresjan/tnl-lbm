@@ -298,6 +298,7 @@ template < typename STATE >
 int setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_TNL)
 {
 	using real = typename STATE::TRAITS::real;
+	using point_t = typename STATE::TRAITS::point_t;
 
 	// based on sigma, estimate N
 	// sigma is the maximal diagonal of a quasi-square that 4 points on the cylinder surface form
@@ -311,14 +312,14 @@ int setupCylinder(STATE &state, double cx, double cz, double diameter, double si
 
 	// compute the amount of N for the lowest radius such that min_dist
 	int points=0;
-	LagrangePoint3D<real> fp3;
+	point_t fp3;
 	int INDEX = state.addLagrange3D();
 	for (int i=0;i<N1;i++) // y-direction
 	for (int j=0;j<N2;j++)
 	{
-		fp3.x = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
-		fp3.y = dm + i * dx;
-		fp3.z = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
+		fp3.x() = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
+		fp3.y() = dm + i * dx;
+		fp3.z() = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
 		state.FF[INDEX].LL.push_back(fp3);
 		points++;
 	}

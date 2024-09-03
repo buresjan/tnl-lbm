@@ -235,6 +235,7 @@ template < typename STATE >
 int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_TNL)
 {
 	using real = typename STATE::TRAITS::real;
+	using point_t = typename STATE::TRAITS::point_t;
 
 	// based on sigma, estimate N
 	real surface = 4.0*PI*radius*radius;
@@ -245,7 +246,7 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 	real count = surface/wanted_unit_area;
 	int N = ceil(count);
 
-	LagrangePoint3D<real> fp;
+	point_t fp;
 	real theta, phi;
 	int INDEX = state.addLagrange3D();
 	int points=0;
@@ -265,9 +266,9 @@ int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius
 		for (int n = 0; n<Mphi; n++)
 		{
 			phi = 2.0*PI*n/(real)Mphi;
-			fp.x = cx + radius * cos( phi ) * sin( theta );
-			fp.y = cy + radius * sin( phi ) * sin( theta );
-			fp.z = cz + radius * cos( theta );
+			fp.x() = cx + radius * cos( phi ) * sin( theta );
+			fp.y() = cy + radius * sin( phi ) * sin( theta );
+			fp.z() = cz + radius * cos( theta );
 			state.FF[INDEX].LL.push_back(fp);
 			points++;
 		}

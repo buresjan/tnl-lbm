@@ -39,45 +39,6 @@ enum {
 	ws_computeHybrid_TNL_zerocopy
 };
 
-// cyclic vector
-template < typename T >
-class CyclicVector : public std::vector<T>
-{
-public:
-    T& operator[](int n)
-    {
-                if (n<0)
-                        return operator[](n+std::vector<T>::size());
-                if (std::size_t(n)>=std::vector<T>::size())
-                        return operator[](n-std::vector<T>::size());
-                return std::vector<T>::operator[](n);
-//        int n=in;
-//        if (in<0) n=std::vector<T>::size()+in; else
-//        if (in>=std::vector<T>::size()) n=in-std::vector<T>::size();
-//        return std::vector<T>::operator[](n);
-    }
-	const T& operator[](int n) const
-    {
-                if (n<0)
-                        return operator[](n+std::vector<T>::size());
-                if (std::size_t(n)>=std::vector<T>::size())
-                        return operator[](n-std::vector<T>::size());
-                return std::vector<T>::operator[](n);
-//        int n=in;
-//        if (in<0) n=std::vector<T>::size()+in; else
-//        if (in>=std::vector<T>::size()) n=in-std::vector<T>::size();
-//        return std::vector<T>::operator[](n);
-    }
-};
-
-template < typename REAL>
-struct LagrangePoint3D
-{
-	using Real = REAL;
-
-	REAL x=0,y=0,z=0;
-};
-
 enum class DiracMethod //Enum for deciding which method is used for calculation
 {
 	MODIFIED = 0,
@@ -93,6 +54,8 @@ struct Lagrange3D
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 	using real = typename TRAITS::real;
+	// TRAITS::point_t is based on real, we want dreal
+	using point_t = TNL::Containers::StaticVector< 3, dreal >;
 
 	LBM &lbm;
 
@@ -162,19 +125,17 @@ struct Lagrange3D
 	int diracDeltaTypeEL=2;
 	int diracDeltaTypeLL=1;
 
-	CyclicVector<LagrangePoint3D<real>> LL;
+	std::vector<point_t> LL;
 
-	using DLPVECTOR_DREAL = TNL::Containers::Vector<TNL::Containers::StaticVector<3,dreal>,TNL::Devices::Cuda>;
-	using HLPVECTOR_DREAL = TNL::Containers::Vector<TNL::Containers::StaticVector<3,dreal>,TNL::Devices::Host>;
+	using DLPVECTOR = TNL::Containers::Vector<point_t, TNL::Devices::Cuda, idx>;
+	using HLPVECTOR = TNL::Containers::Vector<point_t, TNL::Devices::Host, idx>;
 
-	HLPVECTOR_DREAL hLL_lat;
-	DLPVECTOR_DREAL dLL_lat;
+	HLPVECTOR hLL_lat;
+	DLPVECTOR dLL_lat;
 
 	// accessors for macroscopic quantities as a 1D vector
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
 	dVectorView dmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N
-
-	real dist(LagrangePoint3D<real> &A, LagrangePoint3D<real> &B) { return NORM( A.x - B.x, A.y - B.y, A.z - B.z ); }
 
 	real computeMinDist();		// computes min and max distance between neinghboring nodes
 	real computeMaxDistFromMinDist(real mindist);		// computes min and max distance between neighboring nodes

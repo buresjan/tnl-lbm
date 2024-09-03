@@ -73,14 +73,12 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMinDist()
 	maxDist=-1e10;
 	for (std::size_t i=0;i<LL.size()-1;i++)
 	{
-	for (std::size_t j=i+1;j<LL.size();j++)
-	{
-		real d = dist(LL[j],LL[i]);
-		if (d>maxDist) maxDist=d;
-		if (d<minDist) minDist=d;
-	}
-	if (i%1000==0)
-	fmt::print("computeMinDist {} of {}\n", i, LL.size());
+		for (std::size_t j=i+1;j<LL.size();j++)
+		{
+			real d = TNL::l2Norm(LL[j] - LL[i]);
+			if (d>maxDist) maxDist=d;
+			if (d<minDist) minDist=d;
+		}
 	}
 	return minDist;
 }
@@ -94,7 +92,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename L
 		real search_dist = 2.0*mindist;
 		for (std::size_t j=i+1;j<LL.size();j++)
 		{
-			real d = dist(LL[j],LL[i]);
+			real d = TNL::l2Norm(LL[j] - LL[i]);
 			if (d < search_dist)
 				if (d>maxDist) maxDist=d;
 		}
@@ -106,26 +104,15 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename L
 template< typename LBM >
 void Lagrange3D<LBM>::convertLagrangianPoints()
 {
-	using HLPVECTOR_REAL = TNL::Containers::Vector<LagrangePoint3D<real>,TNL::Devices::Host>;
-	HLPVECTOR_REAL tempLL;
-	tempLL = LL;
-
 	hLL_lat.setSize(LL.size());
 
 	TNL::Algorithms::parallelFor< TNL::Devices::Host >(
 		(idx) 0,
 		(idx) LL.size(),
-		[] (
-			idx i,
-			typename HLPVECTOR_DREAL::ViewType hLL_lat,
-			typename HLPVECTOR_REAL::ConstViewType tempLL,
-			typename LBM::lat_t lat
-		) mutable
+		[this] (idx i, typename LBM::lat_t lat) mutable
 		{
-			hLL_lat[i] = lat.phys2lbmPoint({tempLL[i].x, tempLL[i].y, tempLL[i].z});
+			this->hLL_lat[i] = lat.phys2lbmPoint(this->LL[i]);
 		},
-		hLL_lat.getView(),
-		tempLL.getConstView(),
 		lbm.lat
 	);
 }
