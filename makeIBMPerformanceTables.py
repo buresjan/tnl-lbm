@@ -17,10 +17,10 @@ def run_sim(*, compute="gpu", dirac=1, method="modified", Re=100, hi=0, resoluti
     assert hi in range(len(hvals))
     assert method in {"modified", "original"}
     assert compute in {"cpu", "gpu"}
-    if compute == "cpu":
-        compute = 4
-    elif compute == "gpu":
-        compute = 5
+    if compute == "gpu":
+        compute = 0
+    elif compute == "cpu":
+        compute = 1
 
     results_dir = f"results_{SIM_NAME}_CUM_{method}_dirac_{dirac}_res_{resolution}_Re_{Re}_nas_{hvals[hi]:.4f}_compute_{compute}"
     log_file = Path(results_dir) / "log_ibm_rank000"

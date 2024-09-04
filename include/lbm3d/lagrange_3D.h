@@ -2,7 +2,6 @@
 
 #include <TNL/Devices/Host.h>
 #include <vector>
-#include <algorithm>
 #include <string>
 
 #include <math.h>
@@ -32,17 +31,20 @@ using SlicedEllpack = TNL::Matrices::SparseMatrix< Real,
 													SlicedEllpackSegments
 													>;
 
-enum {
-	ws_computeCPU_TNL,
-	ws_computeGPU_TNL,
-	ws_computeHybrid_TNL,
-	ws_computeHybrid_TNL_zerocopy
+// Enum for deciding which compute approach is used
+enum class IbmCompute
+{
+	GPU = 0,
+	CPU = 1,
+	Hybrid = 2,
+	Hybrid_zerocopy = 3,
 };
 
-enum class DiracMethod //Enum for deciding which method is used for calculation
+// Enum for deciding which IBM method is used
+enum class IbmMethod
 {
-	MODIFIED = 0,
-	ORIGINAL = 1,
+	modified = 0,
+	original = 1,
 };
 
 template< typename LBM >
@@ -91,7 +93,7 @@ struct Lagrange3D
 	dEllpack ws_tnl_dM; // matrix realizing projection of u* to lagrange desc.
 	dEllpack ws_tnl_dMT; // matrix realizing projection of uB from lagrange desc. to Euler desc. .... basially transpose of M
 	dVector ws_tnl_dx[3], ws_tnl_db[3];
-	// for ws_computeHybrid_TNL_zerocopy
+	// for IbmCompute::Hybrid_zerocopy
 	using hVectorPinned = TNL::Containers::Vector< dreal, TNL::Devices::Host, idx, TNL::Allocators::CudaHost<dreal> >;
 	hVectorPinned ws_tnl_hxz[3], ws_tnl_hbz[3];
 
@@ -105,8 +107,8 @@ struct Lagrange3D
 	typename std::shared_ptr< dPreconditioner > ws_tnl_dprecond;
 	#endif
 
-	DiracMethod methodVariant=DiracMethod::MODIFIED;		// use continuous ws_ trick with 2 dirac functions
-	int ws_compute=ws_computeGPU_TNL;		// ws_computeCPU, ws_computeGPU, ws_computeHybrid
+	IbmCompute computeVariant = IbmCompute::GPU;
+	IbmMethod methodVariant = IbmMethod::modified;
 
 	bool allocated = false;
 	bool constructed = false;

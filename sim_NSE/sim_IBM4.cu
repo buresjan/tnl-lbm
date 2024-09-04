@@ -271,14 +271,17 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.cnt[PROBE1].period = 0.01;	// Lagrangian points VTK output
 
 	// select compute method
-	int ws_compute;
+	IbmCompute computeVariant;
 	switch (compute)
 	{
-		case 4: ws_compute = ws_computeCPU_TNL; break;
-		case 5: ws_compute = ws_computeGPU_TNL; break;
-		case 6: ws_compute = ws_computeHybrid_TNL; break;
-		case 7: ws_compute = ws_computeHybrid_TNL_zerocopy; break;
-		default: spdlog::warn("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
+		case 0: computeVariant = IbmCompute::GPU; break;
+		case 1: computeVariant = IbmCompute::CPU; break;
+		case 2: computeVariant = IbmCompute::Hybrid; break;
+		case 3: computeVariant = IbmCompute::Hybrid_zerocopy; break;
+		default:
+			spdlog::warn("Unknown parameter compute={}, selecting GPU as the default.", compute);
+			computeVariant = IbmCompute::GPU;
+			break;
 	}
 
 	// add cuts
@@ -295,9 +298,12 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma);
 
 	// configure IBM
-	state.ibm.ws_compute = ws_compute;
+	state.ibm.computeVariant = computeVariant;
 	state.ibm.diracDeltaTypeEL = dirac_delta;
-	state.ibm.methodVariant=(method==0)?DiracMethod::MODIFIED:DiracMethod::ORIGINAL;
+	if (method == 0)
+		state.ibm.methodVariant = IbmMethod::modified;
+	else
+		state.ibm.methodVariant = IbmMethod::original;
 
 	execute(state);
 
@@ -371,13 +377,13 @@ int main(int argc, char **argv)
 		int Re = atoi(argv[3]);		// type=0,1,2 (geometry selection)
 		int hi = atoi(argv[4]);		// index in the hvals
 		int res = atoi(argv[5]);	// res=1,2,3
-		int compute = atoi(argv[6]); // compute=1,2,3,4,5,6,7
+		int compute = atoi(argv[6]); // compute=0,1,2,3
 
 		if (method > 1 || method < 0) { fprintf(stderr, "error: method=%d out of bounds [0, 1]\n",method); return 1; }
 		if (dirac < 1 || dirac > 4) { fprintf(stderr, "error: dirac=%d out of bounds [1,4]\n",dirac); return 1; }
 		if (hi >= hmax || hi < 0) { fprintf(stderr, "error: hi=%d out of bounds [0, %d]\n",hi,hmax-1); return 1; }
 		if (res < 1) { fprintf(stderr, "error: res=%d out of bounds [1, ...]\n",res); return 1; }
-		if (compute < 1 || compute > 7) { fprintf(stderr, "error: compute=%d out of bounds [1,7]\n",compute); return 1; }
+		if (compute < 0 || compute > 3) { fprintf(stderr, "error: compute=%d out of bounds [0,3]\n",compute); return 1; }
 		if (hi<hmax) h=hvals[hi];
 		run(res, (double)Re, h, dirac, method, compute);
 	}

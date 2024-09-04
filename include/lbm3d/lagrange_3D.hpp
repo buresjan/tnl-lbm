@@ -271,7 +271,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		idx rowCapacity = 0;
 		for (idx index_col = 0; index_col < m; index_col++)
 		{
-			if (methodVariant==DiracMethod::MODIFIED)
+			if (methodVariant == IbmMethod::modified)
 			{
 				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
 				{
@@ -318,7 +318,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 
 		for (idx index_col=0;index_col<m;index_col++)
 		{
-			if (methodVariant==DiracMethod::MODIFIED)
+			if (methodVariant == IbmMethod::modified)
 			{
 				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
 				{
@@ -590,19 +590,19 @@ template< typename LBM >
 void Lagrange3D<LBM>::computeForces(real time)
 {
 	const char* compute_desc = "undefined";
-	switch (ws_compute)
+	switch (computeVariant)
 	{
-		case ws_computeCPU_TNL:                compute_desc = "ws_computeCPU_TNL"; break;
-		case ws_computeGPU_TNL:                compute_desc = "ws_computeGPU_TNL"; break;
-		case ws_computeHybrid_TNL:             compute_desc = "ws_computeHybrid_TNL"; break;
-		case ws_computeHybrid_TNL_zerocopy:    compute_desc = "ws_computeHybrid_TNL_zerocopy"; break;
+		case IbmCompute::CPU:                compute_desc = "CPU"; break;
+		case IbmCompute::GPU:                compute_desc = "GPU"; break;
+		case IbmCompute::Hybrid:             compute_desc = "Hybrid"; break;
+		case IbmCompute::Hybrid_zerocopy:    compute_desc = "Hybrid_zerocopy"; break;
 	}
 
-	switch (ws_compute)
+	switch (computeVariant)
 	{
-		case ws_computeCPU_TNL:
-		case ws_computeHybrid_TNL:
-		case ws_computeHybrid_TNL_zerocopy:
+		case IbmCompute::CPU:
+		case IbmCompute::Hybrid:
+		case IbmCompute::Hybrid_zerocopy:
 			if (!allocated)
 				allocateMatricesCPU();
 			allocated = true;
@@ -610,7 +610,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				constructMatricesCPU();
 			constructed = true;
 			break;
-		case ws_computeGPU_TNL:
+		case IbmCompute::GPU:
 			if (!allocated)
 				allocateMatricesGPU();
 			allocated = true;
@@ -620,7 +620,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 	}
 	auto ibm_logger = spdlog::get("ibm");
-	ibm_logger->info("computing forces using ws_compute={}", compute_desc);
+	ibm_logger->info("computing forces using computeVariant={}", compute_desc);
 
 	TNL::Timer timer;
 	timer.start();
@@ -642,10 +642,10 @@ void Lagrange3D<LBM>::computeForces(real time)
 	auto hfy = hmacroVector(MACRO::e_fy);
 	auto hfz = hmacroVector(MACRO::e_fz);
 
-	switch (ws_compute)
+	switch (computeVariant)
 	{
 		#ifdef USE_CUDA
-		case ws_computeGPU_TNL:
+		case IbmCompute::GPU:
 		{
 			// no Device--Host copy is required
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
@@ -679,7 +679,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 		}
 
-		case ws_computeHybrid_TNL:
+		case IbmCompute::Hybrid:
 		{
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
@@ -717,7 +717,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 		}
 
-		case ws_computeHybrid_TNL_zerocopy:
+		case IbmCompute::Hybrid_zerocopy:
 		{
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);
@@ -751,7 +751,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 		}
 		#endif // USE_CUDA
-		case ws_computeCPU_TNL:
+		case IbmCompute::CPU:
 		{
 			// vx, vy, vz, rho must be copied from the device
 			ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
@@ -784,9 +784,6 @@ void Lagrange3D<LBM>::computeForces(real time)
 			dfz = hfz;
 			break;
 		}
-		default:
-			spdlog::error("lagrange_3D: Wu Shu compute flag {} unrecognized.", ws_compute);
-			break;
 	}
 	timer.stop();
 

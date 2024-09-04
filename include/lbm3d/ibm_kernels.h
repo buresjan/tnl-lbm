@@ -108,7 +108,7 @@ __global__ void dA_row_capacities_kernel(
 	typename Lagrange3D<LBM>::dEllpack::RowCapacitiesType::ViewType dA_row_capacities,
 	typename Lagrange3D<LBM>::dEllpack::ConstViewType ws_tnl_dM,
 	int diracDeltaTypeLL,
-	DiracMethod methodVariant
+	IbmMethod methodVariant
 )
 {
 #ifdef __CUDACC__
@@ -123,7 +123,7 @@ __global__ void dA_row_capacities_kernel(
 	idx rowCapacity = 0;  //Number of elements where DiracDelta > 0 //old
 	for (idx index_col=0;index_col<m;index_col++) //old
 	{
-		if (methodVariant==DiracMethod::MODIFIED)
+		if (methodVariant == IbmMethod::modified)
 		{
 			if (is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, LL))
 			{
@@ -145,7 +145,7 @@ __global__ void dA_row_capacities_kernel(
 				}
 			}
 			if (val > 0)
-			rowCapacity++;
+				rowCapacity++;
 		}
 	}
 	dA_row_capacities[index_row] = rowCapacity;
@@ -159,7 +159,7 @@ __global__ void dA_construction_kernel(
 	typename Lagrange3D<LBM>::dEllpack::ViewType ws_tnl_dA,
 	typename Lagrange3D<LBM>::dEllpack::ConstViewType ws_tnl_dM,
 	int diracDeltaTypeLL,
-	DiracMethod methodVariant
+	IbmMethod methodVariant
 )
 {
 #ifdef __CUDACC__
@@ -176,7 +176,7 @@ __global__ void dA_construction_kernel(
 
 	for (idx index_col = 0; index_col < m; index_col++)
 	{
-		if (methodVariant == DiracMethod::MODIFIED)
+		if (methodVariant == IbmMethod::modified)
 		{
 			if (is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, LL))
 			{

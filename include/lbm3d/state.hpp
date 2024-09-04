@@ -1300,15 +1300,15 @@ void State<NSE>::SimUpdate()
 	{
 		doComputeLagrangePhysics=true;
 		doComputeVelocitiesStar=true;
-		switch (ibm.ws_compute)
+		switch (ibm.computeVariant)
 		{
-			case ws_computeCPU_TNL:
+			case IbmCompute::CPU:
 				doCopyQuantitiesStarToHost=true;
 				doZeroForceOnHost=true;
 				break;
-			case ws_computeGPU_TNL:
-			case ws_computeHybrid_TNL:
-			case ws_computeHybrid_TNL_zerocopy:
+			case IbmCompute::GPU:
+			case IbmCompute::Hybrid:
+			case IbmCompute::Hybrid_zerocopy:
 				doZeroForceOnDevice=true;
 				break;
 		}

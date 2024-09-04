@@ -18,7 +18,7 @@ for method in 0 1; do
         echo "Original method"
     fi
     for dirac in {1..4}; do
-        ./build/sim_NSE/sim_IBM3 $method $dirac $Re $hi $resolution 5
+        ./build/sim_NSE/sim_IBM3 $method $dirac $Re $hi $resolution 0
         for matrix in A M; do
             echo "Diff matrix $matrix Dirac $dirac"
             ./pydiff.py ibm_GPU_matrix-${matrix}_method-${method}_dirac-$dirac.mtx ./tests/baseline_ibm_matrices/matrix-${matrix}_method-${method}_dirac-$dirac.mtx
