@@ -1,5 +1,6 @@
 #include "lbm3d/core.h"
 #include "lbm3d/lagrange_3D.h"
+#include "lbm3d/obstacles_ibm.h"
 
 // ball in 3D
 // IBM-LBM
@@ -63,7 +64,7 @@ struct StateLocal : State<NSE>
 	dreal lbm_inflow_vx = 0;
 	bool firstrun=true;
 	real ball_diameter=0.01;
-	real ball_c[3];
+	point_t ball_c;
 
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
@@ -135,61 +136,6 @@ struct StateLocal : State<NSE>
 		: State<NSE>(id, communicator, lat)
 	{}
 };
-
-// ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
-template < typename STATE >
-void drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius, double sigma)
-{
-	using real = typename STATE::TRAITS::real;
-	using point_t = typename STATE::TRAITS::point_t;
-
-	// based on sigma, estimate N
-	real surface = 4.0*PI*radius*radius;
-	// sigma is diagonal of a "quasi-square" that 4 points on the sphere surface form
-	// so the quasi-square has area = b^2 where b^2 + b^2 = sigma^2, i.e., b^2 = 1/2*sigma^2
-	real wanted_unit_area = sigma*sigma / 2.0;
-	// count how many of these
-	real count = surface/wanted_unit_area;
-	int N = ceil(count);
-
-	int points=0;
-//	real a = 4.0*PI*radius*radius/(real)N;
-	real a = 4.0*PI/(real)N;
-	real d = sqrt(a);
-//	int Mtheta = (int)(PI/d);
-	int Mtheta = floor(PI/d);
-	real dtheta = PI/Mtheta;
-	real dphi = a/dtheta;
-	for (int m = 0; m < Mtheta; m++)
-	{
-		// for a given phi and theta:
-		real theta = PI*(m+0.5)/(real)Mtheta;
-//		int Mphi = (int)(2.0*PI*sin(theta)/dphi);
-		int Mphi = floor(2.0*PI*sin(theta)/dphi);
-		for (int n = 0; n<Mphi; n++)
-		{
-			real phi = 2.0*PI*n/(real)Mphi;
-			point_t fp;
-			fp.x() = cx + radius * cos( phi ) * sin( theta );
-			fp.y() = cy + radius * sin( phi ) * sin( theta );
-			fp.z() = cz + radius * cos( theta );
-			state.ibm.LL.push_back(fp);
-			points++;
-		}
-	}
-	spdlog::info("added {} lagrangian points", points);
-
-	real sigma_min = state.ibm.computeMinDist();
-	real sigma_max = state.ibm.computeMaxDistFromMinDist(sigma_min);
-
-	spdlog::info("Ball surface: wanted sigma {:e} ({:f} i.e. {:d} points), wanted_unit_area {:e}, sigma_min {:e}, sigma_max {:e}", sigma, count, N, wanted_unit_area, sigma_min, sigma_max);
-//	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}",points, N, a);
-//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.ibm.WuShuCompute, (state.ibm.ws_regularDirac)?"true":"false");
-	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
-
-	state.writeVTK_Points("ball.vtk",0,0,state.ibm);
-}
 
 template < typename NSE >
 int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int method=0, int compute=5)
@@ -271,12 +217,13 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.add2Dcut_Y(LBM_Y/2,"cut_Y");
 	state.add2Dcut_Z(LBM_Z/2,"cut_Z");
 
+	// create immersed objects
 	state.ball_c[0] = 2*state.ball_diameter;
 	state.ball_c[1] = 5.5*state.ball_diameter;
 	state.ball_c[2] = 5.5*state.ball_diameter;
-	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma);
+	ibmDrawSphere(state.ibm, state.ball_c, state.ball_diameter/2.0, sigma);
+	state.writeVTK_Points("ball",0,0,state.ibm);
 
 	// configure IBM
 	state.ibm.computeVariant = computeVariant;

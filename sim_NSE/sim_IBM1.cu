@@ -1,5 +1,6 @@
 #include "lbm3d/core.h"
 #include "lbm3d/lagrange_3D.h"
+#include "lbm3d/obstacles_ibm.h"
 
 // cylinder in 3D - Schafer-Turek problem
 // IBM-LBM
@@ -94,7 +95,7 @@ struct StateLocal : State<NSE>
 	bool firstrun=true;
 //	bool firstplot=true;
 	real cylinder_diameter=0.01;
-	real cylinder_c[3];
+	point_t cylinder_c;
 
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
@@ -292,55 +293,6 @@ struct StateLocal : State<NSE>
 };
 
 
-// ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
-template < typename STATE >
-void setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma)
-{
-	using real = typename STATE::TRAITS::real;
-	using point_t = typename STATE::TRAITS::point_t;
-
-	// based on sigma, estimate N
-	// sigma is the maximal diagonal of a quasi-square that 4 points on the cylinder surface form
-	// the points do not have to be between y=0 and y=Y-1 sharp, but equidistantly spaced as ckose to sigma as possible
-	int N2 = ceil(sqrt(2.0) * PI * diameter / sigma  ); // minimal number of N2 points
-	real dx = PI*diameter/((real)N2);
-	real W = state.nse.lat.physDl*(state.nse.lat.global.y()-2);
-	int N1 = floor( W / dx );
-	real dm = (W - N1*dx)/2.0;
-	real radius = diameter/2.0;
-
-	// compute the amount of N for the lowest radius such that min_dist
-	int points=0;
-	for (int i=0;i<N1;i++) // y-direction
-	for (int j=0;j<N2;j++)
-	{
-		point_t fp3;
-		fp3.x() = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
-		fp3.y() = dm + i * dx;
-		fp3.z() = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
-		state.ibm.LL.push_back(fp3);
-		points++;
-	}
-	spdlog::info("added {} lagrangian points", points);
-
-	// compute sigma: take lag grid into account
-	//state.ibm.computeMaxMinDist();
-	//real sigma_min = state.ibm.minDist;
-	//real sigma_max = state.ibm.maxDist;
-
-	real sigma_min = state.ibm.computeMinDist();
-	real sigma_max = state.ibm.computeMaxDistFromMinDist(sigma_min);
-
-	spdlog::info("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
-//	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
-//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.ibm.WuShuCompute, (state.ibm.ws_regularDirac)?"true":"false");
-	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
-
-	state.writeVTK_Points("cylinder",0,0,state.ibm);
-}
-
-
 template < typename NSE >
 int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int method=0, int compute=5)
 {
@@ -417,12 +369,13 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.add2Dcut_Y(LBM_Y/2,"cut_Y");
 	state.add2Dcut_Z(LBM_Z/2,"cut_Z");
 
+	// create immersed objects
 	state.cylinder_c[0] = 0.50; //[m]
 	state.cylinder_c[1] = 0; // n/a
 	state.cylinder_c[2] = 0.20; //[m]
-	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	setupCylinder(state, state.cylinder_c[0], state.cylinder_c[2], state.cylinder_diameter, sigma);
+	ibmSetupCylinder(state.ibm, state.cylinder_c, state.cylinder_diameter, sigma);
+	state.writeVTK_Points("cylinder",0,0,state.ibm);
 
 	// configure IBM
 	state.ibm.computeVariant = computeVariant;
