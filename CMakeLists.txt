@@ -118,7 +118,7 @@ target_include_directories(
 include(FetchContent)
 FetchContent_Declare(fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG master
+    GIT_TAG 11.0.2  # master is often broken :-(
     SYSTEM
     FIND_PACKAGE_ARGS
 )
