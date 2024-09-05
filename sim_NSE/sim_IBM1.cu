@@ -375,7 +375,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.cylinder_c[2] = 0.20; //[m]
 	real sigma = nasobek * PHYS_DL;
 	ibmSetupCylinder(state.ibm, state.cylinder_c, state.cylinder_diameter, sigma);
-	state.writeVTK_Points("cylinder",0,0,state.ibm);
+	state.writeVTK_Points("cylinder", 0, 0);
 
 	// configure IBM
 	state.ibm.computeVariant = computeVariant;

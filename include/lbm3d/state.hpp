@@ -126,11 +126,17 @@ bool State<NSE>::isMark()
 
 
 template< typename NSE >
-void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil)
+void State<NSE>::writeVTK_Points(const char* name, real time, int cycle)
 {
-	if (!fil.allocated)
-		fil.convertLagrangianPoints();
+	if (!ibm.allocated)
+		ibm.convertLagrangianPoints();
 
+	writeVTK_Points(name, time, cycle, ibm.hLL_lat);
+}
+
+template< typename NSE >
+void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, const typename Lagrange3D::HLPVECTOR& hLL_lat)
+{
 	VTKWriter vtk;
 
 	const std::string fname = fmt::format("results_{}/vtk3D/rank{:03d}_{}.vtk", id, nse.rank, name);
@@ -141,10 +147,10 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrang
 
 	fprintf(fp, "DATASET POLYDATA\n");
 
-	fprintf(fp, "POINTS %lu float\n", fil.LL.size());
-	for (std::size_t i=0;i<fil.LL.size();i++)
+	fprintf(fp, "POINTS %d float\n", (int)hLL_lat.getSize());
+	for (idx i = 0; i < hLL_lat.getSize(); i++)
 	{
-		const point_t phys = nse.lat.lbm2physPoint(fil.hLL_lat[i]);
+		const point_t phys = nse.lat.lbm2physPoint(hLL_lat[i]);
 		vtk.writeFloat(fp, phys.x());
 		vtk.writeFloat(fp, phys.y());
 		vtk.writeFloat(fp, phys.z());

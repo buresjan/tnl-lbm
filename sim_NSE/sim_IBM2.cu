@@ -322,7 +322,7 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.ball_c[0] = 5.5*state.ball_diameter;
 	ibmDrawSphere(state.ibm, state.ball_c, state.ball_diameter/2.0, sigma);
 
-	state.writeVTK_Points("ball",0,0,state.ibm);
+	state.writeVTK_Points("ball", 0, 0);
 
 	// configure IBM
 	state.ibm.computeVariant = computeVariant;

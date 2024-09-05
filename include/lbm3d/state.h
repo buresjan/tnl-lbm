@@ -106,7 +106,8 @@ struct State
 	// Immersed boundary method
 	Lagrange3D ibm;
 
-	void writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil);
+	void writeVTK_Points(const char* name, real time, int cycle);
+	void writeVTK_Points(const char* name, real time, int cycle, const typename Lagrange3D::HLPVECTOR& hLL_lat);
 
 	// how often to probe/print/write/stat
 	T_COUNTER cnt[MAX_COUNTER];

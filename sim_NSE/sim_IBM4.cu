@@ -115,7 +115,12 @@ struct StateLocal : State<NSE>
 	{
 		static idx cycle = 0;
 		const std::string basename = fmt::format("ball_{:04d}", cycle);
-		this->writeVTK_Points(basename.c_str(), nse.physTime(), cycle++, ibm);
+		this->writeVTK_Points(basename.c_str(), nse.physTime(), cycle++);
+
+		// output the center alone in a vtk file for easier rendering
+		const std::string center_basename = fmt::format("ball_center_{:04d}", cycle);
+		typename Lagrange3D<NSE>::HLPVECTOR center_vector({nse.lat.phys2lbmPoint(ball_c)});
+		this->writeVTK_Points(center_basename.c_str(), nse.physTime(), cycle++, center_vector);
 	}
 
 	virtual void computeBeforeLBMKernel()
@@ -127,6 +132,9 @@ struct StateLocal : State<NSE>
 		ibm.hLL_lat += point_t{0,0,dz};
 		ibm.dLL_lat += point_t{0,0,dz};
 		ibm.constructed = false;
+
+		// update the ball center for drawing
+		ball_c += point_t{0,0,dz*nse.lat.physDl};
 	}
 
 	virtual void updateKernelVelocities()
