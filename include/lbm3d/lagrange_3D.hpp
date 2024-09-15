@@ -132,6 +132,11 @@ void Lagrange3D<LBM>::allocateMatricesCPU()
 	ws_tnl_hM.setDimensions(m, n);
 	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
+	#ifdef USE_CUDA
+	ws_tnl_dM.setDimensions(m, n);
+	ws_tnl_dA = std::make_shared< dEllpack >();
+	ws_tnl_dA->setDimensions(m, m);
+	#endif
 
 	// Allocate row capacity vectors
 	hM_row_capacities.setSize(m);
@@ -363,7 +368,6 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	// Copy matrices from host to the GPU
 	loopTimer.reset();
 	loopTimer.start();
-	ws_tnl_dA = std::make_shared< dEllpack >();
 	*ws_tnl_dA = *ws_tnl_hA;
 	ws_tnl_dM = ws_tnl_hM;
 	ws_tnl_dMT = ws_tnl_hMT;
