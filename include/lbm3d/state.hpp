@@ -9,22 +9,6 @@
 #include "lbm_common/timeutils.h"
 
 template< typename NSE >
-int State<NSE>::addLagrange3D()
-{
-	const std::string dir = fmt::format("results_{}", id);
-	FF.emplace_back(nse, std::move(dir));
-	return FF.size()-1;
-}
-
-template< typename NSE >
-void State<NSE>::computeAllLagrangeForces()
-{
-	for (std::size_t i=0;i<FF.size();i++)
-		if (FF[i].implicitWuShuForcing)
-			FF[i].computeWuShuForcesSparse(nse.physTime());
-}
-
-template< typename NSE >
 bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
 {
 	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
@@ -135,53 +119,6 @@ bool State<NSE>::isMark()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //
-// VTK SURFACE
-//                                                                                                                                                                                                                //
-//                                                                                                                                                                                                                //
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-template< typename NSE >
-void State<NSE>::writeVTK_Surface(const char* name, real time, int cycle, Lagrange3D &fil)
-{
-	VTKWriter vtk;
-
-	const std::string fname = fmt::format("results_{}/vtk3D/rank{:03d}_{}.vtk", id, nse.rank, name);
-	create_file(fname.c_str());
-
-	FILE* fp = fopen(fname.c_str(), "w+");
-	vtk.writeHeader(fp);
-
-	fprintf(fp, "DATASET POLYDATA\n");
-
-	fprintf(fp, "POINTS %d float\n", fil.LL.size());
-	for (std::size_t i=0;i<fil.LL.size();i++)
-	{
-		vtk.writeFloat(fp, fil.LL[i].x);
-		vtk.writeFloat(fp, fil.LL[i].y);
-		vtk.writeFloat(fp, fil.LL[i].z);
-	}
-	vtk.writeBuffer(fp);
-
-	fprintf(fp, "POLYGONS %d %d\n", (fil.lag_X-1)*fil.lag_Y , 5*(fil.lag_X-1)*fil.lag_Y ); // first number: number of polygons, second number: total integers describing the list
-	for (int i=0;i<fil.lag_X-1;i++)
-	for (int j=0;j<fil.lag_Y;j++)
-	{
-		int ip = i+1;
-		int jp = (j==fil.lag_Y-1) ? 0 : j+1;
-		vtk.writeInt(fp,4);
-		vtk.writeInt(fp,fil.findIndex(i,j));
-		vtk.writeInt(fp,fil.findIndex(ip,j));
-		vtk.writeInt(fp,fil.findIndex(ip,jp));
-		vtk.writeInt(fp,fil.findIndex(i,jp));
-	}
-	fclose(fp);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                                                                                                                                //
-//                                                                                                                                                                                                                //
 // VTK POINTS
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //
@@ -189,7 +126,22 @@ void State<NSE>::writeVTK_Surface(const char* name, real time, int cycle, Lagran
 
 
 template< typename NSE >
-void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil)
+void State<NSE>::writeVTK_Points(const char* name, real time, int cycle)
+{
+	if (!ibm.allocated)
+		ibm.convertLagrangianPoints();
+
+	// synchronize hLL_lat if points movement is computed on the GPU
+	if (ibm.use_LL_velocity_in_solution && ibm.computeVariant != IbmCompute::CPU) {
+		ibm.hLL_lat = ibm.dLL_lat;
+		ibm.hLL_velocity_lat = ibm.dLL_velocity_lat;
+	}
+
+	writeVTK_Points(name, time, cycle, ibm.hLL_lat);
+}
+
+template< typename NSE >
+void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, const typename Lagrange3D::HLPVECTOR& hLL_lat)
 {
 	VTKWriter vtk;
 
@@ -201,12 +153,13 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, Lagrang
 
 	fprintf(fp, "DATASET POLYDATA\n");
 
-	fprintf(fp, "POINTS %lu float\n", fil.LL.size());
-	for (std::size_t i=0;i<fil.LL.size();i++)
+	fprintf(fp, "POINTS %d float\n", (int)hLL_lat.getSize());
+	for (idx i = 0; i < hLL_lat.getSize(); i++)
 	{
-		vtk.writeFloat(fp, fil.LL[i].x);
-		vtk.writeFloat(fp, fil.LL[i].y);
-		vtk.writeFloat(fp, fil.LL[i].z);
+		const point_t phys = nse.lat.lbm2physPoint(hLL_lat[i]);
+		vtk.writeFloat(fp, phys.x());
+		vtk.writeFloat(fp, phys.y());
+		vtk.writeFloat(fp, phys.z());
 	}
 	vtk.writeBuffer(fp);
 	fclose(fp);
@@ -1270,7 +1223,7 @@ void State<NSE>::SimInit()
 	for (auto& block : nse.blocks)
 		spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
 
-	spdlog::info("\nSTART: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
+	spdlog::info("START: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
 
 	// reset counters
 	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
@@ -1354,29 +1307,22 @@ void State<NSE>::SimUpdate()
 	// determine global flags
 	// NOTE: all Lagrangian points are assumed to be on the first GPU
 	// TODO
-//	if (nse.data.rank == 0 && FF.size() > 0)
-	if (FF.size() > 0)
+//	if (nse.data.rank == 0 && ibm.LL.size() > 0)
+	if (ibm.LL.size() > 0)
 	{
 		doComputeLagrangePhysics=true;
-		for (std::size_t i=0;i<FF.size();i++)
-		if (FF[i].implicitWuShuForcing)
+		doComputeVelocitiesStar=true;
+		switch (ibm.computeVariant)
 		{
-			doComputeVelocitiesStar=true;
-			switch (FF[i].ws_compute)
-			{
-				case ws_computeCPU:
-				case ws_computeCPU_TNL:
-					doCopyQuantitiesStarToHost=true;
-					doZeroForceOnHost=true;
-					break;
-				case ws_computeGPU_TNL:
-				case ws_computeHybrid_TNL:
-				case ws_computeHybrid_TNL_zerocopy:
-				case ws_computeGPU_CUSPARSE:
-				case ws_computeHybrid_CUSPARSE:
-					doZeroForceOnDevice=true;
-					break;
-			}
+			case IbmCompute::CPU:
+				doCopyQuantitiesStarToHost=true;
+				doZeroForceOnHost=true;
+				break;
+			case IbmCompute::GPU:
+			case IbmCompute::Hybrid:
+			case IbmCompute::Hybrid_zerocopy:
+				doZeroForceOnDevice=true;
+				break;
 		}
 	}
 
@@ -1422,7 +1368,7 @@ void State<NSE>::SimUpdate()
 
 	if (doComputeLagrangePhysics)
 	{
-		computeAllLagrangeForces();
+		ibm.computeForces(nse.physTime());
 	}
 
 

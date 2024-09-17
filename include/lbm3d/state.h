@@ -103,14 +103,11 @@ struct State
 	std::vector< T_PROBE1DCUT > probe1Dvec;
 	std::vector< T_PROBE1DLINECUT > probe1Dlinevec;
 
-	// Lagrange
-	std::deque<Lagrange3D> FF;			// array of filaments (std::deque instead of std::vector because Lagrange3D is not copy-constructible)
-	int addLagrange3D();				// add a filament into the array and returns its index
-	void computeAllLagrangeForces();
+	// Immersed boundary method
+	Lagrange3D ibm;
 
-	// vtk surface rotational
-	void writeVTK_Surface(const char* name, real time, int cycle, Lagrange3D &fil);
-	void writeVTK_Points(const char* name, real time, int cycle, Lagrange3D &fil);
+	void writeVTK_Points(const char* name, real time, int cycle);
+	void writeVTK_Points(const char* name, real time, int cycle, const typename Lagrange3D::HLPVECTOR& hLL_lat);
 
 	// how often to probe/print/write/stat
 	T_COUNTER cnt[MAX_COUNTER];
@@ -251,7 +248,7 @@ struct State
 	// constructors
 	template< typename... ARGS >
 	State(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, ARGS&&... args)
-	: id(id), nse(communicator, lat, std::forward<ARGS>(args)...)
+	: id(id), nse(communicator, lat, std::forward<ARGS>(args)...), ibm(nse, id)
 	{
 		// initialize default spdlog logger
 		init_logging(id, communicator);

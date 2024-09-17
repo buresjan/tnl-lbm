@@ -1,14 +1,9 @@
 #include "lbm3d/core.h"
+#include "lbm3d/lagrange_3D.h"
+#include "lbm3d/obstacles_ibm.h"
 
 // cylinder in 3D - Schafer-Turek problem
 // IBM-LBM
-
-// filament variants
-enum { NIC, NORMAL, MIRROR, FLIP, MIRRORFLIP };
-
-//const int DOMAIN_INNER = -1;
-//const int DOMAIN_OUTER = -2;
-//const int DOMAIN_BNDRY = -3;
 
 template < typename TRAITS >
 struct MacroLocal : D3Q27_MACRO_Base< TRAITS >
@@ -82,9 +77,9 @@ struct StateLocal : State<NSE>
 	using BLOCK = LBM_BLOCK< NSE >;
 
 	using State<NSE>::nse;
+	using State<NSE>::ibm;
 	using State<NSE>::vtk_helper;
 	using State<NSE>::id;
-	using State<NSE>::FF;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -99,9 +94,8 @@ struct StateLocal : State<NSE>
 //	real init_time;
 	bool firstrun=true;
 //	bool firstplot=true;
-	int FIL_INDEX=-1;
 	real cylinder_diameter=0.01;
-	real cylinder_c[3];
+	point_t cylinder_c;
 
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
@@ -211,7 +205,7 @@ struct StateLocal : State<NSE>
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
 //		Fx=Fy=Fz=0;
 //		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
-////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)FF[FIL_INDEX].LL.size());
+////		if (FIL_INDEX>=0) ibm.integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)ibm.LL.size());
 //		real lbm_cd_lagr=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
@@ -273,7 +267,14 @@ struct StateLocal : State<NSE>
 	virtual void updateKernelVelocities()
 	{
 		for (auto& block : nse.blocks)
+		{
+			block.data.inflow_rho = no1;
 			block.data.inflow_vx = nse.lat.phys2lbmVelocity(phys_input_U_max);
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
+			block.data.physDl = nse.lat.physDl;
+			block.data.H = (nse.lat.global.y()-2.0)*nse.lat.physDl; // domain width and height
+		}
 	}
 
 	virtual void setupBoundaries()
@@ -288,80 +289,8 @@ struct StateLocal : State<NSE>
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 		: State<NSE>(id, communicator, lat)
-	{
-		for (auto& block : nse.blocks)
-		{
-			block.data.inflow_rho = no1;
-			block.data.inflow_vx = 0;
-			block.data.inflow_vy = 0;
-			block.data.inflow_vz = 0;
-			block.data.physDl = lat.physDl;
-			block.data.H = (lat.global.y()-2.0)*lat.physDl; // domain width and height
-		}
-	}
+	{}
 };
-
-
-// ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
-template < typename STATE >
-int setupCylinder(STATE &state, double cx, double cz, double diameter, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_CUSPARSE)
-{
-	using real = typename STATE::TRAITS::real;
-
-	// based on sigma, estimate N
-	// sigma is the maximal diagonal of a quasi-square that 4 points on the cylinder surface form
-	// the points do not have to be between y=0 and y=Y-1 sharp, but equidistantly spaced as ckose to sigma as possible
-	int N2 = ceil(sqrt(2.0) * PI * diameter / sigma  ); // minimal number of N2 points
-	real dx = PI*diameter/((real)N2);
-	real W = state.nse.lat.physDl*(state.nse.lat.global.y()-2);
-	int N1 = floor( W / dx );
-	real dm = (W - N1*dx)/2.0;
-	real radius = diameter/2.0;
-
-	// compute the amount of N for the lowest radius such that min_dist
-	int points=0;
-	LagrangePoint3D<real> fp3;
-	int INDEX = state.addLagrange3D();
-	for (int i=0;i<N1;i++) // y-direction
-	for (int j=0;j<N2;j++)
-	{
-		fp3.x = cx + radius * cos( 2.0*PI*j/((real)N2) + PI);
-		fp3.y = dm + i * dx;
-		fp3.z = cz + radius * sin( 2.0*PI*j/((real)N2) + PI);
-		fp3.x_ref = fp3.x;
-		fp3.y_ref = fp3.y;
-		fp3.z_ref = fp3.z;
-		// Lagrangian coordinates
-		fp3.lag_x = i;
-		fp3.lag_y = j;
-		state.FF[INDEX].LL.push_back(fp3);
-		points++;
-	}
-	state.FF[INDEX].lag_X = N1;
-	state.FF[INDEX].lag_Y = N2;
-	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
-	state.FF[INDEX].diracDeltaType = dirac_delta;
-	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
-	state.FIL_INDEX=INDEX;
-	spdlog::info("added {} lagrangian points", points);
-
-	// compute sigma: take lag grid into account
-	state.FF[INDEX].computeMaxMinDist();
-	real sigma_min = state.FF[INDEX].minDist;
-	real sigma_max = state.FF[INDEX].maxDist;
-
-//	real sigma_min = state.FF[INDEX].computeMinDist();
-//	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
-
-	spdlog::info("Cylinder: wanted sigma {:e} dx={:e} dm={:e} ({:d} points total, N1={:d} N2={:d}) sigma_min {:e}, sigma_max {:e}", sigma, dx, dm, points, N1, N2, sigma_min, sigma_max);
-//	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}", Ncount, N, a);
-//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
-	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
-
-	state.writeVTK_Points("cylinder",0,0,state.FF[INDEX]);
-	return INDEX;
-}
 
 
 template < typename NSE >
@@ -400,7 +329,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.physDt = PHYS_DT;
 	lat.physViscosity = PHYS_VISCOSITY;
 
-	const std::string state_id = fmt::format("sim_3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
+	const std::string state_id = fmt::format("sim_IBM1_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
 	if (state.isMark())
@@ -414,7 +343,6 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 
 	state.cnt[PRINT].period = 0.1;
 	state.cnt[PROBE1].period = 0.1;
-	state.cnt[STAT_RESET].period = 500.0;
 	state.nse.physFinalTime = 10.0;
 
 //	state.cnt[VTK3D].period = 1.0;
@@ -422,17 +350,17 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.cnt[VTK1D].period = 1.0;
 
 	// select compute method
-	int ws_compute;
+	IbmCompute computeVariant;
 	switch (compute)
 	{
-		case 1: ws_compute = ws_computeCPU; break;
-		case 2: ws_compute = ws_computeGPU_CUSPARSE; break;
-		case 3: ws_compute = ws_computeHybrid_CUSPARSE; break;
-		case 4: ws_compute = ws_computeCPU_TNL; break;
-		case 5: ws_compute = ws_computeGPU_TNL; break;
-		case 6: ws_compute = ws_computeHybrid_TNL; break;
-		case 7: ws_compute = ws_computeHybrid_TNL_zerocopy; break;
-		default: spdlog::warn("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
+		case 0: computeVariant = IbmCompute::GPU; break;
+		case 1: computeVariant = IbmCompute::CPU; break;
+		case 2: computeVariant = IbmCompute::Hybrid; break;
+		case 3: computeVariant = IbmCompute::Hybrid_zerocopy; break;
+		default:
+			spdlog::warn("Unknown parameter compute={}, selecting GPU as the default.", compute);
+			computeVariant = IbmCompute::GPU;
+			break;
 	}
 
 	// add cuts
@@ -441,12 +369,21 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.add2Dcut_Y(LBM_Y/2,"cut_Y");
 	state.add2Dcut_Z(LBM_Z/2,"cut_Z");
 
+	// create immersed objects
 	state.cylinder_c[0] = 0.50; //[m]
 	state.cylinder_c[1] = 0; // n/a
 	state.cylinder_c[2] = 0.20; //[m]
-	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	state.FIL_INDEX = setupCylinder(state, state.cylinder_c[0], state.cylinder_c[2], state.cylinder_diameter, sigma, method, dirac_delta, ws_compute);
+	ibmSetupCylinder(state.ibm, state.cylinder_c, state.cylinder_diameter, sigma);
+	state.writeVTK_Points("cylinder", 0, 0);
+
+	// configure IBM
+	state.ibm.computeVariant = computeVariant;
+	state.ibm.diracDeltaTypeEL = dirac_delta;
+	if (method == 0)
+		state.ibm.methodVariant = IbmMethod::modified;
+	else
+		state.ibm.methodVariant = IbmMethod::original;
 
 	execute(state);
 
@@ -520,13 +457,13 @@ int main(int argc, char **argv)
 		int Re = atoi(argv[3]);		// type=0,1,2 (geometry selection)
 		int hi = atoi(argv[4]);		// index in the hvals
 		int res = atoi(argv[5]);	// res=1,2,3
-		int compute = atoi(argv[6]); // compute=1,2,3,4,5,6,7
+		int compute = atoi(argv[6]); // compute=0,1,2,3
 
 		if (method > 1 || method < 0) { fprintf(stderr, "error: method=%d out of bounds [0, 1]\n",method); return 1; }
 		if (dirac < 1 || dirac > 4) { fprintf(stderr, "error: dirac=%d out of bounds [1,4]\n",dirac); return 1; }
 		if (hi >= hmax || hi < 0) { fprintf(stderr, "error: hi=%d out of bounds [0, %d]\n",hi,hmax-1); return 1; }
 		if (res < 1) { fprintf(stderr, "error: res=%d out of bounds [1, ...]\n",res); return 1; }
-		if (compute < 1 || compute > 7) { fprintf(stderr, "error: compute=%d out of bounds [1,7]\n",compute); return 1; }
+		if (compute < 0 || compute > 3) { fprintf(stderr, "error: compute=%d out of bounds [0,3]\n",compute); return 1; }
 		if (hi<hmax) h=hvals[hi];
 		run(res, (double)Re, h, dirac, method, compute);
 	}

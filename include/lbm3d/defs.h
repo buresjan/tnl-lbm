@@ -249,8 +249,6 @@ struct LBM_CONFIG
 #define SQ(x) ((x) * (x)) // square function; replaces SQ(x) by ((x) * (x)) in the code
 #define NORM(x, y, z) sqrt(SQ(x) + SQ(y) + SQ(z))
 
-enum { SOLVER_UMFPACK, SOLVER_PETSC };
-
 // NOTE: df_sync_directions must be kept consistent with this enum!
 enum
 {

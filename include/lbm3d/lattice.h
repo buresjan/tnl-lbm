@@ -52,6 +52,7 @@ struct Lattice
 
    // getters for physical coordinates (note that here x,y,z are *global* lattice indices)
    __cuda_callable__ PointType lbm2physPoint(idx x, idx y, idx z) const { return physOrigin + (PointType(x, y, z) - 0.5) * physDl; }
+   __cuda_callable__ PointType lbm2physPoint(PointType p) const { return physOrigin + (p - 0.5) * physDl; }
    __cuda_callable__ real lbm2physX(idx x) const { return physOrigin.x() + (x-0.5) * physDl; }
    __cuda_callable__ real lbm2physY(idx y) const { return physOrigin.y() + (y-0.5) * physDl; }
    __cuda_callable__ real lbm2physZ(idx z) const { return physOrigin.z() + (z-0.5) * physDl; }

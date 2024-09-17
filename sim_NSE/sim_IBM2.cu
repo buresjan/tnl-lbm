@@ -1,14 +1,9 @@
 #include "lbm3d/core.h"
+#include "lbm3d/lagrange_3D.h"
+#include "lbm3d/obstacles_ibm.h"
 
 // ball in 3D
 // IBM-LBM
-
-// filament variants
-enum { NIC, NORMAL, MIRROR, FLIP, MIRRORFLIP };
-
-//const int DOMAIN_INNER = -1;
-//const int DOMAIN_OUTER = -2;
-//const int DOMAIN_BNDRY = -3;
 
 template < typename TRAITS >
 struct MacroLocal : D3Q27_MACRO_Base< TRAITS >
@@ -54,9 +49,9 @@ struct StateLocal : State<NSE>
 	using BLOCK = LBM_BLOCK< NSE >;
 
 	using State<NSE>::nse;
+	using State<NSE>::ibm;
 	using State<NSE>::vtk_helper;
 	using State<NSE>::id;
-	using State<NSE>::FF;
 
 	using idx = typename TRAITS::idx;
 	using real = typename TRAITS::real;
@@ -64,15 +59,10 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	dreal lbm_input_velocity=0.07;
-//	dreal start_velocity;
-//	dreal target_velocity;
-//	real init_time;
+	dreal lbm_inflow_vx = 0;
 	bool firstrun=true;
-//	bool firstplot=true;
-	int FIL_INDEX=-1;
 	real ball_diameter=0.01;
-	real ball_c[3];
+	point_t ball_c;
 
 	virtual bool outputData(const BLOCK& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs)
 	{
@@ -124,8 +114,8 @@ struct StateLocal : State<NSE>
 		// compute drag
 		real Fx=0, Fy=0, Fz=0, dV=nse.lat.physDl*nse.lat.physDl*nse.lat.physDl;
 		real rho = 1.0;//nse.physFluidDensity;
-		real target_velocity = nse.lat.lbm2physVelocity(lbm_input_velocity);
-		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f}", lbm_input_velocity*ball_diameter/nse.lat.physDl/nse.lat.lbmViscosity(), lbm_input_velocity, nse.lat.lbm2physVelocity(lbm_input_velocity));
+		real target_velocity = nse.lat.lbm2physVelocity(lbm_inflow_vx);
+		spdlog::info("Reynolds = {:f} lbmvel {:f} physvel {:f}", lbm_inflow_vx*ball_diameter/nse.lat.physDl/nse.lat.lbmViscosity(), lbm_inflow_vx, nse.lat.lbm2physVelocity(lbm_inflow_vx));
 
 		// FIXME: MPI !!!
 		// todo: compute C_D: integrate over the whole domain
@@ -143,14 +133,14 @@ struct StateLocal : State<NSE>
 			}
 		}
 
-		real lbm_cd_full=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
+		real lbm_cd_full=-Fx*8.0/lbm_inflow_vx/lbm_inflow_vx/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 		real phys_cd_full=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
 		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
 			if (!nse.terminate)
 				spdlog::error("nan detected");
 			nse.terminate=true;
 		}
-		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
+		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_inflow_vx, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
 
 // not used for evaluation of the results
 //		// FIXME: MPI !!!
@@ -177,7 +167,7 @@ struct StateLocal : State<NSE>
 ////		real fil_fx=0,fil_fy=0,fil_fz=0;
 //		Fx=Fy=Fz=0;
 ////		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
-////		if (FIL_INDEX>=0) FF[FIL_INDEX].integrateForce(Fx,Fy,Fz, 1.0);//PI*ball_diameter*ball_diameter/(real)FF[FIL_INDEX].LL.size());
+////		if (FIL_INDEX>=0) ibm.integrateForce(Fx,Fy,Fz, 1.0);//PI*ball_diameter*ball_diameter/(real)ibm.LL.size());
 //		real lbm_cd_lagr=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
 //		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
@@ -218,8 +208,10 @@ struct StateLocal : State<NSE>
 	{
 		for (auto& block : nse.blocks)
 		{
-			block.data.inflow_vx = lbm_input_velocity;
-//			block.data.inflow_vx = nse.lat.phys2lbmVelocity(target_velocity);
+			block.data.inflow_rho = 1;
+			block.data.inflow_vx = lbm_inflow_vx;
+			block.data.inflow_vy = 0;
+			block.data.inflow_vz = 0;
 		}
 	}
 
@@ -235,80 +227,8 @@ struct StateLocal : State<NSE>
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 		: State<NSE>(id, communicator, lat)
-	{
-		for (auto& block : nse.blocks)
-		{
-			block.data.inflow_rho = no1;
-			block.data.inflow_vx = 0;
-			block.data.inflow_vy = 0;
-			block.data.inflow_vz = 0;
-		}
-	}
+	{}
 };
-
-// ball discretization algorithm: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
-template < typename STATE >
-int drawFixedSphere(STATE &state, double cx, double cy, double cz, double radius, double sigma, int method=0, int dirac_delta=1, int WuShuCompute=ws_computeGPU_CUSPARSE)
-{
-	using real = typename STATE::TRAITS::real;
-
-	// based on sigma, estimate N
-	real surface = 4.0*PI*radius*radius;
-	// sigma is diagonal of a "quasi-square" that 4 points on the sphere surface form
-	// so the quasi-square has area = b^2 where b^2 + b^2 = sigma^2, i.e., b^2 = 1/2*sigma^2
-	real wanted_unit_area = sigma*sigma / 2.0;
-	// count how many of these
-	real count = surface/wanted_unit_area;
-	int N = ceil(count);
-
-	LagrangePoint3D<real> fp;
-	real theta, phi;
-	int INDEX = state.addLagrange3D();
-	int points=0;
-//	real a = 4.0*PI*radius*radius/(real)N;
-	real a = 4.0*PI/(real)N;
-	real d = sqrt(a);
-//	int Mtheta = (int)(PI/d);
-	int Mtheta = floor(PI/d);
-	real dtheta = PI/Mtheta;
-	real dphi = a/dtheta;
-	for (int m = 0; m < Mtheta; m++)
-	{
-		// for a given phi and theta:
-		theta = PI*(m+0.5)/(real)Mtheta;
-//		int Mphi = (int)(2.0*PI*sin(theta)/dphi);
-		int Mphi = floor(2.0*PI*sin(theta)/dphi);
-		for (int n = 0; n<Mphi; n++)
-		{
-			phi = 2.0*PI*n/(real)Mphi;
-			fp.x = cx + radius * cos( phi ) * sin( theta );
-			fp.y = cy + radius * sin( phi ) * sin( theta );
-			fp.z = cz + radius * cos( theta );
-			fp.x_ref = fp.x;
-			fp.y_ref = fp.y;
-			fp.z_ref = fp.z;
-			state.FF[INDEX].LL.push_back(fp);
-			points++;
-		}
-	}
-	state.FF[INDEX].ws_compute = WuShuCompute; // given by the argument
-	state.FF[INDEX].diracDeltaType = dirac_delta;
-	state.FF[INDEX].ws_regularDirac=(method==0)?true:false;
-	state.FIL_INDEX=INDEX;
-	spdlog::info("added {} lagrangian points", points);
-
-	real sigma_min = state.FF[INDEX].computeMinDist();
-	real sigma_max = state.FF[INDEX].computeMaxDistFromMinDist(sigma_min);
-
-	spdlog::info("Ball surface: wanted sigma {:e} ({:f} i.e. {:d} points), wanted_unit_area {:e}, sigma_min {:e}, sigma_max {:e}", sigma, count, N, wanted_unit_area, sigma_min, sigma_max);
-//	spdlog::info("Added {} Lagrangian points (requested {}) partial area {:e}",points, N, a);
-//	spdlog::info("Lagrange created: WuShuCompute {} ws_regularDirac {}", state.FF[INDEX].WuShuCompute, (state.FF[INDEX].ws_regularDirac)?"true":"false");
-	spdlog::info("h=physdl {:e} sigma min {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_min, sigma_min/state.nse.lat.physDl);
-	spdlog::info("h=physdl {:e} sigma max {:e} sigma_ku_h {:e}", state.nse.lat.physDl, sigma_max, sigma_max/state.nse.lat.physDl);
-
-	state.writeVTK_Points("ball.vtk",0,0,state.FF[INDEX]);
-	return INDEX;
-}
 
 template < typename NSE >
 int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int method=0, int compute=5)
@@ -341,8 +261,6 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	real PHYS_VISCOSITY = i_PHYS_VISCOSITY;//0.00001;// [m^2/s] fluid viscosity of water
 	real Re=i_Re;//200;
 
-//	real PHYS_TARGET_VELOCITY = i_PHYS_VELOCITY;//2.0*Re*PHYS_VISCOSITY/BALL_DIAMETER; // [m/s]
-//	real PHYS_START_VELOCITY = PHYS_TARGET_VELOCITY; // [m/s]
 //	real INIT_TIME = 1.0; // [s]
 	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;
 
@@ -354,20 +272,19 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	lat.physDt = PHYS_DT;
 	lat.physViscosity = PHYS_VISCOSITY;
 
-	const std::string state_id = fmt::format("sim_4_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
+	const std::string state_id = fmt::format("sim_IBM2_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
 	if (state.isMark())
 		return 0;
 
-	state.lbm_input_velocity = i_LBM_VELOCITY;
+	state.lbm_inflow_vx = i_LBM_VELOCITY;
 	state.nse.physCharLength = BALL_DIAMETER; // [m]
 	state.ball_diameter = BALL_DIAMETER; // [m]
 	//state.nse.physFluidDensity = 1000.0; // [kg/m^3]
 
 	state.cnt[PRINT].period = 0.1;
 	state.cnt[PROBE1].period = 0.1;
-	state.cnt[STAT_RESET].period = 500.0;
 	state.nse.physFinalTime = 30.0;
 
 //	state.cnt[VTK3D].period = 1.0;
@@ -375,17 +292,17 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.cnt[VTK1D].period = 1.0;
 
 	// select compute method
-	int ws_compute;
+	IbmCompute computeVariant;
 	switch (compute)
 	{
-		case 1: ws_compute = ws_computeCPU; break;
-		case 2: ws_compute = ws_computeGPU_CUSPARSE; break;
-		case 3: ws_compute = ws_computeHybrid_CUSPARSE; break;
-		case 4: ws_compute = ws_computeCPU_TNL; break;
-		case 5: ws_compute = ws_computeGPU_TNL; break;
-		case 6: ws_compute = ws_computeHybrid_TNL; break;
-		case 7: ws_compute = ws_computeHybrid_TNL_zerocopy; break;
-		default: spdlog::warn("Unknown parameter compute={}, selecting default ws_computeGPU_TNL.", compute); ws_compute = ws_computeGPU_TNL; break;
+		case 0: computeVariant = IbmCompute::GPU; break;
+		case 1: computeVariant = IbmCompute::CPU; break;
+		case 2: computeVariant = IbmCompute::Hybrid; break;
+		case 3: computeVariant = IbmCompute::Hybrid_zerocopy; break;
+		default:
+			spdlog::warn("Unknown parameter compute={}, selecting GPU as the default.", compute);
+			computeVariant = IbmCompute::GPU;
+			break;
 	}
 
 	// add cuts
@@ -394,16 +311,26 @@ int sim(int RES=2, double i_Re=1000, double nasobek=2.0, int dirac_delta=2, int 
 	state.add2Dcut_Y(LBM_Y/2,"cut_Y");
 	state.add2Dcut_Z(LBM_Z/2,"cut_Z");
 
+	// create immersed objects
 	state.ball_c[0] = 2*state.ball_diameter;
 	state.ball_c[1] = 5.5*state.ball_diameter;
 	state.ball_c[2] = 5.5*state.ball_diameter;
-	// create a filament
 	real sigma = nasobek * PHYS_DL;
-	state.FIL_INDEX = drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma, method, dirac_delta, ws_compute);
+	ibmDrawSphere(state.ibm, state.ball_c, state.ball_diameter/2.0, sigma);
 
 	// 2nd ball
 	state.ball_c[0] = 5.5*state.ball_diameter;
-	state.FIL_INDEX = drawFixedSphere(state, state.ball_c[0], state.ball_c[1], state.ball_c[2], state.ball_diameter/2.0, sigma, method, dirac_delta, ws_compute);
+	ibmDrawSphere(state.ibm, state.ball_c, state.ball_diameter/2.0, sigma);
+
+	state.writeVTK_Points("ball", 0, 0);
+
+	// configure IBM
+	state.ibm.computeVariant = computeVariant;
+	state.ibm.diracDeltaTypeEL = dirac_delta;
+	if (method == 0)
+		state.ibm.methodVariant = IbmMethod::modified;
+	else
+		state.ibm.methodVariant = IbmMethod::original;
 
 	execute(state);
 
@@ -477,13 +404,13 @@ int main(int argc, char **argv)
 		int Re = atoi(argv[3]);		// type=0,1,2 (geometry selection)
 		int hi = atoi(argv[4]);		// index in the hvals
 		int res = atoi(argv[5]);	// res=1,2,3
-		int compute = atoi(argv[6]); // compute=1,2,3,4,5,6,7
+		int compute = atoi(argv[6]); // compute=0,1,2,3
 
 		if (method > 1 || method < 0) { fprintf(stderr, "error: method=%d out of bounds [0, 1]\n",method); return 1; }
 		if (dirac < 1 || dirac > 4) { fprintf(stderr, "error: dirac=%d out of bounds [1,4]\n",dirac); return 1; }
 		if (hi >= hmax || hi < 0) { fprintf(stderr, "error: hi=%d out of bounds [0, %d]\n",hi,hmax-1); return 1; }
 		if (res < 1) { fprintf(stderr, "error: res=%d out of bounds [1, ...]\n",res); return 1; }
-		if (compute < 1 || compute > 7) { fprintf(stderr, "error: compute=%d out of bounds [1,7]\n",compute); return 1; }
+		if (compute < 0 || compute > 3) { fprintf(stderr, "error: compute=%d out of bounds [0,3]\n",compute); return 1; }
 		if (hi<hmax) h=hvals[hi];
 		run(res, (double)Re, h, dirac, method, compute);
 	}

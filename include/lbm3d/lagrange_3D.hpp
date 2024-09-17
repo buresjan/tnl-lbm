@@ -1,5 +1,24 @@
-#include "lbm_common/timeutils.h"
+#pragma once
+
+#include <TNL/Timer.h>
+#include <TNL/Backend/KernelLaunch.h>
+#include <TNL/Backend/Macros.h>
+#include <TNL/Containers/Vector.h>
+#include <TNL/Devices/Cuda.h>
+#include <TNL/Devices/Host.h>
+#include <TNL/DiscreteMath.h>
+#include <TNL/Matrices/MatrixWriter.h>
+
+#include <cstddef>
+#include <string>
+#include <omp.h>
+#include <fmt/core.h>
+#include <nlohmann/json.hpp>
+
+#include "lbm_common/logging.h"
 #include "lagrange_3D.h"
+#include "ibm_kernels.h"
+#include "dirac.h"
 
 template< typename LBM >
 auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
@@ -54,14 +73,12 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMinDist()
 	maxDist=-1e10;
 	for (std::size_t i=0;i<LL.size()-1;i++)
 	{
-	for (std::size_t j=i+1;j<LL.size();j++)
-	{
-		real d = dist(LL[j],LL[i]);
-		if (d>maxDist) maxDist=d;
-		if (d<minDist) minDist=d;
-	}
-	if (i%1000==0)
-	fmt::print("computeMinDist {} of {}\n", i, LL.size());
+		for (std::size_t j=i+1;j<LL.size();j++)
+		{
+			real d = TNL::l2Norm(LL[j] - LL[i]);
+			if (d>maxDist) maxDist=d;
+			if (d<minDist) minDist=d;
+		}
 	}
 	return minDist;
 }
@@ -75,7 +92,7 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename L
 		real search_dist = 2.0*mindist;
 		for (std::size_t j=i+1;j<LL.size();j++)
 		{
-			real d = dist(LL[j],LL[i]);
+			real d = TNL::l2Norm(LL[j] - LL[i]);
 			if (d < search_dist)
 				if (d>maxDist) maxDist=d;
 		}
@@ -85,652 +102,50 @@ typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename L
 
 
 template< typename LBM >
-void Lagrange3D<LBM>::computeMaxMinDist()
+void Lagrange3D<LBM>::convertLagrangianPoints()
 {
-	maxDist=-1e10;
-	minDist=1e10;
-	if (lag_X<=0 || lag_Y<=0) return;
-	for (int i=0;i<lag_X-1;i++)
-	for (int j=0;j<lag_Y-1;j++)
-	{
-		int index = findIndex(i,j);
-		for (int i1=0;i1<=1;i1++)
-		for (int j1=0;j1<=1;j1++)
-		if (j1!=0 || i1!=0)
+	hLL_lat.setSize(LL.size());
+
+	TNL::Algorithms::parallelFor< TNL::Devices::Host >(
+		(idx) 0,
+		(idx) LL.size(),
+		[this] (idx i, typename LBM::lat_t lat) mutable
 		{
-			int index1 = findIndex(i+i1,j+j1);
-//			int index1 = findIndex(i+i1,j);
-			real d = dist(LL[index1],LL[index]);
-			if (d>maxDist) maxDist=d;
-			if (d<minDist) minDist=d;
-		}
-	}
-}
+			this->hLL_lat[i] = lat.phys2lbmPoint(this->LL[i]);
+		},
+		lbm.lat
+	);
 
-
-template< typename LBM >
-int Lagrange3D<LBM>::createIndexArray()
-{
-	if (lag_X<=0 || lag_Y<=0) return 0;
-	index_array = new int*[lag_X];
-	for (int i=0;i<lag_X;i++) index_array[i] = new int[lag_Y];
-	for (std::size_t k=0;k<LL.size();k++) index_array[LL[k].lag_x][LL[k].lag_y] = k;
-	indexed=true;
-	return 1;
-}
-
-
-template< typename LBM >
-int Lagrange3D<LBM>::findIndex(int i, int j)
-{
-	if (!indexed) createIndexArray();
-	if (!indexed) return 0;
-	return index_array[i][j];
-	// brute force
-//	for (std::size_t k=0;k<LL.size();k++) if (LL[k].lag_x == i && LL[k].lag_y == j) return k;
-//	fmt::print("findIndex({},{}): not found\n",i,j);
-//	return 0;
+	hLL_velocity_lat.setSize(LL.size());
+	hLL_velocity_lat = 0;
 }
 
 template< typename LBM >
-int Lagrange3D<LBM>::findIndexOfNearestX(typename LBM::TRAITS::real x)
+void Lagrange3D<LBM>::allocateMatricesCPU()
 {
-	int imin=0;
-	real xmindist=fabs(LL[imin].x-x);
-	// brute force
-	for (std::size_t k=1;k<LL.size();k++)
-	if (fabs(LL[k].x - x) < xmindist)
-	{
-		imin=k;
-		xmindist = fabs(LL[imin].x-x);
-	}
-	return imin;
-}
+	idx m = LL.size();	// number of lagrangian nodes
+	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
 
-template< typename LBM >
-typename LBM::TRAITS::real Lagrange3D<LBM>::diracDelta(int i, typename LBM::TRAITS::real r)
-{
-	switch (i)
-	{
-		case 1: // VU: phi3
-			if(fabs(r) < 1.0)
-				return (1.0 - fabs(r));
-			else
-				return 0;
-		case 2: // VU: phi2
-			if(fabs(r) < 2.0)
-				return 0.25*((1.0+cos((PI*r)/2.0)));
-			else
-				return 0;
-		case 3: // VU: phi1
-			if (fabs(r)>2.0)
-				return 0;
-			else if (fabs(r)>1.0)
-				return (5.0 - 2.0*fabs(r) - sqrt(-7.0 + 12.0*fabs(r) - 4.0*r*r))/8.0;
-			else
-				return (3.0 - 2.0*fabs(r) + sqrt(1.0 + 4.0*fabs(r) - 4.0*r*r))/8.0;
-/*
-			if(r > -2.0 && r <= -1.0 )
-				result = (5.0 + 2.0*r - sqrt(-7.0 - 12.0*r - 4.0*r*r))/8.0;
-			else if(r > -1.0 && r<= 0)
-				result = (3.0 + 2.0*r + sqrt(1.0 - 4.0*r - 4.0*r*r))/8.0;
-			else if(r > 0 && r <= 1.0)
-				result = (3.0 - 2.0*r + sqrt(1.0 + 4.0*r - 4.0*r*r))/8.0;
-			else if(r > 1.0 && r <2.0)
-				result = (5.0 - 2.0*r - sqrt(-7.0 + 12.0*r - 4.0*r*r))/8.0;
-			else result = 0;
-*/
-		case 4: // VU: phi4
-			if (fabs(r)>1.5)
-				return 0;
-			else if (fabs(r)>0.5)
-				return (5.0 - 3.0*fabs(r) - sqrt(-2.0+6.0*fabs(r)-3.0*r*r))/6.0;
-			else
-				return (1.0 + sqrt(1.0 - 3.0*r*r))/3.0;
-	}
-	fmt::print("warning: zero Dirac delta: type={}\n", i);
-	return 0;
-}
+	spdlog::info("number of Lagrangian points: {}", m);
 
+	// Convert Lagrangian points to lattice coordinates and to StaticVector with dreal
+	convertLagrangianPoints();
 
-template< typename LBM >
-void Lagrange3D<LBM>::constructWuShuMatricesSparse()
-{
-
-	if (ws_constructed) return;
-	ws_constructed=true;
-
-
-	int rDirac=1;
-	// count non zero elements in matrix ws_A
-	int m=LL.size();	// number of lagrangian nodes
-	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
-	// projdi veskery filament a najdi sousedni body (ve vzdaelenosti mensi nez je prekryv delta funkci)
-	struct DD_struct
-	{
-		real DD;
-		int ka;
-	};
-
-
-	typedef std::vector<DD_struct> VECDD;
-	typedef std::vector<int> VEC;
-	//typedef std::vector<real> VECR;
-	VEC *v = new VEC[m];
-	VECDD *vr = new VECDD[m];
-
-
-	fmt::print("wushu construct loop 1: start\n");
-//	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
-	real *LLx = new real[m];
-	real *LLy = new real[m];
-	real *LLz = new real[m];
-	int *LLlagx = new int[m];
-	for (int i=0;i<m;i++)
-	{
-		LLx[i]=LL[i].x;
-		LLy[i]=LL[i].y;
-		LLz[i]=LL[i].z;
-		LLlagx[i]=LL[i].lag_x;
-	}
-
-	fmt::print("wushu construct loop 1: cont\n");
-	#pragma omp parallel for schedule(dynamic)
-	for (int el=0;el<m;el++)
-	{
-		if (el%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
-		for (int ka=0;ka<m;ka++)
-		{
-			bool proceed=true;
-			real d1,d2,ddd;
-			if (ws_speedUpAllocation)
-			{
-				if (abs(LLlagx[el] - LLlagx[ka]) > ws_speedUpAllocationSupport) proceed=false;
-			}
-			if (!proceed) continue;
-			if (ws_regularDirac)
-			{
-				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.lat.physDl);
-				if (d1>0)
-				{
-					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.lat.physDl);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.lat.physDl);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
-			} else
-			{
-				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.lat.physDl/2.0);
-				if (d1>0)
-				{
-					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.lat.physDl/2.0);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.lat.physDl/2.0);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
-			}
-		}
-	}
-	delete [] LLx;
-	delete [] LLy;
-	delete [] LLz;
-	delete [] LLlagx;
-	// count non zero
-	int nz=0;
-	for (int el=0;el<m;el++) nz += vr[el].size();
-//	fmt::print("non-zeros: {}\n", nz);
-
-	fmt::print("wushu construct loop 1: end\n");
-
-
-
-	// create spmatrix
-	ws_A = new SpMatrix<real>();
-	ws_A->Solver = Solver;
-	ws_A->Ap = new int[m+1];
-	ws_A->Ai = new int[nz];
-	ws_A->Ax = new real[nz];
-	ws_A->m_nz = nz;
-	ws_A->m_n = m;
-	#ifdef USE_CUSPARSE
-	// create sprectmatrix ... for cuda
-	ws_dA = new SpRectMatrix<dreal>();
-	ws_dA->Ap = new int[m+1];
-	ws_dA->Ai = new int[nz];
-	ws_dA->Ax = new dreal[nz];
-	ws_dA->m_nz = nz;
-	ws_dA->m_nr = m;
-	ws_dA->m_nc = m;
-	#endif
-
-	ws_A->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_A->Ax[i] = 0; // empty
-
-	#ifdef USE_CUSPARSE
-	ws_dA->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_dA->Ax[i] = 0; // empty
-	#endif
-
-//	fmt::print("Ai construct\n");
-	int count=0;
-	for (int i=0;i<m;i++)
-	{
-		ws_A->Ap[i+1] = ws_A->Ap[i] + v[i].size();
-		#ifdef USE_CUSPARSE
-		ws_dA->Ap[i+1] = ws_dA->Ap[i] + v[i].size();
-		#endif
-//		fmt::print("Ap[{}]={} ({})\n", i+1, ws_A->Ap[i+1], nz);
-		for (std::size_t j=0;j<v[i].size();j++)
-		{
-			ws_A->Ai[count]=v[i][j];
-			#ifdef USE_CUSPARSE
-			ws_dA->Ai[count]=v[i][j];
-			#endif
-			count++;
-		}
-	}
-	delete [] v;
-
-	// fill vectors delta_el
-	// sparse vector of deltas
-	d_i = new std::vector<idx>[m];
-	d_x = new std::vector<real>[m];
-	// fill only non zero elements-relevant
-/*
-	 // brute force
-	fmt::print("wushu construct loop 2: start\n");
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
-	{
-//		if (i%20==0)
-//			fmt::print("\r progress: {:04d} of {:04d}", i, m);
-		for (int gz=0;gz<lbm.blocks.front().local.z();gz++)
-		for (int gy=0;gy<lbm.blocks.front().local.y();gy++)
-		for (int gx=0;gx<lbm.blocks.front().local.x();gx++)
-		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-			if (dd>0)
-			{
-				d_i[i].push_back(lbm.pos(gx,gy,gz));
-				d_x[i].push_back(dd);
-			}
-		}
-	}
-	fmt::print("wushu construct loop 2: end\n");
-*/
-
-	fmt::print("wushu construct loop 2: start\n");
-	idx support=5; // search in this support
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
-	{
-		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
-		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
-		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
-
-		// FIXME: iterate over LBM blocks
-		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
-		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
-		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
-		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-			if (dd>0)
-			{
-				// FIXME: local vs global indices
-				d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
-				d_x[i].push_back(dd);
-			}
-		}
-	}
-	fmt::print("wushu construct loop 2: end\n");
-
-
-	fmt::print("wushu construct loop 3: start\n");
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
-	{
-		if (i%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
-		for (std::size_t ka=0;ka<vr[i].size();ka++)
-		{
-			int j=vr[i][ka].ka;
-			real ddd = vr[i][ka].DD;
-			if (ws_regularDirac)
-			{
-				ws_A->get(i,j) = ddd;
-				#ifdef USE_CUSPARSE
-				ws_dA->get(i,j) = ddd;
-				#endif
-			} else
-			{
-				if (ddd>0) // we have non-zero element at i,j
-				{
-					real val=0;
-					for (std::size_t in1=0;in1<d_i[i].size();in1++)
-					{
-						for (std::size_t in2=0;in2<d_i[j].size();in2++)
-						{
-							if (d_i[i][in1]==d_i[j][in2])
-							{
-								val += d_x[i][in1]*d_x[j][in2];
-								break;
-							}
-						}
-					}
-					ws_A->get(i,j) = val;
-					#ifdef USE_CUSPARSE
-					ws_dA->get(i,j) = (dreal)val;
-					#endif
-				}
-			}
-		}
-	}
-	delete [] vr; // free
-	fmt::print("wushu construct loop 3: end\n");
-
-	fmt::print("wushu construct loop 4: start\n");
-	for (int k=0;k<3;k++)
-	{
-		ws_x[k] = new real[m];
-		ws_b[k] = new real[m]; // right hand side
-
-		ws_hx[k] = new dreal[m];
-		ws_hb[k] = new dreal[m]; // right hand side
-	}
-
-//	ws_ds = new real[m]; // delta s_ell
-	#ifdef USE_CUDA
-	for (int k=0;k<3;k++)
-	{
-		cudaMalloc((void **)&ws_dx[k], m*sizeof(dreal));
-		cudaMalloc((void **)&ws_db[k], m*sizeof(dreal));
-	}
-	cudaMalloc((void **)&ws_du,  n*sizeof(dreal));
-
-	// copy zero to x1, x2 (init)
-	dreal* zero = new dreal[m];
-	for (int i=0;i<m;i++) zero[i]=0;
-	for (int k=0;k<3;k++) cudaMemcpy(ws_dx[k], zero, m*sizeof(dreal), cudaMemcpyHostToDevice); // TODO use setCudaValue ...
-	delete [] zero;
-	#endif
-
-	// create Matrix M: matrix realizing projection of u* to lagrange desc.
-	nz=0;
-	for (int el=0;el<m;el++)
-	for (std::size_t in1=0;in1<d_i[el].size();in1++)
-		nz++;
-	#ifdef USE_CUSPARSE
-	ws_M = new SpRectMatrix<dreal>();
-	ws_M->Ap = new int[m+1];
-	ws_M->Ai = new int[nz];
-	ws_M->Ax = new dreal[nz];
-	ws_M->m_nz = nz;
-	ws_M->m_nr = m;
-	ws_M->m_nc = n;
-
-	ws_M->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_M->Ax[i] = 0; // empty
-
-//	fmt::print("Ai construct\n");
-	count=0;
-	for (int i=0;i<m;i++)
-	{
-		ws_M->Ap[i+1] = ws_M->Ap[i] + d_i[i].size();
-		for (std::size_t j=0;j<d_i[i].size();j++)
-		{
-			ws_M->Ai[count]=d_i[i][j];
-			ws_M->Ax[count]=(dreal)d_x[i][j];
-			count++;
-		}
-	}
-
-
-	// its transpose
-	ws_MT = new SpRectMatrix<dreal>();
-	ws_MT->Ap = new int[n+1];
-	ws_MT->Ai = new int[nz];
-	ws_MT->Ax = new dreal[nz];
-	ws_MT->m_nz = nz;
-	ws_MT->m_nr = n;
-	ws_MT->m_nc = m;
-
-	ws_MT->Ap[0]=0;
-	for (int i=0;i<nz;i++) ws_MT->Ax[i] = 0; // empty
-
-	// for each Euler node, assign
-	VEC *vn = new VEC[n];
-	VECR *vx = new VECR[n];
-	for (int i=0;i<m;i++)
-	for (std::size_t j=0;j<d_i[i].size();j++)
-	{
-		vn[ d_i[i][j] ].push_back( i );
-		vx[ d_i[i][j] ].push_back( d_x[i][j] );
-	}
-
-	count=0;
-	for (int i=0;i<n;i++)
-	{
-		ws_MT->Ap[i+1] = ws_MT->Ap[i] + vn[i].size();
-		for (std::size_t j=0;j<vn[i].size();j++)
-		{
-			ws_MT->Ai[count]=vn[i][j];
-			ws_MT->Ax[count]=vx[i][j];
-			count++;
-		}
-	}
-	delete [] vn;
-	delete [] vx;
-	fmt::print("wushu construct loop 4: end\n");
-	#endif
-}
-
-
-template< typename LBM >
-void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
-{
-	if (ws_tnl_constructed) return;
-	ws_tnl_constructed=true;
-	int rDirac=1;
-	// count non zero elements in matrix A
-	int m=LL.size();	// number of lagrangian nodes
-	int n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
-	// projdi veskery filament a najdi sousedni body (ve vzdaelenosti mensi nez je prekryv delta funkci)
-	struct DD_struct
-	{
-		real DD;
-		int ka;
-	};
-	typedef std::vector<DD_struct> VECDD;
-	typedef std::vector<int> VEC;
-	typedef std::vector<real> VECR;
-	VEC *v = new VEC[m];
-	VECDD *vr = new VECDD[m];
-
-	fmt::print("tnl wushu construct loop 1: start\n");
-//	int resrv = 2*((ws_speedUpAllocation) ? ws_speedUpAllocationSupport : 10); // we have plenty of memory, we need performance
-	real *LLx = new real[m];
-	real *LLy = new real[m];
-	real *LLz = new real[m];
-	int *LLlagx = new int[m];
-	for (int i=0;i<m;i++)
-	{
-		LLx[i]=LL[i].x;
-		LLy[i]=LL[i].y;
-		LLz[i]=LL[i].z;
-		LLlagx[i]=LL[i].lag_x;
-	}
-
-	fmt::print("tnl wushu construct loop 1: cont\n");
-	#pragma omp parallel for schedule(dynamic)
-	for (int el=0;el<m;el++)
-	{
-		if (el%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*el/(real)m);
-		for (int ka=0;ka<m;ka++)
-		{
-			bool proceed=true;
-			real d1,d2,ddd;
-			if (ws_speedUpAllocation)
-			{
-				if (abs(LLlagx[el] - LLlagx[ka]) > ws_speedUpAllocationSupport) proceed=false;
-			}
-			if (!proceed) continue;
-			if (ws_regularDirac)
-			{
-				d1 = diracDelta(rDirac,(LLx[el] - LLx[ka])/lbm.lat.physDl);
-				if (d1>0)
-				{
-					d2 = diracDelta(rDirac, (LLy[el] - LLy[ka])/lbm.lat.physDl);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta(rDirac, (LLz[el] - LLz[ka])/lbm.lat.physDl);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
-			} else
-			{
-				d1 = diracDelta((LLx[el] - LLx[ka])/lbm.lat.physDl/2.0);
-				if (d1>0)
-				{
-					d2 = diracDelta((LLy[el] - LLy[ka])/lbm.lat.physDl/2.0);
-					if (d2>0)
-					{
-						ddd=d1*d2*diracDelta((LLz[el] - LLz[ka])/lbm.lat.physDl/2.0);
-						if (ddd>0)
-						{
-							v[el].push_back(ka);
-							DD_struct sdd;
-							sdd.DD = ddd;
-							sdd.ka = ka;
-							vr[el].push_back(sdd);
-						}
-					}
-				}
-			}
-		}
-	}
-	delete [] LLx;
-	delete [] LLy;
-	delete [] LLz;
-	delete [] LLlagx;
-
-	fmt::print("tnl wushu construct loop 1: end\n");
-
-	// allocate matrix A
+	// Allocate matrices
+	ws_tnl_hM.setDimensions(m, n);
 	ws_tnl_hA = std::make_shared< hEllpack >();
 	ws_tnl_hA->setDimensions(m, m);
-//	int max_nz_per_row=0;
-//	for (int el=0;el<m;el++) {
-//		max_nz_per_row = TNL::max(max_nz_per_row, vr[el].size());
-//	}
-//	ws_tnl_hA->setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::RowCapacitiesType hA_row_lengths( m );
-	for (int el=0; el<m; el++) hA_row_lengths[el] = vr[el].size();
-	ws_tnl_hA->setRowCapacities(hA_row_lengths);
+	#ifdef USE_CUDA
+	ws_tnl_dM.setDimensions(m, n);
+	ws_tnl_dA = std::make_shared< dEllpack >();
+	ws_tnl_dA->setDimensions(m, m);
+	#endif
 
-	for (int i=0;i<m;i++)
-	{
-		auto row = ws_tnl_hA->getRow(i);
-		for (std::size_t j=0;j<v[i].size();j++)
-			row.setElement(j, v[i][j], 1);
-	}
-	delete [] v;
+	// Allocate row capacity vectors
+	hM_row_capacities.setSize(m);
+	hA_row_capacities.setSize(m);
 
-	// fill vectors delta_el
-	// sparse vector of deltas
-	d_i = new std::vector<idx>[m];
-	d_x = new  std::vector<real>[m];
-	// fill only non zero elements-relevant
-
-	fmt::print("tnl wushu construct loop 2: start\n");
-	idx support=5; // search in this support
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
-	{
-		idx fi_x = floor(LL[i].x/lbm.lat.physDl);
-		idx fi_y = floor(LL[i].y/lbm.lat.physDl);
-		idx fi_z = floor(LL[i].z/lbm.lat.physDl);
-
-		// FIXME: iterate over LBM blocks
-		for (int gz=MAX( 0, fi_z - support);gz<MIN(lbm.blocks.front().local.z(), fi_z + support);gz++)
-		for (int gy=MAX( 0, fi_y - support);gy<MIN(lbm.blocks.front().local.y(), fi_y + support);gy++)
-		for (int gx=MAX( 0, fi_x - support);gx<MIN(lbm.blocks.front().local.x(), fi_x + support);gx++)
-		{
-			real dd = diracDelta((real)(gx + 0.5) - LL[i].x/lbm.lat.physDl) * diracDelta((real)(gy + 0.5) - LL[i].y/lbm.lat.physDl) * diracDelta((real)(gz + 0.5) - LL[i].z/lbm.lat.physDl);
-			if (dd>0)
-			{
-				// FIXME: local vs global indices
-				d_i[i].push_back(lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz));
-				d_x[i].push_back(dd);
-			}
-		}
-	}
-	fmt::print("tnl wushu construct loop 2: end\n");
-
-	fmt::print("tnl wushu construct loop 3: start\n");
-	#pragma omp parallel for schedule(static)
-	for (int i=0;i<m;i++)
-	{
-		if (i%100==0)
-			fmt::print("progress {:5.2f} %    \r", 100.0*i/(real)m);
-		for (std::size_t ka=0;ka<vr[i].size();ka++)
-		{
-			int j=vr[i][ka].ka;
-			real ddd = vr[i][ka].DD;
-			if (ws_regularDirac)
-			{
-				ws_tnl_hA->setElement(i,j, ddd);
-			} else
-			{
-				if (ddd>0) // we have non-zero element at i,j
-				{
-					real val=0;
-					for (std::size_t in1=0;in1<d_i[i].size();in1++)
-					{
-						for (std::size_t in2=0;in2<d_i[j].size();in2++)
-						{
-							if (d_i[i][in1]==d_i[j][in2])
-							{
-								val += d_x[i][in1]*d_x[j][in2];
-								break;
-							}
-						}
-					}
-					ws_tnl_hA->setElement(i,j, val);
-				}
-			}
-		}
-	}
-	delete [] vr; // free
-	fmt::print("tnl wushu construct loop 3: end\n");
-
-	// create vectors for the solution of the linear system
+	// Create vectors for the solution of the linear system
 	for (int k=0;k<3;k++)
 	{
 		ws_tnl_hx[k].setSize(m);
@@ -743,93 +158,423 @@ void Lagrange3D<LBM>::constructWuShuMatricesSparse_TNL()
 		#endif
 	}
 
-	// zero-initialize x1, x2, x3
+	// Zero-initialize x1, x2, x3
 	for (int k=0;k<3;k++) ws_tnl_hx[k].setValue(0);
 	#ifdef USE_CUDA
 	for (int k=0;k<3;k++) ws_tnl_dx[k].setValue(0);
 	for (int k=0;k<3;k++) ws_tnl_hxz[k].setValue(0);
 	#endif
+}
 
-	#ifdef USE_CUDA
-	// create Matrix M: matrix realizing projection of u* to lagrange desc.
-	ws_tnl_hM.setDimensions(m, n);
-//	max_nz_per_row = 0;
-//	for (int el=0;el<m;el++)
-//		max_nz_per_row = TNL::max(max_nz_per_row, d_i[el].size());
-//	ws_tnl_hM.setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::RowCapacitiesType hM_row_lengths( m );
-	for (int el=0; el<m; el++) hM_row_lengths[el] = d_i[el].size();
-	ws_tnl_hM.setRowCapacities(hM_row_lengths);
+template< typename LBM >
+void Lagrange3D<LBM>::constructMatricesCPU()
+{
+	auto ibm_logger = spdlog::get("ibm");
 
-//	fmt::print("Ai construct\n");
-	for (int i=0;i<m;i++)
+	// Start timer to measure WuShu construction time
+	TNL::Timer timer;
+	TNL::Timer loopTimer;
+
+	double time_M_capacities = 0;
+	double time_M_construct = 0;
+	double time_M_transpose = 0;
+	double time_A_capacities = 0;
+	double time_A_construct = 0;
+	double time_matrixWrite = 0;
+	double time_matrixCopy = 0;
+
+	idx m = LL.size();	// number of lagrangian nodes
+
+	timer.start();
+	loopTimer.start();
+	// Calculate row capacities of hM
+	const idx support = 5; // search in this support
+	#pragma omp parallel for schedule(static)
+	for (idx i = 0; i < m; i++)
+	{
+		idx rowCapacity = 0;
+
+		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
+		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
+		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
+
+		// FIXME: iterate over LBM blocks
+		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
+		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
+		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
+		{
+			if (
+				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
+				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
+				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
+			)
+			{
+				rowCapacity++;
+			}
+		}
+
+		hM_row_capacities[i] = rowCapacity;
+	}
+
+	loopTimer.stop();
+	time_M_capacities = loopTimer.getRealTime();
+
+	ws_tnl_hM.setRowCapacities(hM_row_capacities);
+
+	loopTimer.reset();
+	loopTimer.start();
+	// Construct the matrix hM
+	#pragma omp parallel for schedule(static)
+	for (idx i = 0; i < m; i++)
 	{
 		auto row = ws_tnl_hM.getRow(i);
-		for (std::size_t j=0;j<d_i[i].size();j++)
-			row.setElement(j, d_i[i][j], (dreal)d_x[i][j]);
+		idx element_idx = 0;
+
+		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
+		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
+		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
+
+		// FIXME: iterate over LBM blocks
+		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
+		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
+		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
+		{
+			if (
+				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
+				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
+				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
+			)
+			{
+				dreal dd =
+					diracDelta(diracDeltaTypeEL, gx - hLL_lat[i].x()) *
+					diracDelta(diracDeltaTypeEL, gy - hLL_lat[i].y()) *
+					diracDelta(diracDeltaTypeEL, gz - hLL_lat[i].z());
+				idx index = lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz);
+				row.setElement(element_idx++, index, dd);
+			}
+		}
 	}
+	loopTimer.stop();
+	time_M_construct = loopTimer.getRealTime();
 
-	// its transpose
-	ws_tnl_hMT.setDimensions(n, m);
+	// Transpose matrix M
+	loopTimer.reset();
+	loopTimer.start();
+    ws_tnl_hMT.getTransposition(ws_tnl_hM);
+	loopTimer.stop();
+	time_M_transpose = loopTimer.getRealTime();
 
-	// for each Euler node, assign
-	VEC *vn = new VEC[n];
-	VECR *vx = new VECR[n];
-	for (int i=0;i<m;i++)
-	for (std::size_t j=0;j<d_i[i].size();j++)
+	int threads = omp_get_max_threads();
+	// TODO: find the correct threshold for this condition
+	//if( m < 1000 )
+	//	threads = 1;
+	(void) threads; // shut up clang warning
+
+	loopTimer.reset();
+	loopTimer.start();
+	// Calculate row capacities of matrix A
+	#pragma omp parallel for schedule(dynamic) num_threads(threads)
+	for (idx index_row = 0; index_row < m; index_row++)
 	{
-		vn[ d_i[i][j] ].push_back( i );
-		vx[ d_i[i][j] ].push_back( d_x[i][j] );
+		idx rowCapacity = 0;
+		for (idx index_col = 0; index_col < m; index_col++)
+		{
+			if (methodVariant == IbmMethod::modified)
+			{
+				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
+				{
+					rowCapacity++;
+				}
+			}
+			else
+			{
+				real val=0;
+				auto row1 = ws_tnl_hM.getRow(index_row);
+				auto row2 = ws_tnl_hM.getRow(index_col);
+				for (idx in1=0; in1 < row1.getSize(); in1++)
+				{
+					for (idx in2=0; in2 < row2.getSize(); in2++)
+					{
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
+						{
+							val += row1.getValue(in1) * row2.getValue(in2);
+							break;
+						}
+					}
+				}
+				if (val > 0)
+					rowCapacity++;
+			}
+		}
+		hA_row_capacities[index_row] = rowCapacity;
 	}
 
-//	max_nz_per_row = 0;
-//	for (int el=0;el<n;el++)
-//		max_nz_per_row = TNL::max(max_nz_per_row, vn[el].size());
-//	ws_tnl_hMT.setConstantCompressedRowLengths(max_nz_per_row);
-	typename hEllpack::RowCapacitiesType hMT_row_lengths( n );
-	for (int el=0; el<n; el++) hMT_row_lengths[el] = vn[el].size();
-	ws_tnl_hMT.setRowCapacities(hMT_row_lengths);
 
-	for (int i=0;i<n;i++)
+	loopTimer.stop();
+	time_A_capacities = loopTimer.getRealTime();
+	ws_tnl_hA->setRowCapacities(hA_row_capacities);
+
+
+	loopTimer.reset();
+	loopTimer.start();
+	// Construct the matrix A
+	#pragma omp parallel for schedule(dynamic) num_threads(threads)
+	for (idx index_row=0;index_row<m;index_row++)
 	{
-		auto row = ws_tnl_hMT.getRow(i);
-		for (std::size_t j=0;j<vn[i].size();j++)
-			row.setElement(j, vn[i][j], vx[i][j]);
-	}
-	delete [] vn;
-	delete [] vx;
-	#endif
+		auto row = ws_tnl_hA->getRow(index_row);
+		idx element_idx = 0;
 
-	// update the preconditioner
+		for (idx index_col=0;index_col<m;index_col++)
+		{
+			if (methodVariant == IbmMethod::modified)
+			{
+				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
+				{
+					dreal ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row, hLL_lat);
+					row.setElement(element_idx++, index_col, ddd);
+					if (element_idx == row.getSize())
+						break;
+				}
+			} else
+			{
+				dreal val=0;
+				auto row1 = ws_tnl_hM.getRow(index_row);
+				auto row2 = ws_tnl_hM.getRow(index_col);
+				for (idx in1=0; in1 < row1.getSize(); in1++)
+				{
+					for (idx in2=0; in2 < row2.getSize(); in2++)
+					{
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
+						{
+							val += row1.getValue(in1) * row2.getValue(in2);
+							break;
+						}
+					}
+				}
+				if (val > 0) {
+					row.setElement(element_idx++, index_col, val);
+					if (element_idx == row.getSize())
+						break;
+				}
+			}
+		}
+	}
+	loopTimer.stop();
+	time_A_construct = loopTimer.getRealTime();
+
+
+	// Update the preconditioner
 	ws_tnl_hprecond->update(ws_tnl_hA);
 	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 
 	#ifdef USE_CUDA
-	// copy matrices from host to the GPU
-	ws_tnl_dA = std::make_shared< dEllpack >();
+	// Copy matrices from host to the GPU
+	loopTimer.reset();
+	loopTimer.start();
 	*ws_tnl_dA = *ws_tnl_hA;
 	ws_tnl_dM = ws_tnl_hM;
 	ws_tnl_dMT = ws_tnl_hMT;
+	loopTimer.stop();
+	time_matrixCopy = loopTimer.getRealTime();
 
-	// update the preconditioner
+	// Update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
 	#endif
-	fmt::print("tnl wushu lagrange_3D_end\n");
-	fmt::print("number of lagrangian points: {}\n", m);
 
-	const char* compute_desc = "undefined";
-	switch (ws_compute)
+	if (mtx_output)
 	{
-		case ws_computeCPU:                    compute_desc = "ws_computeCPU"; break;
-		case ws_computeGPU_CUSPARSE:           compute_desc = "ws_computeGPU_CUSPARSE"; break;
-		case ws_computeHybrid_CUSPARSE:        compute_desc = "ws_computeHybrid_CUSPARSE"; break;
-		case ws_computeCPU_TNL:                compute_desc = "ws_computeCPU_TNL"; break;
-		case ws_computeGPU_TNL:                compute_desc = "ws_computeGPU_TNL"; break;
-		case ws_computeHybrid_TNL:             compute_desc = "ws_computeHybrid_TNL"; break;
-		case ws_computeHybrid_TNL_zerocopy:    compute_desc = "ws_computeHybrid_TNL_zerocopy"; break;
+		loopTimer.reset();
+		loopTimer.start();
+		const std::string output_M = fmt::format("ibm_CPU_matrix-M_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_CPU_matrix-A_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_M, ws_tnl_hM );
+		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_A, *ws_tnl_hA );
+		loopTimer.stop();
+		time_matrixWrite = loopTimer.getRealTime();
 	}
-	log("constructed WuShu matrices for ws_compute={}", compute_desc);
+
+	timer.stop();
+	nlohmann::json j;
+	j["threads"] = omp_get_max_threads();
+	j["time_total"] = timer.getRealTime();
+	j["time_A_capacities"] = time_A_capacities;
+	j["time_A_construct"] = time_A_construct;
+	j["time_M_capacities"] = time_M_capacities;
+	j["time_M_construct"] = time_M_construct;
+	j["time_M_transpose"] = time_M_transpose;
+	j["time_matrixWrite"] = time_matrixWrite;
+	j["time_matrixCopy"] = time_matrixCopy;
+	ibm_logger->info("constructMatricesJSON: {}", j.dump());
+}
+
+template< typename LBM >
+void Lagrange3D<LBM>::allocateMatricesGPU()
+{
+	idx m = LL.size();	// number of lagrangian nodes
+	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
+
+	spdlog::info("number of Lagrangian points: {}", m);
+
+	// Convert Lagrangian points to lattice coordinates and to StaticVector with dreal
+	convertLagrangianPoints();
+	dLL_lat = hLL_lat;
+	dLL_velocity_lat.setSize(m);
+	dLL_velocity_lat = 0;
+
+	// Allocate matrices
+	ws_tnl_dM.setDimensions(m, n);
+	ws_tnl_dA = std::make_shared< dEllpack >();
+	ws_tnl_dA->setDimensions(m, m);
+
+	// Allocate row capacity vectors
+	dM_row_capacities.setSize(m);
+	dA_row_capacities.setSize(m);
+
+	// Create vectors for the solution of the linear system
+	for (int k=0;k<3;k++)
+	{
+		#ifdef USE_CUDA
+		ws_tnl_dx[k].setSize(m);
+		ws_tnl_db[k].setSize(m);
+		#endif
+	}
+
+	// Zero-initialize x1, x2, x3
+	#ifdef USE_CUDA
+	for (int k=0;k<3;k++) ws_tnl_dx[k].setValue(0);
+	#endif
+}
+
+template< typename LBM >
+void Lagrange3D<LBM>::constructMatricesGPU()
+{
+	auto ibm_logger = spdlog::get("ibm");
+
+	// Start timer to measure WuShu construction time
+	TNL::Timer timer;
+	TNL::Timer loopTimer;
+
+	double time_M_capacities = 0;
+	double time_M_construct = 0;
+	double time_M_transpose = 0;
+	double time_A_capacities = 0;
+	double time_A_construct = 0;
+	double time_matrixWrite = 0;
+	double time_matrixCopy = 0;
+
+	idx m = LL.size();	// number of lagrangian nodes
+
+	timer.start();
+	loopTimer.start();
+	// Calculate row capacities of matrix M
+	TNL::Backend::LaunchConfiguration dM_config;
+	dM_config.blockSize.x = 256;
+	dM_config.gridSize.x = TNL::roundUpDivision(m,dM_config.blockSize.x);
+	TNL::Backend::launchKernelSync( dM_row_capacities_kernel<LBM>, dM_config,
+		dLL_lat.getView(),
+		dM_row_capacities.getView(),
+		lbm.blocks.front().local,
+		diracDeltaTypeEL);
+
+	loopTimer.stop();
+	time_M_capacities = loopTimer.getRealTime();
+
+	ws_tnl_dM.setRowCapacities(dM_row_capacities);
+
+	loopTimer.reset();
+	loopTimer.start();
+	// Construct the matrix M
+	TNL::Backend::LaunchConfiguration dM_config_build;
+	dM_config_build.blockSize.x = 256;
+	dM_config_build.gridSize.x = TNL::roundUpDivision(m,dM_config_build.blockSize.x);
+
+	TNL::Backend::launchKernelSync( dM_construction_kernel<LBM>, dM_config_build,
+		dLL_lat.getConstView(),
+		ws_tnl_dM.getView(),
+		lbm.blocks.front().local,
+		#ifdef HAVE_MPI
+		lbm.blocks.front().dmap.getConstLocalView(),
+		#else
+		lbm.blocks.front().dmap.getConstView(),
+		#endif
+		diracDeltaTypeEL);
+
+	loopTimer.stop();
+	time_M_construct = loopTimer.getRealTime();
+
+	// Transpose matrix M
+	loopTimer.reset();
+	loopTimer.start();
+    ws_tnl_dMT.getTransposition(ws_tnl_dM);
+	loopTimer.stop();
+	time_M_transpose = loopTimer.getRealTime();
+
+	loopTimer.reset();
+	loopTimer.start();
+	// Calculate row capacities of matrix A
+	TNL::Backend::LaunchConfiguration dA_config;
+	dA_config.blockSize.x = 256;
+	dA_config.gridSize.x = TNL::roundUpDivision(m, dA_config.blockSize.x);
+	TNL::Backend::launchKernelSync(dA_row_capacities_kernel<LBM>, dA_config,
+		dLL_lat.getConstView(),
+		dA_row_capacities.getView(),
+		ws_tnl_dM.getConstView(),
+		diracDeltaTypeLL,
+		methodVariant
+		);
+
+	loopTimer.stop();
+	time_A_capacities = loopTimer.getRealTime();
+	ws_tnl_dA->setRowCapacities(dA_row_capacities);
+
+
+	loopTimer.reset();
+	loopTimer.start();
+	// Construct the matrix A
+	TNL::Backend::LaunchConfiguration dA_construct_config;
+	dA_construct_config.blockSize.x =256;
+	dA_construct_config.gridSize.x = TNL::roundUpDivision(m,dA_construct_config.blockSize.x);
+	TNL::Backend::launchKernelSync(dA_construction_kernel<LBM>, dA_construct_config,
+		dLL_lat.getConstView(),
+		ws_tnl_dA->getView(),
+		ws_tnl_dM.getConstView(),
+		diracDeltaTypeLL,
+		methodVariant
+		);
+
+	loopTimer.stop();
+	time_A_construct = loopTimer.getRealTime();
+
+
+	// Update the preconditioner
+	ws_tnl_dprecond->update(ws_tnl_dA);
+	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
+
+	if (mtx_output)
+	{
+		loopTimer.reset();
+		loopTimer.start();
+		const std::string output_M = fmt::format("ibm_GPU_matrix-M_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_GPU_matrix-A_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_M, ws_tnl_dM );
+		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_A, *ws_tnl_dA );
+		loopTimer.stop();
+		time_matrixWrite = loopTimer.getRealTime();
+	}
+
+	timer.stop();
+	nlohmann::json j;
+	j["threads"] = omp_get_max_threads();
+	j["time_total"] = timer.getRealTime();
+	j["time_A_capacities"] = time_A_capacities;
+	j["time_A_construct"] = time_A_construct;
+	j["time_M_capacities"] = time_M_capacities;
+	j["time_M_construct"] = time_M_construct;
+	j["time_M_transpose"] = time_M_transpose;
+	j["time_matrixWrite"] = time_matrixWrite;
+	j["time_matrixCopy"] = time_matrixCopy;
+	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
 
 template< typename Matrix, typename Vector >
@@ -851,23 +596,45 @@ rowVectorProduct( const Matrix& matrix, typename Matrix::IndexType i, const Vect
 
 //require: rho, vx, vy, vz
 template< typename LBM >
-void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
+void Lagrange3D<LBM>::computeForces(real time)
 {
-	switch (ws_compute)
+	const char* compute_desc = "undefined";
+	switch (computeVariant)
 	{
-		case ws_computeCPU_TNL:
-		case ws_computeGPU_TNL:
-		case ws_computeHybrid_TNL:
-		case ws_computeHybrid_TNL_zerocopy:
-			constructWuShuMatricesSparse_TNL();
-			break;
-		default:
-			constructWuShuMatricesSparse();
-			break;
+		case IbmCompute::CPU:                compute_desc = "CPU"; break;
+		case IbmCompute::GPU:                compute_desc = "GPU"; break;
+		case IbmCompute::Hybrid:             compute_desc = "Hybrid"; break;
+		case IbmCompute::Hybrid_zerocopy:    compute_desc = "Hybrid_zerocopy"; break;
 	}
 
-	int m=LL.size();
-	idx n=lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
+	switch (computeVariant)
+	{
+		case IbmCompute::CPU:
+		case IbmCompute::Hybrid:
+		case IbmCompute::Hybrid_zerocopy:
+			if (!allocated)
+				allocateMatricesCPU();
+			allocated = true;
+			if (!constructed)
+				constructMatricesCPU();
+			constructed = true;
+			break;
+		case IbmCompute::GPU:
+			if (!allocated)
+				allocateMatricesGPU();
+			allocated = true;
+			if (!constructed)
+				constructMatricesGPU();
+			constructed = true;
+			break;
+	}
+	auto ibm_logger = spdlog::get("ibm");
+	ibm_logger->info("computing forces using computeVariant={}", compute_desc);
+
+	TNL::Timer timer;
+	timer.start();
+	idx m = LL.size();
+	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
 
 	const auto drho = dmacroVector(MACRO::e_rho);
 	const auto dvx = dmacroVector(MACRO::e_vx);
@@ -885,15 +652,29 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 	auto hfy = hmacroVector(MACRO::e_fy);
 	auto hfz = hmacroVector(MACRO::e_fz);
 
-	switch (ws_compute)
+	switch (computeVariant)
 	{
 		#ifdef USE_CUDA
-		case ws_computeGPU_TNL:
+		case IbmCompute::GPU:
 		{
 			// no Device--Host copy is required
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
 			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto dbx = ws_tnl_db[0].getView();
+				auto dby = ws_tnl_db[1].getView();
+				auto dbz = ws_tnl_db[2].getView();
+				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					dbx[i] += v.x();
+					dby[i] += v.y();
+					dbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
+			}
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -901,7 +682,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
 			}
 			const auto x1 = ws_tnl_dx[0].getConstView();
 			const auto x2 = ws_tnl_dx[1].getConstView();
@@ -922,11 +703,25 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			break;
 		}
 
-		case ws_computeHybrid_TNL:
+		case IbmCompute::Hybrid:
 		{
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
 			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto dbx = ws_tnl_db[0].getView();
+				auto dby = ws_tnl_db[1].getView();
+				auto dbz = ws_tnl_db[2].getView();
+				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					dbx[i] += v.x();
+					dby[i] += v.y();
+					dbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
+			}
 			// copy to Host
 			for (int k=0;k<3;k++) ws_tnl_hb[k] = ws_tnl_db[k];
 			// solve on CPU
@@ -936,7 +731,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// copy to GPU
 			for (int k=0;k<3;k++) ws_tnl_dx[k] = ws_tnl_hx[k];
@@ -960,11 +755,25 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			break;
 		}
 
-		case ws_computeHybrid_TNL_zerocopy:
+		case IbmCompute::Hybrid_zerocopy:
 		{
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);
 			ws_tnl_dM.vectorProduct(dvz, ws_tnl_hbz[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto dbx = ws_tnl_db[0].getView();
+				auto dby = ws_tnl_db[1].getView();
+				auto dbz = ws_tnl_db[2].getView();
+				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					dbx[i] += v.x();
+					dby[i] += v.y();
+					dbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
+			}
 			// solve on CPU
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -972,7 +781,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			// continue on GPU
 			const auto x1 = ws_tnl_hxz[0].getConstView();
@@ -993,69 +802,27 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
 			break;
 		}
-
-		case ws_computeGPU_CUSPARSE:
-		{
-			#ifdef USE_CUSPARSE
-			// no Device--Host copy is required
-			// HOKUS POKUS
-			ws_M->dmultiply(lbm.blocks.front().dvx(), ws_db[0], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[1], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvz(), ws_db[2], -1.0);
-			// solver
-			for (int k=0;k<3;k++) ws_dA->dsolve(ws_db[k], ws_dx[k]);
-			// now compute delta u
-			ws_MT->dmultiply(ws_dx[0], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfx());
-			ws_MT->dmultiply(ws_dx[1], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfy());
-			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n, ws_du, lbm.blocks.front().drho(), 1.0, lbm.blocks.front().dfz());
-			#else
-			fmt::print(stderr, "ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build.\n");
-			#endif
-			break;
-		}
-		case ws_computeHybrid_CUSPARSE:
-		{
-			#ifdef USE_CUSPARSE
-			ws_M->dmultiply(lbm.blocks.front().dvx(), ws_db[0], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[1], -1.0);
-			ws_M->dmultiply(lbm.blocks.front().dvy(), ws_db[2], -1.0);
-			// copy to Host
-			for (int k=0;k<3;k++) cudaMemcpy(ws_hb[k],ws_db[k],m*sizeof(dreal), cudaMemcpyDeviceToHost);
-			// retype
-			for (int k=0;k<3;k++)
-			for (int i=0;i<m;i++)
-				ws_b[k][i]=(real)ws_hb[k][i];
-			// solve on CPU
-			for (int k=0;k<3;k++)
-				ws_A->solve(ws_b[k],ws_x[k]);
-			// retype and copy to GPU
-			for (int k=0;k<3;k++)
-			for (int i=0;i<m;i++)
-				ws_hx[k][i]=(dreal)ws_x[k][i];
-			for (int k=0;k<3;k++)
-				cudaMemcpy(ws_dx[k],ws_hx[k],m*sizeof(dreal), cudaMemcpyHostToDevice);
-			// continue on GPU
-			ws_MT->dmultiply(ws_dx[0], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfx());
-			ws_MT->dmultiply(ws_dx[1], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfy());
-			ws_MT->dmultiply(ws_dx[2], ws_du, 2.0);
-			ws_MT->dVectorMultiplyAndAdd(n,ws_du,lbm.blocks.front().drho(),1.0, lbm.blocks.front().dfz());
-			#else
-			fmt::print(stderr, "ws_computeHybrid_CUSPARSE failed: CUSPARSE not included in the build.\n");
-			#endif
-			break;
-		}
 		#endif // USE_CUDA
-		case ws_computeCPU_TNL:
+		case IbmCompute::CPU:
 		{
 			// vx, vy, vz, rho must be copied from the device
 			ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
 			ws_tnl_hM.vectorProduct(hvy, ws_tnl_hb[1], -1.0);
 			ws_tnl_hM.vectorProduct(hvz, ws_tnl_hb[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto hbx = ws_tnl_hb[0].getView();
+				auto hby = ws_tnl_hb[1].getView();
+				auto hbz = ws_tnl_hb[2].getView();
+				const auto LL_velocity_lat = hLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					hbx[i] += v.x();
+					hby[i] += v.y();
+					hbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, m, kernel);
+			}
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -1063,7 +830,7 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 				auto end = std::chrono::steady_clock::now();
 				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 				real WT = int_ms * 1e-6;
-				log("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
+				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
 			}
 			auto kernel = [&] (idx i) mutable
 			{
@@ -1083,72 +850,20 @@ void Lagrange3D<LBM>::computeWuShuForcesSparse(real time)
 			dfz = hfz;
 			break;
 		}
-		case ws_computeCPU:
-		{
-			// vx, vy, rho must be copied from the device
-			// fx, fy must be zero
-			for (int el=0;el<m;el++)
-			{
-				for (int k=0;k<3;k++)
-					ws_b[k][el]=0;
-				for (std::size_t in1=0;in1<d_i[el].size();in1++)
-				{
-					int gi=d_i[el][in1];
-					ws_b[0][el] -= hvx[gi] * d_x[el][in1];
-					ws_b[1][el] -= hvy[gi] * d_x[el][in1];
-					ws_b[2][el] -= hvz[gi] * d_x[el][in1];
-				}
-			}
-			//solver
-			for (int k=0;k<3;k++) ws_A->solve(ws_b[k],ws_x[k]);
-			// transfer to fx fy
-			for (int el=0;el<m;el++)
-			{
-				for (std::size_t in1=0;in1<d_i[el].size();in1++)
-				{
-					int gi=d_i[el][in1];
-					hfx[gi] += 2 * hrho[gi] * ws_x[0][el]*d_x[el][in1];
-					hfy[gi] += 2 * hrho[gi] * ws_x[1][el]*d_x[el][in1];
-					hfz[gi] += 2 * hrho[gi] * ws_x[2][el]*d_x[el][in1];
-				}
-			}
-			// copy forces to the device
-			// FIXME: this is copied multiple times when there are multiple Lagrange3D objects
-			// (ideally there should be only one Lagrange3D object that comprises all immersed bodies)
-			dfx = hfx;
-			dfy = hfy;
-			dfz = hfz;
-			break;
-		}
-		default:
-			fmt::print(stderr, "lagrange_3D: Wu Shu compute flag {} unrecognized.\n", ws_compute);
-			break;
 	}
+	timer.stop();
+
+	nlohmann::json j;
+	j["threads"] = omp_get_max_threads();
+	j["time_total"] = timer.getRealTime();
+	ibm_logger->info("computeForcesJSON: {}", j.dump());
 }
 
 template< typename LBM >
-template< typename... ARGS >
-void Lagrange3D<LBM>::log(const char* fmts, ARGS... args)
+Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& state_id) : lbm(inputLBM)
 {
-	FILE* f = fopen(logfile.c_str(), "at"); // append information
-	if (f==0) {
-		fmt::print(stderr, "unable to create/access file {}\n", logfile);
-		return;
-	}
-	// insert time stamp
-	fmt::print(f, "{} ", timestamp());
-	fmt::print(f, fmts, args...);
-	fmt::print(f, "\n");
-	fclose(f);
-
-	//fmt::print(fmts, args...);
-	//fmt::print("\n");
-}
-
-template< typename LBM >
-Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir) : lbm(inputLBM)
-{
-	logfile = fmt::format("{}/ibm_solver.log", resultsDir);
+	if (!spdlog::get("ibm"))
+		init_file_logger("ibm", state_id, inputLBM.communicator);
 
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
@@ -1160,60 +875,4 @@ Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& resultsDir) : lbm(
 	ws_tnl_dprecond = std::make_shared< dPreconditioner >();
 //	ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
 	#endif
-
-	#ifdef USE_CUSPARSE
-	ws_M=0;
-	ws_MT=0;
-	ws_dA=0;
-	#endif
-	ws_A=0;
-	for (int k=0;k<3;k++)
-	{
-		ws_x[k]=0;
-		ws_b[k]=0;
-		ws_hx[k]=0;
-		ws_hb[k]=0;
-		ws_dx[k]=0;
-		ws_db[k]=0;
-	}
-	ws_du=0;
-	d_i=0;
-	d_x=0;
-}
-
-template< typename LBM >
-Lagrange3D<LBM>::~Lagrange3D()
-{
-	if (index_array)
-	{
-		for (int i=0;i<lag_X;i++) delete [] index_array[i];
-		delete [] index_array;
-	}
-	// WuShu
-	if (d_i) delete [] d_i;
-	if (d_x) delete [] d_x;
-
-	// WuShu
-	if (ws_constructed)
-	{
-		for (int k=0;k<3;k++)
-		{
-			if (ws_x[k]) delete [] ws_x[k];
-			if (ws_b[k]) delete [] ws_b[k];
-			if (ws_hx[k]) delete [] ws_hx[k];
-			if (ws_hb[k]) delete [] ws_hb[k];
-		}
-		#ifdef USE_CUSPARSE
-		if (ws_du) cudaFree(ws_du);
-		for (int k=0;k<3;k++)
-		{
-			if (ws_dx[k]) cudaFree(ws_dx[k]);
-			if (ws_db[k]) cudaFree(ws_db[k]);
-		}
-		if (ws_dA) delete ws_dA;
-		if (ws_M) delete ws_M;
-		if (ws_MT) delete ws_MT;
-		#endif
-		if (ws_A) delete ws_A;
-	}
 }

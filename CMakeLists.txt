@@ -135,6 +135,16 @@ set(SPDLOG_INSTALL ON)  # needed for adding to the interface target
 set(SPDLOG_FMT_EXTERNAL ON)
 FetchContent_MakeAvailable(spdlog)
 
+FetchContent_Declare(nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG master
+    SYSTEM
+    FIND_PACKAGE_ARGS
+)
+set(JSON_Install ON)  # needed for adding to the interface target
+set(JSON_SystemInclude ON)
+FetchContent_MakeAvailable(nlohmann_json)
+
 FetchContent_Declare(TNL
     GIT_REPOSITORY https://gitlab.com/tnl-project/tnl.git
     GIT_TAG main
@@ -148,7 +158,7 @@ find_package(OpenMP COMPONENTS CXX)
 find_package(MPI COMPONENTS CXX)
 
 # Add dependencies to the interface target
-target_link_libraries(TNL_LBM INTERFACE TNL::TNL PNG::PNG fmt::fmt spdlog::spdlog)
+target_link_libraries(TNL_LBM INTERFACE TNL::TNL PNG::PNG fmt::fmt spdlog::spdlog nlohmann_json::nlohmann_json)
 if(OPENMP_FOUND)
     target_compile_definitions(TNL_LBM INTERFACE "-DHAVE_OPENMP")
     target_link_libraries(TNL_LBM INTERFACE OpenMP::OpenMP_CXX)
