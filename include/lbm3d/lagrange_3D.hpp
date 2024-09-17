@@ -115,6 +115,9 @@ void Lagrange3D<LBM>::convertLagrangianPoints()
 		},
 		lbm.lat
 	);
+
+	hLL_velocity_lat.setSize(LL.size());
+	hLL_velocity_lat = 0;
 }
 
 template< typename LBM >
@@ -416,6 +419,8 @@ void Lagrange3D<LBM>::allocateMatricesGPU()
 	// Convert Lagrangian points to lattice coordinates and to StaticVector with dreal
 	convertLagrangianPoints();
 	dLL_lat = hLL_lat;
+	dLL_velocity_lat.setSize(m);
+	dLL_velocity_lat = 0;
 
 	// Allocate matrices
 	ws_tnl_dM.setDimensions(m, n);
@@ -628,6 +633,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 
 	TNL::Timer timer;
 	timer.start();
+	idx m = LL.size();
 	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
 
 	const auto drho = dmacroVector(MACRO::e_rho);
@@ -655,6 +661,20 @@ void Lagrange3D<LBM>::computeForces(real time)
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
 			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto dbx = ws_tnl_db[0].getView();
+				auto dby = ws_tnl_db[1].getView();
+				auto dbz = ws_tnl_db[2].getView();
+				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					dbx[i] += v.x();
+					dby[i] += v.y();
+					dbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
+			}
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -688,6 +708,20 @@ void Lagrange3D<LBM>::computeForces(real time)
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
 			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto dbx = ws_tnl_db[0].getView();
+				auto dby = ws_tnl_db[1].getView();
+				auto dbz = ws_tnl_db[2].getView();
+				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					dbx[i] += v.x();
+					dby[i] += v.y();
+					dbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
+			}
 			// copy to Host
 			for (int k=0;k<3;k++) ws_tnl_hb[k] = ws_tnl_db[k];
 			// solve on CPU
@@ -726,6 +760,20 @@ void Lagrange3D<LBM>::computeForces(real time)
 			ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
 			ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);
 			ws_tnl_dM.vectorProduct(dvz, ws_tnl_hbz[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto dbx = ws_tnl_db[0].getView();
+				auto dby = ws_tnl_db[1].getView();
+				auto dbz = ws_tnl_db[2].getView();
+				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					dbx[i] += v.x();
+					dby[i] += v.y();
+					dbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
+			}
 			// solve on CPU
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();
@@ -761,6 +809,20 @@ void Lagrange3D<LBM>::computeForces(real time)
 			ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
 			ws_tnl_hM.vectorProduct(hvy, ws_tnl_hb[1], -1.0);
 			ws_tnl_hM.vectorProduct(hvz, ws_tnl_hb[2], -1.0);
+			if (use_LL_velocity_in_solution) {
+				auto hbx = ws_tnl_hb[0].getView();
+				auto hby = ws_tnl_hb[1].getView();
+				auto hbz = ws_tnl_hb[2].getView();
+				const auto LL_velocity_lat = hLL_velocity_lat.getConstView();
+				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
+				{
+					const point_t v = LL_velocity_lat[i];
+					hbx[i] += v.x();
+					hby[i] += v.y();
+					hbz[i] += v.z();
+				};
+				TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, m, kernel);
+			}
 			// solver
 			for (int k=0;k<3;k++) {
 				auto start = std::chrono::steady_clock::now();

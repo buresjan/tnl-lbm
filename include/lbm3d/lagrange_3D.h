@@ -130,8 +130,16 @@ struct Lagrange3D
 	using DLPVECTOR = TNL::Containers::Vector<point_t, TNL::Devices::Cuda, idx>;
 	using HLPVECTOR = TNL::Containers::Vector<point_t, TNL::Devices::Host, idx>;
 
+	// current position of Lagrangian points in lattice coordinates
 	HLPVECTOR hLL_lat;
 	DLPVECTOR dLL_lat;
+
+	// current velocity of Lagrangian points in lattice coordinates
+	HLPVECTOR hLL_velocity_lat;
+	DLPVECTOR dLL_velocity_lat;
+
+	// controls whether the velocity of Lagrangian points is used in the solution of velocity correction
+	bool use_LL_velocity_in_solution = false;
 
 	// accessors for macroscopic quantities as a 1D vector
 	hVectorView hmacroVector(int macro_idx);  // macro_idx must be less than MACRO::N

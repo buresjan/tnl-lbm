@@ -115,12 +115,14 @@ struct StateLocal : State<NSE>
 	{
 		static idx cycle = 0;
 		const std::string basename = fmt::format("ball_{:04d}", cycle);
-		this->writeVTK_Points(basename.c_str(), nse.physTime(), cycle++);
+		this->writeVTK_Points(basename.c_str(), nse.physTime(), cycle);
 
 		// output the center alone in a vtk file for easier rendering
 		const std::string center_basename = fmt::format("ball_center_{:04d}", cycle);
 		typename Lagrange3D<NSE>::HLPVECTOR center_vector({nse.lat.phys2lbmPoint(ball_c)});
-		this->writeVTK_Points(center_basename.c_str(), nse.physTime(), cycle++, center_vector);
+		this->writeVTK_Points(center_basename.c_str(), nse.physTime(), cycle, center_vector);
+
+		cycle++;
 	}
 
 	virtual void computeBeforeLBMKernel()
@@ -128,13 +130,19 @@ struct StateLocal : State<NSE>
 		// update ball position
 		const dreal velocity_amplitude = 2 * ball_amplitude / ball_period;
 		const dreal vz = TNL::sign( cos(2*TNL::pi*nse.iterations/ball_period) ) * velocity_amplitude;
-		const dreal dz = vz;  // *Delta t
-		ibm.hLL_lat += point_t{0,0,dz};
-		ibm.dLL_lat += point_t{0,0,dz};
+		if (ibm.computeVariant == IbmCompute::CPU) {
+			ibm.hLL_velocity_lat = point_t{0,0,vz};
+			ibm.hLL_lat += ibm.hLL_velocity_lat;	// Delta t = 1
+		}
+		else {
+			ibm.dLL_velocity_lat = point_t{0,0,vz};
+			ibm.dLL_lat += ibm.dLL_velocity_lat;	// Delta t = 1
+		}
 		ibm.constructed = false;
+		ibm.use_LL_velocity_in_solution = true;
 
 		// update the ball center for drawing
-		ball_c += point_t{0,0,dz*nse.lat.physDl};
+		ball_c += point_t{0,0,vz*nse.lat.physDl};
 	}
 
 	virtual void updateKernelVelocities()

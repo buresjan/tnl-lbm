@@ -131,6 +131,12 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle)
 	if (!ibm.allocated)
 		ibm.convertLagrangianPoints();
 
+	// synchronize hLL_lat if points movement is computed on the GPU
+	if (ibm.use_LL_velocity_in_solution && ibm.computeVariant != IbmCompute::CPU) {
+		ibm.hLL_lat = ibm.dLL_lat;
+		ibm.hLL_velocity_lat = ibm.dLL_velocity_lat;
+	}
+
 	writeVTK_Points(name, time, cycle, ibm.hLL_lat);
 }
 
