@@ -442,7 +442,7 @@ void State<NSE>::writeVTKs_3D()
 	TNL::Timer timer;
 	for (const auto& block : nse.blocks)
 	{
-		const std::string fname = fmt::format("results_{}/vtk3D/block{:03d}_{:d}.vtk", id, block.id, cnt[VTK3D].count);
+		const std::string fname = fmt::format("results_{}/output_3D", id);
 		create_parent_directories(fname.c_str());
 		auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 		{
@@ -494,7 +494,7 @@ void State<NSE>::writeVTKs_3Dcut()
 	{
 		for (const auto& block : nse.blocks)
 		{
-			const std::string fname = fmt::format("results_{}/vtk3Dcut/{}_block{:03d}_{:d}.vtk", id, probevec.name, block.id, probevec.cycle);
+			const std::string fname = fmt::format("results_{}/output_3Dcut_{}", id, probevec.name);
 			create_parent_directories(fname.c_str());
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
@@ -581,7 +581,7 @@ void State<NSE>::writeVTKs_2D()
 	{
 		for (const auto& block : nse.blocks)
 		{
-			const std::string fname = fmt::format("results_{}/vtk2D/{}_block{:03d}_{:d}.vtk", id, probevec.name, block.id, probevec.cycle);
+			const std::string fname = fmt::format("results_{}/output_2D_{}", id, probevec.name);
 			create_parent_directories(fname.c_str());
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
