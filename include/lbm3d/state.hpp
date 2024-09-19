@@ -241,8 +241,7 @@ void State<NSE>::writeVTKs_1D()
 		for (std::size_t i=0;i<probe1Dvec.size(); i++)
 		{
 			const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dvec[i].name, nse.rank, probe1Dvec[i].cycle);
-			// create parent directories
-			create_file(fname.c_str());
+			create_parent_directories(fname.c_str());
 			spdlog::info("[1dcut {}]", fname);
 //			probeLine(probe1Dvec[i].from[0],probe1Dvec[i].from[1],probe1Dvec[i].from[2],probe1Dvec[i].to[0],probe1Dvec[i].to[1],probe1Dvec[i].to[2],fname);
 			switch (probe1Dvec[i].type)
@@ -262,8 +261,7 @@ void State<NSE>::writeVTKs_1D()
 	for (std::size_t i=0;i<probe1Dlinevec.size(); i++)
 	{
 		const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
-		// create parent directories
-		create_file(fname.c_str());
+		create_parent_directories(fname.c_str());
 		spdlog::info("[1dcut {}]", fname);
 		write1Dcut(probe1Dlinevec[i].from, probe1Dlinevec[i].to, fname);
 		probe1Dlinevec[i].cycle++;
@@ -446,43 +444,16 @@ void State<NSE>::write1Dcut_Z(idx x, idx y, const std::string& fname)
 template< typename NSE >
 void State<NSE>::writeVTKs_3D()
 {
-	const std::string dir = fmt::format("results_{}/vtk3D", id);
-	mkdir_p(dir.c_str(), 0755);
-
 	for (const auto& block : nse.blocks)
 	{
-		std::string tmp_dirname;
-		const char* local_scratch = getenv("LOCAL_SCRATCH");
-		if (!local_scratch || local_scratch[0] == '\0')
-		{
-			// $LOCAL_SCRATCH is not defined or empty - default to regular subdirectory in results_*
-			tmp_dirname = dir;
-			local_scratch = NULL;
-		}
-		else
-		{
-			// Write files temporarily into the local scratch and move them to final_dirname at
-			// the end, after all MPI processes have completed. This avoids small buffered writes
-			// into the shared filesystem on clusters as well as corruption of previous state due
-			// to MPI errors...
-			tmp_dirname = fmt::format("{}/{}", local_scratch, dir);
-		}
-		mkdir_p(tmp_dirname.c_str(), 0755);
-
-		const std::string basename = fmt::format("block{:03d}_{:d}.vtk", block.id, cnt[VTK3D].count);
-		const std::string filename = fmt::format("{}/{}", tmp_dirname, basename);
+		const std::string fname = fmt::format("results_{}/vtk3D/block{:03d}_{:d}.vtk", id, block.id, cnt[VTK3D].count);
+		create_parent_directories(fname.c_str());
 		auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 		{
 			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 		};
-		block.writeVTK_3D(nse.lat, outputData, filename, nse.physTime(), cnt[VTK3D].count);
-		spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", filename, nse.physTime(), cnt[VTK3D].count);
-
-		if (local_scratch)
-		{
-			// move the files from local_scratch into final_dirname and create a backup of the existing files
-			move(tmp_dirname, dir, basename, basename);
-		}
+		block.writeVTK_3D(nse.lat, outputData, fname, nse.physTime(), cnt[VTK3D].count);
+		spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), cnt[VTK3D].count);
 	}
 }
 
@@ -524,8 +495,7 @@ void State<NSE>::writeVTKs_3Dcut()
 		for (const auto& block : nse.blocks)
 		{
 			const std::string fname = fmt::format("results_{}/vtk3Dcut/{}_block{:03d}_{:d}.vtk", id, probevec.name, block.id, probevec.cycle);
-			// create parent directories
-			create_file(fname.c_str());
+			create_parent_directories(fname.c_str());
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
@@ -618,8 +588,7 @@ void State<NSE>::writeVTKs_2D()
 		for (const auto& block : nse.blocks)
 		{
 			const std::string fname = fmt::format("results_{}/vtk2D/{}_block{:03d}_{:d}.vtk", id, probevec.name, block.id, probevec.cycle);
-			// create parent directories
-			create_file(fname.c_str());
+			create_parent_directories(fname.c_str());
 			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);

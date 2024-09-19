@@ -58,6 +58,15 @@ static int mkdir_p(const char *path, mode_t mode)
 
 #include <libgen.h>   // dirname, basename
 
+// create parent directories of a file path
+static int create_parent_directories(const char* fname)
+{
+	char buffer[PATH_MAX];
+	strcpy(buffer, fname);
+	char* dir = dirname(buffer);
+	return mkdir_p(dir, 0777);
+}
+
 // create parent directories and then the file
 static int create_file(const char* fname)
 {
@@ -65,12 +74,8 @@ static int create_file(const char* fname)
 	if (fileExists(fname))
 		return 0;
 
-	char buffer[PATH_MAX];
-	strcpy(buffer, fname);
-	char* dir = dirname(buffer);
-
 	// make sure that the parent directory exists
-	mkdir_p(dir, 0777);
+	create_parent_directories(fname);
 
 	// create the file
 	FILE* fp = fopen(fname, "wb");
