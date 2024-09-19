@@ -191,8 +191,6 @@ template< typename NSE >
 template< typename... ARGS >
 void State<NSE>::add1Dcut_X(real y, real z, const char* fmts, ARGS... args)
 {
-	if (!nse.isAnyLocalY(nse.lat.phys2lbmY(y)) || !nse.isAnyLocalZ(nse.lat.phys2lbmZ(z))) return;
-
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	probe1Dvec[last].name = fmt::format(fmts, args...);
@@ -206,8 +204,6 @@ template< typename NSE >
 template< typename... ARGS >
 void State<NSE>::add1Dcut_Y(real x, real z, const char* fmts, ARGS... args)
 {
-	if (!nse.isAnyLocalX(nse.lat.phys2lbmX(x)) || !nse.isAnyLocalZ(nse.lat.phys2lbmZ(z))) return;
-
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	probe1Dvec[last].name = fmt::format(fmts, args...);
@@ -221,8 +217,6 @@ template< typename NSE >
 template< typename... ARGS >
 void State<NSE>::add1Dcut_Z(real x, real y, const char* fmts, ARGS... args)
 {
-	if (!nse.isAnyLocalX(nse.lat.phys2lbmX(x)) || !nse.isAnyLocalY(nse.lat.phys2lbmY(y))) return;
-
 	probe1Dvec.push_back( T_PROBE1DCUT() );
 	int last = probe1Dvec.size()-1;
 	probe1Dvec[last].name = fmt::format(fmts, args...);
@@ -533,8 +527,6 @@ template< typename NSE >
 template< typename... ARGS >
 void State<NSE>::add2Dcut_X(idx x, const char* fmts, ARGS... args)
 {
-	if (!nse.isAnyLocalX(x)) return;
-
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
 
@@ -549,8 +541,6 @@ template< typename NSE >
 template< typename... ARGS >
 void State<NSE>::add2Dcut_Y(idx y, const char* fmts, ARGS... args)
 {
-	if (!nse.isAnyLocalY(y)) return;
-
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
 
@@ -565,8 +555,6 @@ template< typename NSE >
 template< typename... ARGS >
 void State<NSE>::add2Dcut_Z(idx z, const char* fmts, ARGS... args)
 {
-	if (!nse.isAnyLocalZ(z)) return;
-
 	probe2Dvec.push_back( T_PROBE2DCUT() );
 	int last = probe2Dvec.size()-1;
 
