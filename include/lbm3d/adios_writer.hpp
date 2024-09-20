@@ -119,10 +119,44 @@ void ADIOSWriter<TRAITS>::addVTKAttributes()
 }
 
 template<typename TRAITS >
+void ADIOSWriter<TRAITS>::addFidesAttributes()
+{
+	// add attributes for Fides
+	io.DefineAttribute<std::string>("Fides_Data_Model", "uniform");
+	io.DefineAttribute<typename point_t::ValueType>("Fides_Origin", &physOrigin[0], point_t::getSize());
+	real spacing[3] = {physDl, physDl, physDl};
+	io.DefineAttribute<real>("Fides_Spacing", &spacing[0], 3);
+
+	bool dimension_variable_set = false;
+	std::vector<std::string> variable_list;
+	std::vector<std::string> variable_associations;
+	for (const auto& [name, dim] : variables)
+	{
+		if (dim > 0) {
+			if (!dimension_variable_set) {
+				// NOTE: Fides_Dimension_Variable must refer to a scalar variable
+				// https://gitlab.kitware.com/vtk/fides/-/issues/22
+				// FIXME: Fides requires this variable to be PointData for sizing,
+				// but PointData leads to visual "gaps" between subdomains in Paraview
+				// https://github.com/ornladios/ADIOS2-Examples/issues/90
+				io.DefineAttribute<std::string>("Fides_Dimension_Variable", name);
+				dimension_variable_set = true;
+			}
+			variable_list.push_back(name);
+			variable_associations.push_back("points");
+		}
+	}
+	io.DefineAttribute<std::string>("Fides_Variable_List", variable_list.data(), variable_list.size());
+	io.DefineAttribute<std::string>("Fides_Variable_Associations", variable_associations.data(), variable_associations.size());
+	io.DefineAttribute<std::string>("Fides_Time_Variable", "TIME");
+}
+
+template<typename TRAITS >
 ADIOSWriter<TRAITS>::~ADIOSWriter()
 {
 	if (!variables.empty()) {
 		addVTKAttributes();
+		addFidesAttributes();
 	}
 
 	engine.EndStep();

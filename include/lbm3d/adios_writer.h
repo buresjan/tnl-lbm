@@ -36,6 +36,8 @@ private:
 
 	void addVTKAttributes();
 
+	void addFidesAttributes();
+
 public:
 	ADIOSWriter() = delete;
 
