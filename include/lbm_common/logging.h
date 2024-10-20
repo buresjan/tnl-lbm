@@ -63,3 +63,16 @@ static void init_logging(const std::string& id, const TNL::MPI::Comm& communicat
 	// initialize spdlog logger for profiling output
 	init_file_logger("profile", id, communicator);
 }
+
+static void deinit_logging()
+{
+	// create new default logger (same as spdlog itself) before destroying the current one
+	auto color_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    const char *default_logger_name = "";
+	auto logger = std::make_shared<spdlog::logger>(default_logger_name, std::move(color_sink));
+	spdlog::set_default_logger(std::move(logger));
+
+	// drop/unregister all loggers initialized by our code
+	spdlog::drop("main");
+	spdlog::drop("profile");
+}

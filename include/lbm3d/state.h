@@ -266,6 +266,11 @@ struct State
 		// initial time of current simulation
 		timer_total.start();
 	}
+
+	~State()
+	{
+		deinit_logging();
+	}
 };
 
 #include "state.hpp"
