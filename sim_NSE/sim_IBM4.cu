@@ -149,7 +149,6 @@ struct StateLocal : State<NSE>
 	{
 		for (auto& block : nse.blocks)
 		{
-			block.data.inflow_rho = 1;
 			block.data.inflow_vx = lbm_inflow_vx;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
@@ -158,7 +157,7 @@ struct StateLocal : State<NSE>
 
 	virtual void setupBoundaries()
 	{
-		nse.setBoundaryX(0, BC::GEO_INFLOW); // left
+		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT); // left
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);// right
 		nse.setBoundaryY(0, BC::GEO_INFLOW); // back
 		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_INFLOW);// front

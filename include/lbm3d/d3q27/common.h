@@ -34,6 +34,12 @@ struct D3Q27_COMMON
 			+((KS.f[pzz]+KS.f[mzz]) + (KS.f[zpz]+KS.f[zmz]) + (KS.f[zzp]+KS.f[zzm]))) + KS.f[zzz];
 		#endif
 
+		computeVelocity(KS);
+	}
+
+	template< typename LBM_KS >
+	CUDA_HOSTDEV static void computeVelocity(LBM_KS &KS)
+	{
 		KS.vz=((((KS.f[ppp]-KS.f[mmm])+(KS.f[mpp]-KS.f[pmm]))+((KS.f[pmp]-KS.f[mpm])+(KS.f[mmp]-KS.f[ppm])))+(((KS.f[zpp]-KS.f[zmm])+(KS.f[zmp]-KS.f[zpm]))+((KS.f[pzp]-KS.f[mzm])+(KS.f[mzp]-KS.f[pzm])))+(KS.f[zzp]-KS.f[zzm])+KS.fz*n1o2)/KS.rho;
 		KS.vx=((((KS.f[ppp]-KS.f[mmm])+(KS.f[pmp]-KS.f[mpm]))+((KS.f[ppm]-KS.f[mmp])+(KS.f[pmm]-KS.f[mpp])))+(((KS.f[pzp]-KS.f[mzm])+(KS.f[pzm]-KS.f[mzp]))+((KS.f[ppz]-KS.f[mmz])+(KS.f[pmz]-KS.f[mpz])))+(KS.f[pzz]-KS.f[mzz])+KS.fx*n1o2)/KS.rho;
 		KS.vy=((((KS.f[ppp]-KS.f[mmm])+(KS.f[ppm]-KS.f[mmp]))+((KS.f[mpp]-KS.f[pmm])+(KS.f[mpm]-KS.f[pmp])))+(((KS.f[ppz]-KS.f[mmz])+(KS.f[mpz]-KS.f[pmz]))+((KS.f[zpp]-KS.f[zmm])+(KS.f[zpm]-KS.f[zmp])))+(KS.f[zpz]-KS.f[zmz])+KS.fy*n1o2)/KS.rho;

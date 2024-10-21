@@ -17,34 +17,11 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	real lbm_inflow_density = 1;
 	real lbm_inflow_vx = 0;
-
-	void extrapolateInflowDensity()
-	{
-		// inflow density extrapolation
-		idx x = 5;
-		idx y = nse.lat.global.y()/3;
-		idx z = nse.lat.global.z()/3;
-
-		real old_lbm_inflow_density = lbm_inflow_density;
-		for (auto& block : nse.blocks)
-			if (block.isLocalIndex(x, y, z)) {
-				lbm_inflow_density = block.dmacro.getElement(MACRO::e_rho, x, y, z);
-				break;
-			}
-			else {
-				// set to zero so that MPI::reduce works with MPI_MAX
-				lbm_inflow_density = 0;
-			}
-		// make sure that all ranks get the same value
-		lbm_inflow_density = TNL::MPI::reduce(lbm_inflow_density, MPI_MAX, nse.communicator);
-		spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
-	}
 
 	virtual void setupBoundaries()
 	{
-		nse.setBoundaryX(0, BC::GEO_INFLOW); 	// left
+		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT); 	// left
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);	// right
 
 		nse.setBoundaryZ(1, BC::GEO_WALL);		// top
@@ -84,16 +61,9 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void probe1()
-	{
-		if (nse.iterations != 0)
-			extrapolateInflowDensity();
-	}
-
 	virtual void updateKernelVelocities()
 	{
 		for (auto& block : nse.blocks) {
-			block.data.inflow_rho = lbm_inflow_density;
 			block.data.inflow_vx = lbm_inflow_vx;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
@@ -116,9 +86,6 @@ struct StateLocal : State<NSE>
 				this->flagCreate("savestate_done");
 			}
 			if (forced) this->flagCreate("loadstate");
-
-			// set lbmInflowDensity from hmacro -- for consistency with restarted computations
-			extrapolateInflowDensity();
 		}
 	}
 
@@ -128,9 +95,6 @@ struct StateLocal : State<NSE>
 		{
 			spdlog::debug("[loadState invoked]");
 			this->saveAndLoadState(FileToMemory, "current_state");
-
-			// set lbmInflowDensity from hmacro
-			extrapolateInflowDensity();
 		}
 	}
 };
@@ -174,7 +138,6 @@ int sim(int RESOLUTION = 2)
 
 	state.nse.physFinalTime = 1.0;
 	state.cnt[PRINT].period = 0.001;
-	state.cnt[PROBE1].period = 0.001;
 	// test
 //	state.cnt[PRINT].period = 100*PHYS_DT;
 //	state.nse.physFinalTime = 1000*PHYS_DT;

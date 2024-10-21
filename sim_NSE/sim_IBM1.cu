@@ -49,7 +49,6 @@ struct NSE_Data_SpecialInflow : NSE_Data< TRAITS >
 	dreal inflow_vx=0;
 	dreal inflow_vy=0;
 	dreal inflow_vz=0;
-	dreal inflow_rho=no1;
 //	dreal inflow_z0=0.00112;
 //	dreal inflow_mez=0.0112;
 //	dreal inflow_physDl=0.1;
@@ -59,7 +58,6 @@ struct NSE_Data_SpecialInflow : NSE_Data< TRAITS >
 	template < typename LBM_KS >
 	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
 	{
-		KS.rho = inflow_rho;
 		KS.vx = 16.0*inflow_vx*MAX(0, (physDl*(y-0.5)/H)*(physDl*(z-0.5)/H)*(1.0 - physDl*(y-0.5)/H)*(1.0 - physDl*(z-0.5)/H) );
 //			(no1 - ((physDl*y-y0)*(physDl*y-y0) + (physDl*z-z0)*(physDl*z-z0))/delta/delta);
 //		KS.vx = inflow_vx*(no1 - ((physDl*y-y0)*(physDl*y-y0) + (physDl*z-z0)*(physDl*z-z0))/delta/delta);
@@ -268,7 +266,6 @@ struct StateLocal : State<NSE>
 	{
 		for (auto& block : nse.blocks)
 		{
-			block.data.inflow_rho = no1;
 			block.data.inflow_vx = nse.lat.phys2lbmVelocity(phys_input_U_max);
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
@@ -279,7 +276,7 @@ struct StateLocal : State<NSE>
 
 	virtual void setupBoundaries()
 	{
-		nse.setBoundaryX(0, BC::GEO_INFLOW); // left
+		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT); // left
 		nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);// right
 		nse.setBoundaryY(0, BC::GEO_WALL); // back
 		nse.setBoundaryY(nse.lat.global.y()-1, BC::GEO_WALL);// front

@@ -16,14 +16,12 @@ struct NSE_Data_XProfileInflow : NSE_Data < TRAITS >
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 
-//	dreal inflow_rho=no1;
 	dreal* vx_profile=NULL;
 	idx size_y=0;
 
 	template< typename LBM_KS >
 	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
 	{
-//		KS.rho = inflow_rho;
 		KS.vx  = vx_profile[y+z*size_y];
 		KS.vy  = 0;
 		KS.vz  = 0;
@@ -114,8 +112,7 @@ struct StateLocal : State<NSE>
 //		if (nse.blocks.front().data.inflow_vx != 0)
 		if (nse.blocks.front().data.vx_profile)
 		{
-			nse.setBoundaryX(0, BC::GEO_INFLOW); 		// left
-//			nse.setBoundaryX(0, BC::GEO_INFLOW_FREE_RHO); 		// left
+			nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT); 		// left
 //			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);		// right
 			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);		// right
 //			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT_INTERP);		// right

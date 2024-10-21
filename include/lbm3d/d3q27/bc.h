@@ -15,6 +15,7 @@ struct D3Q27_BC_All
 		GEO_FLUID, 		// compulsory
 		GEO_WALL, 		// compulsory
 		GEO_INFLOW,
+		GEO_INFLOW_LEFT,
 		GEO_OUTFLOW_EQ,
 		GEO_OUTFLOW_RIGHT,
 		GEO_PERIODIC,
@@ -65,19 +66,31 @@ struct D3Q27_BC_All
 		{
 		case GEO_INFLOW:
 			SD.inflow(KS,x,y,z);
+			KS.rho = 1;
+			COLL::setEquilibrium(KS);
+			break;
+		case GEO_INFLOW_LEFT:
+			SD.inflow(KS,x,y,z);
+			// formula given by Pavel Eichler
+			KS.rho = (dreal)1.0/(1-KS.vx) * (
+				KS.f[zzz] + KS.f[zmm] + KS.f[zpp] + KS.f[zpm] + KS.f[zmp] + KS.f[zmz] + KS.f[zpz] + KS.f[zzm] + KS.f[zzp]
+				+ 2*(
+				KS.f[mzz] + KS.f[mmm] + KS.f[mpp] + KS.f[mpm] + KS.f[mmp] + KS.f[mzm] + KS.f[mmz] + KS.f[mpz] + KS.f[mzp]
+				)
+			);
 			COLL::setEquilibrium(KS);
 			break;
 		case GEO_OUTFLOW_EQ:
-			COLL::computeDensityAndVelocity(KS);
 			KS.rho = 1;
+			COLL::computeVelocity(KS);
 			COLL::setEquilibrium(KS);
 			break;
 		case GEO_OUTFLOW_RIGHT:
-			COLL::computeDensityAndVelocity(KS);
 			KS.rho = 1;
+			COLL::computeVelocity(KS);
 			break;
 		case GEO_WALL:
-			// nema zadny vliv na vypocet, jen pro output
+			// does not affect the computation, only the output
 			KS.rho = 1;
 			KS.vx = 0;
 			KS.vy = 0;

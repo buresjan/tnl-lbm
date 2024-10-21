@@ -69,7 +69,6 @@ struct NSE_Data_ConstInflow : NSE_Data<TRAITS>
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 
-	dreal inflow_rho = 1;
 	dreal inflow_vx = 0;
 	dreal inflow_vy = 0;
 	dreal inflow_vz = 0;
@@ -77,10 +76,9 @@ struct NSE_Data_ConstInflow : NSE_Data<TRAITS>
 	template < typename LBM_KS >
 	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
 	{
-		KS.rho = inflow_rho;
-		KS.vx  = inflow_vx;
-		KS.vy  = inflow_vy;
-		KS.vz  = inflow_vz;
+		KS.vx = inflow_vx;
+		KS.vy = inflow_vy;
+		KS.vz = inflow_vz;
 	}
 };
 
