@@ -173,23 +173,6 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-/*
-	// clear Lattice + boundary setup
-	virtual void resetLattice(real irho, real ivx, real ivy, real ivz)
-	{
-		for (int x = 0; x < nse.X;x++)
-		for (int y = 0; y < nse.Y;y++)
-		for (int z = 0; z < nse.Z;z++)
-		{
-			dreal rho= no1;
-			dreal vx= 0;//(lbmInputVelocityX!=0) ? (dreal)analytical_ux(y,z) : 0;
-			dreal vy= 0;
-			dreal vz= 0;
-			nse.setEqLat(x,y,z,rho,vx,vy,vz);
-		}
-
-	}
-*/
 	virtual void probe1()
 	{
 		// compute exact error
@@ -287,8 +270,7 @@ int sim(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 		LBM_Z = std::round(LBM_Z * factor);
 	}
 	// NOTE: LBM_VISCOSITY must be less than 1/6
-//	real LBM_VISCOSITY = 0.01*RES;
-	real LBM_VISCOSITY = std::min(0.1, 0.01*RES);
+	real LBM_VISCOSITY = 0.04;
 	real PHYS_VISCOSITY = 1.5e-5;// [m^2/s] fluid viscosity air: 1.81e-5
 	real PHYS_HEIGHT = 0.25;
 	real PHYS_DL = PHYS_HEIGHT / real(LBM_Z - 2);
