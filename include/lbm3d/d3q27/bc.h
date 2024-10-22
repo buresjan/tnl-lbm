@@ -70,16 +70,53 @@ struct D3Q27_BC_All
 			COLL::setEquilibrium(KS);
 			break;
 		case GEO_INFLOW_LEFT:
+		{
 			SD.inflow(KS,x,y,z);
-			// formula given by Pavel Eichler
+			// moment boundary condition by Pavel Eichler https://doi.org/10.1016/j.camwa.2024.08.009
+			// expressions symetrized by Jakub Klinkovsky
 			KS.rho = (dreal)1.0/(1-KS.vx) * (
-				KS.f[zzz] + KS.f[zmm] + KS.f[zpp] + KS.f[zpm] + KS.f[zmp] + KS.f[zmz] + KS.f[zpz] + KS.f[zzm] + KS.f[zzp]
+				(
+					KS.f[zzz] + (
+						+ ((KS.f[zpp] + KS.f[zmm]) + (KS.f[zpm] + KS.f[zmp]))
+						+ ((KS.f[zpz] + KS.f[zmz]) + (KS.f[zzp] + KS.f[zzm]))
+					)
+				)
 				+ 2*(
-				KS.f[mzz] + KS.f[mmm] + KS.f[mpp] + KS.f[mpm] + KS.f[mmp] + KS.f[mzm] + KS.f[mmz] + KS.f[mpz] + KS.f[mzp]
+					KS.f[mzz] + (
+						+ ((KS.f[mpp] + KS.f[mmm]) + (KS.f[mpm] + KS.f[mmp]))
+						+ ((KS.f[mpz] + KS.f[mmz]) + (KS.f[mzp] + KS.f[mzm]))
+					)
 				)
 			);
-			COLL::setEquilibrium(KS);
+			dreal m100 = KS.rho*KS.vx;
+			dreal m010 = KS.rho*KS.vy;
+			dreal m001 = KS.rho*KS.vz;
+			dreal m011 = KS.rho*(KS.vy*KS.vz);
+			dreal m020 = n1o3*KS.rho + KS.rho*(KS.vy*KS.vy);
+			dreal m002 = n1o3*KS.rho + KS.rho*(KS.vz*KS.vz);
+			dreal m021 = n1o3*KS.rho*KS.vz + KS.rho*((KS.vy*KS.vy)*KS.vz);
+			dreal m012 = n1o3*KS.rho*KS.vy + KS.rho*(KS.vy*(KS.vz*KS.vz));
+			dreal m022 = n1o9*KS.rho + n1o3*KS.rho*(KS.vy*KS.vy + KS.vz*KS.vz) + KS.rho*(KS.vy*KS.vy)*(KS.vz*KS.vz);
+			KS.f[pzz] = m100 + (m022 - (m020 + m002))
+				+ KS.f[mzz]
+				+ (
+					+ ((KS.f[zpp] + KS.f[zmm]) + (KS.f[zpm] + KS.f[zmp]))
+					+ ((KS.f[zzp] + KS.f[zzm]) + (KS.f[zpz] + KS.f[zmz]))
+				)
+				+ 2*(
+					+ ((KS.f[mpp] + KS.f[mmm]) + (KS.f[mpm] + KS.f[mmp]))
+					+ ((KS.f[mpz] + KS.f[mmz]) + (KS.f[mzp] + KS.f[mzm]))
+				);
+			KS.f[ppz] = (dreal)0.5 * ((m020 - m022) + (-m012 + m010)) - (KS.f[mpz] + KS.f[zpz]);
+			KS.f[pmz] = (dreal)0.5 * ((m020 - m022) + ( m012 - m010)) - (KS.f[mmz] + KS.f[zmz]);
+			KS.f[pzp] = (dreal)0.5 * ((m002 - m022) + (-m021 + m001)) - (KS.f[mzp] + KS.f[zzp]);
+			KS.f[pzm] = (dreal)0.5 * ((m002 - m022) + ( m021 - m001)) - (KS.f[mzm] + KS.f[zzm]);
+			KS.f[ppp] = (dreal)0.25 * ((m022 + m011) + ( m021 + m012)) - (KS.f[mpp] + KS.f[zpp]);
+			KS.f[ppm] = (dreal)0.25 * ((m022 - m011) + (-m021 + m012)) - (KS.f[mpm] + KS.f[zpm]);
+			KS.f[pmp] = (dreal)0.25 * ((m022 - m011) + ( m021 - m012)) - (KS.f[mmp] + KS.f[zmp]);
+			KS.f[pmm] = (dreal)0.25 * ((m022 + m011) + (-m021 - m012)) - (KS.f[mmm] + KS.f[zmm]);
 			break;
+		}
 		case GEO_OUTFLOW_EQ:
 			KS.rho = 1;
 			COLL::computeVelocity(KS);
@@ -193,7 +230,8 @@ struct D3Q27_BC_All
 		// by default, collision is done on non-BC sites only
 		// additionally, BCs which include the collision step should be specified here
 		return isFluid(mapgi) || isPeriodic(mapgi)
-			|| mapgi == GEO_OUTFLOW_RIGHT;
+			|| mapgi == GEO_OUTFLOW_RIGHT
+			|| mapgi == GEO_INFLOW_LEFT;
 	}
 
 	template< typename LBM_KS >
