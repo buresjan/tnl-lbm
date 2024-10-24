@@ -34,12 +34,6 @@ struct D3Q27_COMMON
 			+((KS.f[pzz]+KS.f[mzz]) + (KS.f[zpz]+KS.f[zmz]) + (KS.f[zzp]+KS.f[zzm]))) + KS.f[zzz];
 		#endif
 
-		computeVelocity(KS);
-	}
-
-	template< typename LBM_KS >
-	CUDA_HOSTDEV static void computeVelocity(LBM_KS &KS)
-	{
 		KS.vz=((((KS.f[ppp]-KS.f[mmm])+(KS.f[mpp]-KS.f[pmm]))+((KS.f[pmp]-KS.f[mpm])+(KS.f[mmp]-KS.f[ppm])))+(((KS.f[zpp]-KS.f[zmm])+(KS.f[zmp]-KS.f[zpm]))+((KS.f[pzp]-KS.f[mzm])+(KS.f[mzp]-KS.f[pzm])))+(KS.f[zzp]-KS.f[zzm])+KS.fz*n1o2)/KS.rho;
 		KS.vx=((((KS.f[ppp]-KS.f[mmm])+(KS.f[pmp]-KS.f[mpm]))+((KS.f[ppm]-KS.f[mmp])+(KS.f[pmm]-KS.f[mpp])))+(((KS.f[pzp]-KS.f[mzm])+(KS.f[pzm]-KS.f[mzp]))+((KS.f[ppz]-KS.f[mmz])+(KS.f[pmz]-KS.f[mpz])))+(KS.f[pzz]-KS.f[mzz])+KS.fx*n1o2)/KS.rho;
 		KS.vy=((((KS.f[ppp]-KS.f[mmm])+(KS.f[ppm]-KS.f[mmp]))+((KS.f[mpp]-KS.f[pmm])+(KS.f[mpm]-KS.f[pmp])))+(((KS.f[ppz]-KS.f[mmz])+(KS.f[mpz]-KS.f[pmz]))+((KS.f[zpp]-KS.f[zmm])+(KS.f[zpm]-KS.f[zmp])))+(KS.f[zpz]-KS.f[zmz])+KS.fy*n1o2)/KS.rho;
@@ -84,6 +78,39 @@ struct D3Q27_COMMON
 		KS.f[ppm] = EQ::eq_ppm(KS.rho,KS.vx,KS.vy,KS.vz);
 		KS.f[ppz] = EQ::eq_ppz(KS.rho,KS.vx,KS.vy,KS.vz);
 		KS.f[ppp] = EQ::eq_ppp(KS.rho,KS.vx,KS.vy,KS.vz);
+	}
+
+	// used in the "interpolated outflow boundary condition with decomposition" by Eichler https://doi.org/10.1016/j.camwa.2024.08.009
+	template< typename LBM_KS >
+	CUDA_HOSTDEV static void setEquilibriumDecomposition(LBM_KS &KS, dreal rho_out)
+	{
+		KS.f[mmm] += EQ::eq_mmm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mmm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mmz] += EQ::eq_mmz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mmz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mmp] += EQ::eq_mmp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mmp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mzm] += EQ::eq_mzm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mzm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mzz] += EQ::eq_mzz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mzz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mzp] += EQ::eq_mzp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mzp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mpm] += EQ::eq_mpm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mpm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mpz] += EQ::eq_mpz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mpz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[mpp] += EQ::eq_mpp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_mpp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zmm] += EQ::eq_zmm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zmm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zmz] += EQ::eq_zmz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zmz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zmp] += EQ::eq_zmp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zmp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zzm] += EQ::eq_zzm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zzm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zzz] += EQ::eq_zzz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zzz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zzp] += EQ::eq_zzp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zzp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zpm] += EQ::eq_zpm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zpm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zpz] += EQ::eq_zpz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zpz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[zpp] += EQ::eq_zpp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_zpp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[pmm] += EQ::eq_pmm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_pmm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[pmz] += EQ::eq_pmz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_pmz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[pmp] += EQ::eq_pmp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_pmp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[pzm] += EQ::eq_pzm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_pzm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[pzz] += EQ::eq_pzz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_pzz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[pzp] += EQ::eq_pzp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_pzp(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[ppm] += EQ::eq_ppm(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_ppm(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[ppz] += EQ::eq_ppz(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_ppz(KS.rho,KS.vx,KS.vy,KS.vz);
+		KS.f[ppp] += EQ::eq_ppp(rho_out,KS.vx,KS.vy,KS.vz) - EQ::eq_ppp(KS.rho,KS.vx,KS.vy,KS.vz);
 	}
 
 	template< typename LAT_DFS >

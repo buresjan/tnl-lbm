@@ -18,6 +18,7 @@ struct D3Q27_BC_All
 		GEO_INFLOW_LEFT,
 		GEO_OUTFLOW_EQ,
 		GEO_OUTFLOW_RIGHT,
+		GEO_OUTFLOW_RIGHT_INTERP,
 		GEO_PERIODIC,
 		GEO_NOTHING,
 		GEO_SYM_TOP,
@@ -59,7 +60,8 @@ struct D3Q27_BC_All
 		if (mapgi == GEO_OUTFLOW_RIGHT)
 			xp = x = xm;
 
-		STREAMING::streaming(SD,KS,xm,x,xp,ym,y,yp,zm,z,zp);
+		if (mapgi != GEO_OUTFLOW_RIGHT_INTERP)
+			STREAMING::streaming(SD,KS,xm,x,xp,ym,y,yp,zm,z,zp);
 
 		// boundary conditions
 		switch (mapgi)
@@ -118,13 +120,19 @@ struct D3Q27_BC_All
 			break;
 		}
 		case GEO_OUTFLOW_EQ:
+			COLL::computeDensityAndVelocity(KS);
 			KS.rho = 1;
-			COLL::computeVelocity(KS);
 			COLL::setEquilibrium(KS);
 			break;
 		case GEO_OUTFLOW_RIGHT:
+			COLL::computeDensityAndVelocity(KS);
 			KS.rho = 1;
-			COLL::computeVelocity(KS);
+			break;
+		case GEO_OUTFLOW_RIGHT_INTERP:
+			STREAMING::streamingInterpRight(SD,KS,xm,x,xp,ym,y,yp,zm,z,zp);
+			COLL::computeDensityAndVelocity(KS);
+			COLL::setEquilibriumDecomposition(KS, 1);
+			KS.rho = 1;
 			break;
 		case GEO_WALL:
 			// does not affect the computation, only the output
@@ -231,6 +239,7 @@ struct D3Q27_BC_All
 		// additionally, BCs which include the collision step should be specified here
 		return isFluid(mapgi) || isPeriodic(mapgi)
 			|| mapgi == GEO_OUTFLOW_RIGHT
+			|| mapgi == GEO_OUTFLOW_RIGHT_INTERP
 			|| mapgi == GEO_INFLOW_LEFT;
 	}
 

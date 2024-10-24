@@ -193,4 +193,39 @@ struct D3Q27_STREAMING
 			- TNL::Backend::ldg(SD.df(df_cur,zpm,xm  ,ym,zp))
 			- TNL::Backend::ldg(SD.df(df_cur,mpm, x  ,ym,zp));
     }
+
+	template < typename LBM_DATA, typename LBM_KS >
+	CUDA_HOSTDEV static dreal streamingInterpRight(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	{
+		// streaming: interpolation from Geier - CuLBM (2015)
+		// NOTE: velocity is neglected (for the case velocity << speed of sound)
+		constexpr dreal SpeedOfSound = 0.5773502691896257;
+		KS.f[mmm] = SpeedOfSound*SD.df(df_cur,mmm,xm,yp,zp) + (1-SpeedOfSound)*SD.df(df_cur,mmm,x,yp,zp);
+		KS.f[mmz] = SpeedOfSound*SD.df(df_cur,mmz,xm,yp, z) + (1-SpeedOfSound)*SD.df(df_cur,mmz,x,yp, z);
+		KS.f[mmp] = SpeedOfSound*SD.df(df_cur,mmp,xm,yp,zm) + (1-SpeedOfSound)*SD.df(df_cur,mmp,x,yp,zm);
+		KS.f[mzm] = SpeedOfSound*SD.df(df_cur,mzm,xm, y,zp) + (1-SpeedOfSound)*SD.df(df_cur,mzm,x, y,zp);
+		KS.f[mzz] = SpeedOfSound*SD.df(df_cur,mzz,xm, y, z) + (1-SpeedOfSound)*SD.df(df_cur,mzz,x, y, z);
+		KS.f[mzp] = SpeedOfSound*SD.df(df_cur,mzp,xm, y,zm) + (1-SpeedOfSound)*SD.df(df_cur,mzp,x, y,zm);
+		KS.f[mpm] = SpeedOfSound*SD.df(df_cur,mpm,xm,ym,zp) + (1-SpeedOfSound)*SD.df(df_cur,mpm,x,ym,zp);
+		KS.f[mpz] = SpeedOfSound*SD.df(df_cur,mpz,xm,ym, z) + (1-SpeedOfSound)*SD.df(df_cur,mpz,x,ym, z);
+		KS.f[mpp] = SpeedOfSound*SD.df(df_cur,mpp,xm,ym,zm) + (1-SpeedOfSound)*SD.df(df_cur,mpp,x,ym,zm);
+		KS.f[zmm] = SD.df(df_cur,zmm, x,yp,zp);
+		KS.f[zmz] = SD.df(df_cur,zmz, x,yp, z);
+		KS.f[zmp] = SD.df(df_cur,zmp, x,yp,zm);
+		KS.f[zzm] = SD.df(df_cur,zzm, x, y,zp);
+		KS.f[zzz] = SD.df(df_cur,zzz, x, y, z);
+		KS.f[zzp] = SD.df(df_cur,zzp, x, y,zm);
+		KS.f[zpm] = SD.df(df_cur,zpm, x,ym,zp);
+		KS.f[zpz] = SD.df(df_cur,zpz, x,ym, z);
+		KS.f[zpp] = SD.df(df_cur,zpp, x,ym,zm);
+		KS.f[pmm] = SD.df(df_cur,pmm,xm,yp,zp);
+		KS.f[pmz] = SD.df(df_cur,pmz,xm,yp, z);
+		KS.f[pmp] = SD.df(df_cur,pmp,xm,yp,zm);
+		KS.f[pzm] = SD.df(df_cur,pzm,xm, y,zp);
+		KS.f[pzz] = SD.df(df_cur,pzz,xm, y, z);
+		KS.f[pzp] = SD.df(df_cur,pzp,xm, y,zm);
+		KS.f[ppm] = SD.df(df_cur,ppm,xm,ym,zp);
+		KS.f[ppz] = SD.df(df_cur,ppz,xm,ym, z);
+		KS.f[ppp] = SD.df(df_cur,ppp,xm,ym,zm);
+	}
 };

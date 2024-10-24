@@ -114,8 +114,8 @@ struct StateLocal : State<NSE>
 		{
 			nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT); 		// left
 //			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_EQ);		// right
-			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);		// right
-//			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT_INTERP);		// right
+//			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT);		// right
+			nse.setBoundaryX(nse.lat.global.x()-1, BC::GEO_OUTFLOW_RIGHT_INTERP);		// right
 		} else
 		{
 			nse.setBoundaryX(0, BC::GEO_PERIODIC); 		// left
@@ -267,7 +267,7 @@ int sim(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 		LBM_Z = std::round(LBM_Z * factor);
 	}
 	// NOTE: LBM_VISCOSITY must be less than 1/6
-	real LBM_VISCOSITY = 0.04;
+	real LBM_VISCOSITY = 0.001;
 	real PHYS_VISCOSITY = 1.5e-5;// [m^2/s] fluid viscosity air: 1.81e-5
 	real PHYS_HEIGHT = 0.25;
 	real PHYS_DL = PHYS_HEIGHT / real(LBM_Z - 2);
@@ -355,7 +355,7 @@ int sim(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	}
 
 	state.cnt[PRINT].period = 10.0;
-	state.cnt[PROBE1].period = 10.0;// / RES;
+	state.cnt[PROBE1].period = 1.0;
 //	state.nse.physFinalTime = PHYS_DT * 1e7;
 	state.nse.physFinalTime = 100; //5000;
 //	state.cnt[VTK2D].period = 1.0;
