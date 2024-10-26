@@ -832,7 +832,11 @@ int State<NSE>::saveLoadTextData(int direction, const std::string& dirname, cons
 			spdlog::error("unable to access file {}", fname);
 			return 0;
 		}
-		fscanf(f, fmt.c_str(), &args...);
+		if (fscanf(f, fmt.c_str(), &args...) != sizeof...(args))
+		{
+			spdlog::error("failed to parse text in the file");
+			return 0;
+		}
 		fclose(f);
 		spdlog::info("[saveLoadTextData: read data from {}]", fname);
 	}
