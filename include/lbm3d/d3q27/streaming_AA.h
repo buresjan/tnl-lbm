@@ -148,7 +148,7 @@ struct D3Q27_STREAMING
 	}
 
 	template < typename LBM_DATA, typename LBM_KS >
-	CUDA_HOSTDEV static dreal streamingVx(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	CUDA_HOSTDEV static void streamingVx(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// (KS.f[pz] + KS.f[pm] + KS.f[pp] - KS.f[mz] - KS.f[mm] - KS.f[mp] + n1o2*KS.fx)/KS.rho;
 		KS.vx =
@@ -174,7 +174,7 @@ struct D3Q27_STREAMING
 
 
 	template < typename LBM_DATA, typename LBM_KS >
-	CUDA_HOSTDEV static dreal streamingVy(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	CUDA_HOSTDEV static void streamingVy(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// (KS.f[pz] + KS.f[pm] + KS.f[pp] - KS.f[mz] - KS.f[mm] - KS.f[mp] + n1o2*KS.fx)/KS.rho;
 		KS.vy =
@@ -199,7 +199,7 @@ struct D3Q27_STREAMING
 	}
 
 	template < typename LBM_DATA, typename LBM_KS >
-	CUDA_HOSTDEV static dreal streamingVz(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	CUDA_HOSTDEV static void streamingVz(LBM_DATA &SD, LBM_KS &KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// (KS.f[pz] + KS.f[pm] + KS.f[pp] - KS.f[mz] - KS.f[mm] - KS.f[mp] + n1o2*KS.fx)/KS.rho;
 		KS.vz =
