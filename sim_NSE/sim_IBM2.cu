@@ -135,11 +135,6 @@ struct StateLocal : State<NSE>
 
 		real lbm_cd_full=-Fx*8.0/lbm_inflow_vx/lbm_inflow_vx/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 		real phys_cd_full=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
-			if (!nse.terminate)
-				spdlog::error("nan detected");
-			nse.terminate=true;
-		}
 		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_inflow_vx, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
 
 // not used for evaluation of the results
@@ -159,7 +154,6 @@ struct StateLocal : State<NSE>
 //		}
 //		real lbm_cd=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
 //		spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
 ////		spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}", 0.07*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
 
@@ -170,7 +164,6 @@ struct StateLocal : State<NSE>
 ////		if (FIL_INDEX>=0) ibm.integrateForce(Fx,Fy,Fz, 1.0);//PI*ball_diameter*ball_diameter/(real)ibm.LL.size());
 //		real lbm_cd_lagr=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
 //		spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
 

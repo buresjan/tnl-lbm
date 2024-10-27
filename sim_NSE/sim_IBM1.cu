@@ -169,11 +169,6 @@ struct StateLocal : State<NSE>
 		real phys_cd_full = -nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 		real lbm_cl_full = -Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 		real phys_cl_full = -nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) {
-			if (!nse.terminate)
-				spdlog::error("nan detected");
-			nse.terminate=true;
-		}
 		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_full, lbm_cd_full, phys_cl_full, lbm_cl_full);
 
 // not used for evaluation of the results
@@ -195,7 +190,6 @@ struct StateLocal : State<NSE>
 //		real phys_cd=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cl=-nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
 //		spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
 ////		spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
 
@@ -208,7 +202,6 @@ struct StateLocal : State<NSE>
 //		real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
 //		real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
 //		real phys_cl_lagr=-nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-//		if (std::isnan(Fx) || std::isnan(Fz) || std::isnan(Fz)) { if (!nse.terminate) spdlog::error("nan detected"); nse.terminate=true; }
 //		spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr, lbm_cd_lagr);
 
 

@@ -1521,13 +1521,49 @@ void State<NSE>::AfterSimUpdate()
 
 	bool write_info = false;
 
-	if (cnt[VTK1D].action(nse.physTime()) ||
+	if (cnt[PRINT].action(nse.physTime()) ||
+	    cnt[VTK1D].action(nse.physTime()) ||
 	    cnt[VTK2D].action(nse.physTime()) ||
 	    cnt[VTK3D].action(nse.physTime()) ||
 	    cnt[VTK3DCUT].action(nse.physTime()) ||
 	    cnt[PROBE1].action(nse.physTime()) ||
 	    cnt[PROBE2].action(nse.physTime()) ||
 	    cnt[PROBE3].action(nse.physTime())
+	    )
+	{
+		write_info = true;
+		cnt[PRINT].count++;
+	}
+
+	// check for NaN values, abusing the period of other actions
+	bool nan_detected = false;
+	if (nse.iterations > 1 && write_info && MACRO::e_rho < MACRO::N)
+	{
+		for( auto& block : nse.blocks )
+		{
+			auto data = block.data;
+			auto fetch_rho = [=] __cuda_callable__ (idx i)
+			{
+				return data.dmacro[MACRO::e_rho * data.XYZ + i];
+			};
+			dreal rho_sum = TNL::Algorithms::reduce<TNL::Devices::GPU>(idx(0), data.XYZ, fetch_rho, TNL::Plus{});
+			nan_detected = TNL::MPI::reduce(std::isnan(rho_sum), MPI_LOR);
+			if (nan_detected)
+			{
+				spdlog::error("Detected NaN, terminating the simulation.");
+				nse.terminate=true;
+			}
+		}
+	}
+
+	if (cnt[VTK1D].action(nse.physTime()) ||
+	    cnt[VTK2D].action(nse.physTime()) ||
+	    cnt[VTK3D].action(nse.physTime()) ||
+	    cnt[VTK3DCUT].action(nse.physTime()) ||
+	    cnt[PROBE1].action(nse.physTime()) ||
+	    cnt[PROBE2].action(nse.physTime()) ||
+	    cnt[PROBE3].action(nse.physTime()) ||
+	    nan_detected
 	    )
 	{
 		// cpu macro
@@ -1551,7 +1587,7 @@ void State<NSE>::AfterSimUpdate()
 			cnt[PROBE3].count++;
 		}
 		// 3D VTK
-		if (cnt[VTK3D].action(nse.physTime()))
+		if (cnt[VTK3D].action(nse.physTime()) || nan_detected)
 		{
 			writeVTKs_3D();
 			cnt[VTK3D].count++;
@@ -1563,7 +1599,7 @@ void State<NSE>::AfterSimUpdate()
 			cnt[VTK3DCUT].count++;
 		}
 		// 2D VTK
-		if (cnt[VTK2D].action(nse.physTime()))
+		if (cnt[VTK2D].action(nse.physTime()) || nan_detected)
 		{
 			writeVTKs_2D();
 			cnt[VTK2D].count++;
@@ -1574,13 +1610,6 @@ void State<NSE>::AfterSimUpdate()
 			writeVTKs_1D();
 			cnt[VTK1D].count++;
 		}
-		write_info = true;
-	}
-
-	if (cnt[PRINT].action(nse.physTime()))
-	{
-		write_info = true;
-		cnt[PRINT].count++;
 	}
 
 	// statReset is called after all probes and VTK output
