@@ -859,7 +859,11 @@ int State<NSE>::saveloadBinaryData(int direction, const std::string& dirname, co
 			spdlog::error("unable to create file {}", fname);
 			return 0;
 		}
-		fwrite(data, sizeof(VARTYPE), length, f);
+		if (fwrite(data, sizeof(VARTYPE), length, f) != (std::size_t) length)
+		{
+			spdlog::error("failed to write data to the file");
+			return 0;
+		}
 		fclose(f);
 		spdlog::info("[saveLoadBinaryData: saved data into {}]", fname);
 	}
@@ -871,7 +875,11 @@ int State<NSE>::saveloadBinaryData(int direction, const std::string& dirname, co
 			spdlog::error("unable to access file {}", fname);
 			return 0;
 		}
-		fread(data, sizeof(VARTYPE), length, f);
+		if (fread(data, sizeof(VARTYPE), length, f) != (std::size_t) length)
+		{
+			spdlog::error("failed to read data from the file");
+			return 0;
+		}
 		fclose(f);
 		spdlog::info("[saveLoadBinaryData: read data from {}]", fname);
 	}
