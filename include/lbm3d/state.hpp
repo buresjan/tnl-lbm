@@ -1550,17 +1550,24 @@ void State<NSE>::AfterSimUpdate()
 		for( auto& block : nse.blocks )
 		{
 			auto data = block.data;
-			auto fetch_rho = [=] __cuda_callable__ (idx i)
+			auto check_nan = [=] __cuda_callable__ (idx i) -> bool
 			{
-				return data.dmacro[MACRO::e_rho * data.XYZ + i];
+				auto value = data.dmacro[MACRO::e_rho * data.XYZ + i];
+				return value != value;
 			};
-			dreal rho_sum = TNL::Algorithms::reduce<TNL::Devices::GPU>(idx(0), data.XYZ, fetch_rho, TNL::Plus{});
-			nan_detected = TNL::MPI::reduce(std::isnan(rho_sum), MPI_LOR);
-			if (nan_detected)
-			{
-				spdlog::error("Detected NaN, terminating the simulation.");
-				nse.terminate=true;
+			bool result = TNL::Algorithms::reduce<TNL::Devices::GPU>(idx(0), data.XYZ, check_nan, TNL::LogicalOr{});
+			if (result) {
+				spdlog::error("NaN detected on rank {} block {}", block.rank, block.id);
+				nan_detected = true;
 			}
+		}
+		nan_detected = TNL::MPI::reduce(nan_detected, MPI_LOR);
+		if (nan_detected)
+		{
+			spdlog::error("Detected NaN, terminating the simulation.");
+			nse.terminate=true;
+			// in order to save the proper data, we need to copy macros from device to host
+			nse.copyMacroToHost();
 		}
 	}
 
