@@ -264,11 +264,6 @@ struct State_NSE_ADE : State<NSE>
 			// common copy
 			nse.copyMacroToHost();
 			ade.copyMacroToHost();
-			// to be able to compute rho, vx, vy, vz etc... based on DFs on CPU to save GPU memory FIXME may not work with ESOTWIST
-			if (NSE::CPU_MACRO::N>0)
-				nse.copyDFsToHost(output_df);
-			if (ADE::CPU_MACRO::N>0)
-				ade.copyDFsToHost(output_df);
 		}
 	}
 

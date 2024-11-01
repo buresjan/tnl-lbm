@@ -418,8 +418,7 @@ void run()
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
 				D3Q27_BC_All,
-				D3Q27_MACRO_Default< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >
+				D3Q27_MACRO_Default< TRAITS >
 			>;
 
 	bool use_forcing = false;

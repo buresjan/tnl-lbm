@@ -287,13 +287,6 @@ void LBM<CONFIG>::synchronizeMapDevice()
 #endif  // HAVE_MPI
 
 template< typename CONFIG >
-void LBM<CONFIG>::computeCPUMacroFromLat()
-{
-	for( auto& block : blocks )
-		block.computeCPUMacroFromLat();
-}
-
-template< typename CONFIG >
 void LBM<CONFIG>::allocateHostData()
 {
 	for( auto& block : blocks )

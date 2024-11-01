@@ -250,8 +250,7 @@ void run(int res, double Re, double h, int dirac, int method, int compute)
 				typename COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
 				D3Q27_BC_All,
-				MacroLocal< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >
+				MacroLocal< TRAITS >
 			>;
 
 	sim<NSE_CONFIG>(res, Re, h, dirac, method, compute);

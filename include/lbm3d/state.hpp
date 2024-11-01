@@ -1492,9 +1492,6 @@ void State<NSE>::SimUpdate()
 	{
 		// common copy
 		nse.copyMacroToHost();
-		// to be able to compute rho, vx, vy, vz etc... based on DFs on CPU to save GPU memory FIXME may not work with ESOTWIST
-		if (NSE::CPU_MACRO::N>0)
-			nse.copyDFsToHost(output_df);
 	}
 
 	timer_SimUpdate.stop();
@@ -1562,8 +1559,6 @@ void State<NSE>::AfterSimUpdate()
 	    nan_detected
 	    )
 	{
-		// cpu macro
-		nse.computeCPUMacroFromLat();
 		// probe1
 		if (cnt[PROBE1].action(nse.physTime()))
 		{

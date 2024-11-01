@@ -470,43 +470,6 @@ void LBM_BLOCK<CONFIG>::synchronizeMapDevice_start()
 #endif  // HAVE_MPI
 
 template< typename CONFIG >
-void LBM_BLOCK<CONFIG>::computeCPUMacroFromLat()
-{
-	// take Lat, compute KS and then CPU_MACRO
-	if (CPU_MACRO::N > 0)
-	{
-		typename CONFIG::DATA SD;
-		for (uint8_t dfty=0;dfty<DFMAX;dfty++)
-			SD.dfs[dfty] = hfs[dfty].getData();
-		#ifdef HAVE_MPI
-		SD.indexer = hmap.getLocalView().getIndexer();
-		#else
-		SD.indexer = hmap.getIndexer();
-		#endif
-		SD.XYZ = SD.indexer.getStorageSize();
-		SD.dmap = hmap.getData();
-		SD.dmacro = cpumacro.getData();
-
-		#pragma omp parallel for schedule(static) collapse(2)
-		for (idx x=0; x<local.x(); x++)
-		for (idx z=0; z<local.z(); z++)
-		for (idx y=0; y<local.y(); y++)
-		{
-			typename CONFIG::template KernelStruct<dreal> KS;
-			KS.fx=0;
-			KS.fy=0;
-			KS.fz=0;
-			CONFIG::COLL::copyDFcur2KS(SD, KS, x, y, z);
-			CONFIG::COLL::computeDensityAndVelocity(KS);
-			CPU_MACRO::outputMacro(SD, KS, x, y, z);
-//			if (x==128 && y==23 && z==103)
-//			printf("KS: %e %e %e %e vs. cpumacro %e %e %e %e [at %d %d %d]\n", KS.vx, KS.vy, KS.vz, KS.rho, cpumacro[mpos(CPU_MACRO::e_vx,x,y,z)], cpumacro[mpos(CPU_MACRO::e_vy,x,y,z)], cpumacro[mpos(CPU_MACRO::e_vz,x,y,z)],cpumacro[mpos(CPU_MACRO::e_rho,x,y,z)],x,y,z);
-		}
-//                printf("computeCPUMAcroFromLat done.\n");
-	}
-}
-
-template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::allocateHostData()
 {
 	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
@@ -541,7 +504,6 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 #endif
 
 	hmacro.setSizes(0, global.x(), global.y(), global.z());
-	cpumacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	if (local.x() != global.x())
 		hmacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
@@ -553,21 +515,8 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	hmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	hmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	hmacro.allocate();
-	if (local.x() != global.x())
-		cpumacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
-	if (local.y() != global.y())
-		cpumacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
-	if (local.z() != global.z())
-		cpumacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
-	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
-	cpumacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
-	cpumacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
-	cpumacro.allocate();
 #endif
 	hmacro.setValue(0);
-	// avoid setting empty array
-	if (CPU_MACRO::N)
-		cpumacro.setValue(0);
 }
 
 template< typename CONFIG >

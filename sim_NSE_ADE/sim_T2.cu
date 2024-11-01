@@ -228,8 +228,7 @@ void run(int RES)
 				typename NSE_COLL::EQ,
 				D3Q27_STREAMING< TRAITS >,
 				D3Q27_BC_All,
-				D3Q27_MACRO_Default< TRAITS >,
-				D3Q27_MACRO_Void< TRAITS >
+				D3Q27_MACRO_Default< TRAITS >
 			>;
 
 //	using ADE_COLL = D3Q7_SRT< TRAITS >;
@@ -243,8 +242,7 @@ void run(int RES)
 				typename ADE_COLL::EQ,
 				D3Q7_STREAMING< TRAITS >,
 				D3Q7_BC_All,
-				D3Q7_MACRO_Default< TRAITS >,
-				D3Q7_MACRO_Void< TRAITS >
+				D3Q7_MACRO_Default< TRAITS >
 			>;
 
 	sim< NSE_CONFIG, ADE_CONFIG >(RES);
