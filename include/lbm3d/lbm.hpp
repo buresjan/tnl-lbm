@@ -34,10 +34,10 @@ LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t lat, std::vector<BLOC
 }
 
 template< typename CONFIG >
-void LBM<CONFIG>::resetForces(real ifx, real ify, real ifz)
+void LBM<CONFIG>::resetForces(real fx, real fy, real fz)
 {
 	for( auto& block : blocks )
-		block.resetForces(ifx, ify, ifz);
+		block.resetForces(fx, fy, fz);
 }
 
 
@@ -119,6 +119,22 @@ void LBM<CONFIG>::resetMap(map_t geo_type)
 {
 	for( auto& block : blocks )
 		block.resetMap(geo_type);
+}
+
+
+template< typename CONFIG >
+void LBM<CONFIG>::setEquilibrium(real rho, real vx, real vy, real vz)
+{
+	for( auto& block : blocks )
+		block.setEquilibrium(rho, vx, vy, vz);
+}
+
+
+template< typename CONFIG >
+void LBM<CONFIG>::computeInitialMacro()
+{
+	for( auto& block : blocks )
+		block.computeInitialMacro();
 }
 
 

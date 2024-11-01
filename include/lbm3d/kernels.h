@@ -192,33 +192,6 @@ void LBMKernel(
 }
 
 
-// initial condition --> hmacro on CPU
-template < typename LBM_TYPE >
-void LBMKernelInit(
-	typename LBM_TYPE::DATA& SD,
-	typename LBM_TYPE::TRAITS::idx x,
-	typename LBM_TYPE::TRAITS::idx y,
-	typename LBM_TYPE::TRAITS::idx z
-)
-{
-	using dreal = typename LBM_TYPE::TRAITS::dreal;
-
-	typename LBM_TYPE::template KernelStruct<dreal> KS;
-	for (int i = 0; i < LBM_TYPE::Q; i++)
-		KS.f[i] = SD.df(df_cur, i, x, y, z);
-
-	// copy quantities
-	LBM_TYPE::MACRO::copyQuantities(SD, KS, x, y, z);
-
-	LBM_TYPE::MACRO::zeroForcesInKS(KS);
-
-	// compute Density & Velocity
-	LBM_TYPE::COLL::computeDensityAndVelocity(KS);
-
-	LBM_TYPE::MACRO::outputMacro(SD, KS, x, y, z);
-}
-
-
 template < typename NSE >
 #ifdef USE_CUDA
 __global__ void cudaLBMComputeVelocitiesStar(

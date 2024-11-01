@@ -167,7 +167,8 @@ struct LBM_BLOCK
 	void setBoundaryZ(idx z, map_t value);
 
 	void resetMap(map_t geo_type);
-	void setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz); // prescribe rho,vx,vy,vz at a given point into "hfs" array
+	void setEquilibrium(real rho, real vx, real vy, real vz);
+	void computeInitialMacro();
 
 	void allocateHostData();
 	void allocateDeviceData();

@@ -1193,27 +1193,31 @@ bool State<NSE>::estimateMemoryDemands()
 	return true;
 }
 
-// clear Lattice and boundary setup
 template< typename NSE >
 void State<NSE>::reset()
 {
-	nse.resetMap(NSE::BC::GEO_FLUID);
-	resetLattice(1.0, 0, 0, 0);
-//	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
+	// compute initial DFs on GPU
+	resetDFs();
 
-	// setup domain geometry after all resets, including setEqLat,
+	nse.resetMap(NSE::BC::GEO_FLUID);
+
+	// setup domain geometry after all resets, including setEquilibrium,
 	// so it can override the defaults with different initial condition
 	setupBoundaries();
+
+	nse.copyMapToDevice();
+
+	// compute initial macroscopic quantities on GPU and copy to CPU
+	nse.computeInitialMacro();
+	nse.copyMacroToHost();
 }
 
 template< typename NSE >
-void State<NSE>::resetLattice(real rho, real vx, real vy, real vz)
+void State<NSE>::resetDFs()
 {
-	// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
-	// (because GEO_INFLOW and GEO_OUTFLOW_EQ access the ghost layer in streaming)
-	nse.forAllLatticeSites( [&] (BLOCK_NSE& block, idx x, idx y, idx z) {
-		block.setEqLat(x,y,z,rho,vx,vy,vz);
-	} );
+	// compute initial DFs on GPU and copy to CPU
+	nse.setEquilibrium(1, 0, 0, 0);	// rho, vx, vy, vz
+	nse.copyDFsToHost();
 }
 
 template< typename NSE >
@@ -1249,40 +1253,16 @@ void State<NSE>::SimInit()
 		loadState(); // load saved state into CPU memory
 		nse.physStartTime = nse.physTime();
 		nse.allocateDeviceData();
+		copyAllToDevice();
 	}
 	else
 	{
 		// allocate before reset - it might initialize on the GPU...
 		nse.allocateDeviceData();
 
-		// setup map and DFs in CPU memory
+		// initialize map, DFs, and macro both in CPU and GPU memory
 		reset();
-
-		for (auto& block : nse.blocks)
-		{
-			// create LBM_DATA with host pointers
-			typename NSE::DATA SD;
-			for (uint8_t dfty=0;dfty<DFMAX;dfty++)
-				SD.dfs[dfty] = block.hfs[dfty].getData();
-			#ifdef HAVE_MPI
-			SD.indexer = block.hmap.getLocalView().getIndexer();
-			#else
-			SD.indexer = block.hmap.getIndexer();
-			#endif
-			SD.XYZ = SD.indexer.getStorageSize();
-			SD.dmap = block.hmap.getData();
-			SD.dmacro = block.hmacro.getData();
-
-			// initialize macroscopic quantities on CPU
-			#pragma omp parallel for schedule(static) collapse(2)
-			for (idx x = 0; x < block.local.x(); x++)
-			for (idx z = 0; z < block.local.z(); z++)
-			for (idx y = 0; y < block.local.y(); y++)
-				LBMKernelInit<NSE>(SD, x, y, z);
-		}
 	}
-
-	copyAllToDevice();
 
 #ifdef HAVE_MPI
 	if (nse.nproc > 1)
@@ -1293,6 +1273,7 @@ void State<NSE>::SimInit()
 	}
 #endif
 
+	spdlog::info("Finished SimInit");
 	timer_SimInit.stop();
 }
 

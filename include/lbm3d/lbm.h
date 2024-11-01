@@ -59,8 +59,7 @@ struct LBM
 	real Re(real physvel) { return fabs(physvel) * physCharLength / lat.physViscosity; }
 	real physTime() { return lat.physDt*(real)iterations; }
 
-	void resetForces() { resetForces(0,0,0);}
-	void resetForces(real ifx, real ify, real ifz);
+	void resetForces(real fx = 0, real fy = 0, real fz = 0);
 
 	void copyMapToHost();
 	void copyMapToDevice();
@@ -86,6 +85,8 @@ struct LBM
 	void setBoundaryZ(idx z, map_t value);
 
 	void resetMap(map_t geo_type);
+	void setEquilibrium(real rho, real vx, real vy, real vz);
+	void computeInitialMacro();
 
 	void allocateHostData();
 	void allocateDeviceData();

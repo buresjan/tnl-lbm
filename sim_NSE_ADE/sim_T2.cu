@@ -102,16 +102,33 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 				(block.hmap(x, y, z) == ADE::BC::GEO_WALL ||
 				block.hmap(x, y, z) == ADE::BC::GEO_NOTHING))
 				return;
-			// TODO: phys -> lbm conversion for concentration?
-			if( x < center_x )
-				block.setEqLat(x, y, z, phi_left, 0, 0, 0);   // phi, vx, vy, vz
-			else
-				block.setEqLat(x, y, z, phi_right, 0, 0, 0);  // phi, vx, vy, vz
 			if( z < center_z )
 				block.hdiffusionCoeff(x, y, z) = ade.lat.phys2lbmViscosity(diffusion_bottom);
 			else
 				block.hdiffusionCoeff(x, y, z) = ade.lat.phys2lbmViscosity(diffusion_top);
+
+			#ifdef HAVE_MPI
+			auto local_df = block.hfs[0].getLocalView();
+			// shift global indices to local
+			const auto local_begins = block.hfs[0].getLocalBegins();
+			x -= local_begins.template getSize< 1 >();
+			y -= local_begins.template getSize< 2 >();
+			z -= local_begins.template getSize< 3 >();
+			#else
+			auto local_df = block.hfs[0].getView();
+			#endif
+			// TODO: phys -> lbm conversion for concentration?
+			if( x < center_x )
+				ADE::COLL::setEquilibriumLat(local_df, x, y, z, phi_left, 0, 0, 0);	// phi, vx, vy, vz
+			else
+				ADE::COLL::setEquilibriumLat(local_df, x, y, z, phi_right, 0, 0, 0);	// phi, vx, vy, vz
 		} );
+
+		// copy the initialized DFs so that they are not overridden
+		for (auto& block : ade.blocks)
+			for (uint8_t dftype = 1; dftype < DFMAX; dftype++)
+				block.hfs[dftype] = block.hfs[0];
+		ade.copyDFsToDevice();
 	}
 
 	bool outputData(const BLOCK_NSE& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) override
