@@ -33,7 +33,7 @@ void execute(STATE& state)
 
 			spdlog::info("maximum wall time reached");
 			// copy data to CPU (if needed)
-			state.saveState(true);
+			state.saveState();
 			quit = true;
 		}
 		// check savestate
@@ -51,13 +51,19 @@ void execute(STATE& state)
 		{
 			spdlog::info("physFinalTime reached");
 			quit = true;
+			state.flagCreate("finished");
+			state.flagDelete("loadstate");
 		}
 
-		// handle termination locally
+		// handle termination (we must reduce the terminate flag first, because
+		// only rank 0 can create and delete flags)
+		state.nse.terminate = TNL::MPI::reduce(state.nse.terminate, MPI_LOR, MPI_COMM_WORLD);
 		if (state.nse.terminate)
 		{
 			spdlog::info("terminate flag triggered");
 			quit = true;
+			state.flagCreate("terminated");
+			state.flagDelete("loadstate");
 		}
 
 		// distribute quit among all MPI processes

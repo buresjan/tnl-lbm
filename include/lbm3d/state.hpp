@@ -7,7 +7,6 @@
 
 #include "lbm_common/png_tool.h"
 #include "lbm_common/fileutils.h"
-#include "lbm_common/timeutils.h"
 
 template< typename NSE >
 bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
@@ -41,17 +40,8 @@ void State<NSE>::flagCreate(const char* flagname)
 {
 	if (nse.rank != 0) return;
 
-	const std::string fname = fmt::format("results_{}/{}", id, flagname);
+	const std::string fname = fmt::format("results_{}/flag.{}", id, flagname);
 	create_file(fname.c_str());
-
-	FILE*f = fopen(fname.c_str(), "at"); // append information
-	if (f==0) {
-		fmt::print(stderr, "unable to create/access file {}", fname);
-		return;
-	}
-	// insert time stamp
-	fmt::print(f, "{}\n", timestamp());
-	fclose(f);
 }
 
 template< typename NSE >
@@ -59,7 +49,7 @@ void State<NSE>::flagDelete(const char*flagname)
 {
 	if (nse.rank != 0) return;
 
-	const std::string fname = fmt::format("results_{}/{}", id, flagname);
+	const std::string fname = fmt::format("results_{}/flag.{}", id, flagname);
 	if (fileExists(fname.c_str()))
 		remove(fname.c_str());
 }
@@ -67,32 +57,10 @@ void State<NSE>::flagDelete(const char*flagname)
 template< typename NSE >
 bool State<NSE>::flagExists(const char* flagname)
 {
-	const std::string fname = fmt::format("results_{}/{}", id, flagname);
+	const std::string fname = fmt::format("results_{}/flag.{}", id, flagname);
 	return fileExists(fname.c_str());
 }
 
-template< typename NSE >
-template< typename... ARGS >
-void State<NSE>::mark(const char* fmts, ARGS... args)
-{
-	if (nse.rank != 0) return;
-
-	const std::string fname = fmt::format("results_{}/mark", id);
-	create_file(fname.c_str());
-
-	FILE* f = fopen(fname.c_str(), "at"); // append information
-	if (f==0) {
-		fmt::print(stderr, "unable to create/access file {}", fname);
-		return;
-	}
-	// insert time stamp
-	fmt::print(f, "{} ", timestamp());
-	fmt::print(f, fmts, args...);
-	fmt::print(f, "\n");
-	fclose(f);
-}
-
-/// checks/creates mark and return status
 template< typename NSE >
 bool State<NSE>::isMark()
 {
@@ -108,7 +76,7 @@ bool State<NSE>::isMark()
 		else
 		{
 			spdlog::info("Mark {} does not exist. Creating new mark.", fname);
-			mark("");
+			create_file(fname.c_str());
 			result = false;
 		}
 	}
@@ -810,7 +778,7 @@ void State<NSE>::checkpointState(adios2::Mode mode)
 }
 
 template< typename NSE >
-void State<NSE>::saveState(bool forced)
+void State<NSE>::saveState()
 {
 	// checkpoint to a staging file first to not break the previous checkpoint if we fail to create another one
 	const std::string filename_tmp = fmt::format("results_{}/checkpoint_tmp.bp", id);
@@ -836,12 +804,10 @@ void State<NSE>::saveState(bool forced)
 		}
 	}
 
-	// prevent duplicate save
-	if (!forced)
-		flagDelete("savestate");
-	// indicate the need to load state after forced save (e.g. due to wallTimeReached)
-	if (forced)
-		flagCreate("loadstate");
+	// Indicate that state can be loaded after restart (e.g. after a
+	// failed/cancelled run or running over the walltime limit). The flag will
+	// be deleted from core.h when a finished/terminated flag is created.
+	flagCreate("loadstate");
 }
 
 template< typename NSE >
@@ -853,9 +819,6 @@ void State<NSE>::loadState()
 	checkpointState(adios2::Mode::Read);
 	checkpointStateLocal(adios2::Mode::Read);
 	checkpoint.finalize();
-
-	// prevent immediate save after load
-	flagDelete("savestate");
 }
 
 template< typename NSE >

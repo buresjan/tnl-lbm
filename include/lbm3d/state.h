@@ -186,20 +186,19 @@ struct State
 	virtual void copyAllToDevice(); // called from SimInit -- copy the initial state to the GPU
 	virtual void copyAllToHost(); // called from core.h -- inside the time loop before saving state
 
-	template < typename... ARGS >
-	void mark(const char* fmt, ARGS... args);
+	// checks/creates mark and returns status
 	bool isMark();
 
-	void flagCreate(const char*flagname);
-	void flagDelete(const char*flagname);
-	bool flagExists(const char*flagname);
+	void flagCreate(const char* flagname);
+	void flagDelete(const char* flagname);
+	bool flagExists(const char* flagname);
 
 	// checkpoint data in the main State class
 	void checkpointState(adios2::Mode mode);
 	// checkpoint additional data in subclasses of State
 	virtual void checkpointStateLocal(adios2::Mode mode) {}
 	// called periodically through cnt[SAVESTATE]
-	void saveState(bool forced=false);
+	void saveState();
 	void loadState();
 
 	// timers for walltime, GLUPS and ETA calculations
