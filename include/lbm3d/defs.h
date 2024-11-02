@@ -156,8 +156,7 @@ template<
 	typename _EQ,
 	typename _STREAMING,
 	template<typename> class _BC,
-	typename _MACRO,
-	typename _CPU_MACRO
+	typename _MACRO
 >
 struct LBM_CONFIG
 {
@@ -170,7 +169,6 @@ struct LBM_CONFIG
 	using STREAMING = _STREAMING;
 	using BC = _BC<LBM_CONFIG>;
 	using MACRO = _MACRO;
-	using CPU_MACRO = _CPU_MACRO;
 
 	static constexpr int Q = KernelStruct<typename TRAITS::dreal>::Q;
 
@@ -188,7 +186,6 @@ struct LBM_CONFIG
 
 	using __hmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
 	using __dmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, DeviceType>;
-	using __cpumacro_array_t = typename TRAITS::template array4d<CPU_MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
 
 #ifdef HAVE_MPI
 	using sync_array_t = TNL::Containers::DistributedNDArray< typename TRAITS::template array3d<typename TRAITS::dreal, DeviceType > >;
@@ -208,7 +205,6 @@ struct LBM_CONFIG
 
 	using hmacro_array_t = TNL::Containers::DistributedNDArray< __hmacro_array_t >;
 	using dmacro_array_t = TNL::Containers::DistributedNDArray< __dmacro_array_t >;
-	using cpumacro_array_t = TNL::Containers::DistributedNDArray< __cpumacro_array_t >;
 #else
 	using sync_array_t = typename TRAITS::template array3d<typename TRAITS::dreal, DeviceType>;
 
@@ -226,7 +222,6 @@ struct LBM_CONFIG
 
 	using hmacro_array_t = __hmacro_array_t;
 	using dmacro_array_t = __dmacro_array_t;
-	using cpumacro_array_t = __cpumacro_array_t;
 #endif
 
 	using hmap_view_t = typename hmap_array_t::ViewType;

@@ -171,8 +171,8 @@ struct State
 	// simulation control
 	virtual bool estimateMemoryDemands(); // called from State constructor
 	virtual void reset();
+	virtual void resetDFs(); // called from State::reset -- sets the initial DFs on GPU
 	virtual void setupBoundaries() { } // called from State::reset
-	virtual void resetLattice(real irho, real ivx, real ivy, real ivz); // called from State::reset
 	virtual void SimInit(); // called from core.h -- before time loop
 	virtual void updateKernelData(); // called from core.h -- calls updateKernelData on all LBM blocks
 	virtual void updateKernelVelocities() { } // called from core.h -- setup current velocity profile for the Kernel

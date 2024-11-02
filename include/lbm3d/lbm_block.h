@@ -7,7 +7,6 @@ template< typename CONFIG >
 struct LBM_BLOCK
 {
 	using MACRO = typename CONFIG::MACRO;
-	using CPU_MACRO = typename CONFIG::CPU_MACRO;
 	using TRAITS = typename CONFIG::TRAITS;
 
 	using idx = typename TRAITS::idx;
@@ -24,7 +23,6 @@ struct LBM_BLOCK
 	using dlat_view_t = typename CONFIG::dlat_view_t;
 	using hmacro_array_t = typename CONFIG::hmacro_array_t;
 	using dmacro_array_t = typename CONFIG::dmacro_array_t;
-	using cpumacro_array_t = typename CONFIG::cpumacro_array_t;
 	using sync_array_t = typename CONFIG::sync_array_t;
 	using dreal_array_t = typename CONFIG::dreal_array_t;
 	using hreal_array_t = typename CONFIG::hreal_array_t;
@@ -40,7 +38,6 @@ struct LBM_BLOCK
 	// macroscopic quantities
 	hmacro_array_t hmacro;
 	dmacro_array_t dmacro;
-	cpumacro_array_t cpumacro;
 
 	// Arrays for non-constant diffusion coefficient depending on spatial coordinates.
 	// Note that these arrays are empty (zero size) by default and `lat.lbmViscosity`
@@ -140,9 +137,6 @@ struct LBM_BLOCK
 	void synchronizeMapDevice_start();
 #endif
 
-	void resetForces() { resetForces(0,0,0);}
-	void resetForces(real ifx, real ify, real ifz);
-
 	void copyMapToHost();
 	void copyMapToDevice();
 	void copyMacroToHost();
@@ -151,8 +145,6 @@ struct LBM_BLOCK
 	void copyDFsToDevice(uint8_t dfty);
 	void copyDFsToHost();
 	void copyDFsToDevice();
-
-	void computeCPUMacroFromLat();
 
 	// Helpers for indexing - methods check if the given GLOBAL (multi)index is in the local range
 	bool isLocalIndex(idx x, idx y, idx z) const;
@@ -167,7 +159,8 @@ struct LBM_BLOCK
 	void setBoundaryZ(idx z, map_t value);
 
 	void resetMap(map_t geo_type);
-	void setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz); // prescribe rho,vx,vy,vz at a given point into "hfs" array
+	void setEquilibrium(real rho, real vx, real vy, real vz);
+	void computeInitialMacro();
 
 	void allocateHostData();
 	void allocateDeviceData();

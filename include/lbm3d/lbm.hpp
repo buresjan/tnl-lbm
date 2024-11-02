@@ -33,13 +33,6 @@ LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t lat, std::vector<BLOC
 	physCharLength = lat.physDl * (real)lat.global.y();
 }
 
-template< typename CONFIG >
-void LBM<CONFIG>::resetForces(real ifx, real ify, real ifz)
-{
-	for( auto& block : blocks )
-		block.resetForces(ifx, ify, ifz);
-}
-
 
 template< typename CONFIG >
 bool LBM<CONFIG>::isAnyLocalIndex(idx x, idx y, idx z)
@@ -119,6 +112,22 @@ void LBM<CONFIG>::resetMap(map_t geo_type)
 {
 	for( auto& block : blocks )
 		block.resetMap(geo_type);
+}
+
+
+template< typename CONFIG >
+void LBM<CONFIG>::setEquilibrium(real rho, real vx, real vy, real vz)
+{
+	for( auto& block : blocks )
+		block.setEquilibrium(rho, vx, vy, vz);
+}
+
+
+template< typename CONFIG >
+void LBM<CONFIG>::computeInitialMacro()
+{
+	for( auto& block : blocks )
+		block.computeInitialMacro();
 }
 
 
@@ -269,13 +278,6 @@ void LBM<CONFIG>::synchronizeMapDevice()
 		block.map_sync.wait();
 }
 #endif  // HAVE_MPI
-
-template< typename CONFIG >
-void LBM<CONFIG>::computeCPUMacroFromLat()
-{
-	for( auto& block : blocks )
-		block.computeCPUMacroFromLat();
-}
 
 template< typename CONFIG >
 void LBM<CONFIG>::allocateHostData()

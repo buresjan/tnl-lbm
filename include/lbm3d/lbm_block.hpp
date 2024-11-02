@@ -209,39 +209,57 @@ dim3 LBM_BLOCK<CONFIG>::getCudaGridSize(const idx3d& local_size, const dim3& blo
 }
 
 template< typename CONFIG >
-void LBM_BLOCK<CONFIG>::setEqLat(idx x, idx y, idx z, real rho, real vx, real vy, real vz)
+void LBM_BLOCK<CONFIG>::setEquilibrium(real rho, real vx, real vy, real vz)
 {
-	for (uint8_t dfty=0; dfty<DFMAX; dfty++) {
-		#ifdef HAVE_MPI
-		// shift global indices to local
-		const auto local_begins = hfs[dfty].getLocalBegins();
-		const idx lx = x - local_begins.template getSize< 1 >();
-		const idx ly = y - local_begins.template getSize< 2 >();
-		const idx lz = z - local_begins.template getSize< 3 >();
-		// call setEquilibriumLat on the local array view
-		auto local_view = hfs[dfty].getLocalView();
-		CONFIG::COLL::setEquilibriumLat(local_view, lx, ly, lz, rho, vx, vy, vz);
-		#else
-		// without MPI, global array = local array
-		auto local_view = hfs[dfty].getView();
-		CONFIG::COLL::setEquilibriumLat(local_view, x, y, z, rho, vx, vy, vz);
-		#endif
-	}
+	// extract variables and views for capturing in the lambda function
+	#ifdef HAVE_MPI
+	auto local_df = dfs[0].getLocalView();
+	#else
+	auto local_df = dfs[0].getView();
+	#endif
+
+	// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
+	// (because GEO_INFLOW and GEO_OUTFLOW_EQ access the ghost layer in streaming)
+	const int overlap_x = local_df.template getOverlap< 0 >();
+	const int overlap_y = local_df.template getOverlap< 1 >();
+	const int overlap_z = local_df.template getOverlap< 2 >();
+	const idx3d begin = {-overlap_y, -overlap_z, -overlap_x};
+	const idx3d end = {local.y() + overlap_y, local.z() + overlap_z, local.x() + overlap_x};
+
+	TNL::Algorithms::parallelFor< DeviceType >( begin, end,
+			[local_df, rho, vx, vy, vz] __cuda_callable__ ( idx3d yzx ) mutable
+			{
+				const auto& [y, z, x] = yzx;
+				CONFIG::COLL::setEquilibriumLat(local_df, x, y, z, rho, vx, vy, vz);
+			});
+
+	// copy the initialized DFs so that they are not overridden
+	for (uint8_t dftype = 1; dftype < DFMAX; dftype++)
+		dfs[dftype] = dfs[0];
 }
 
 template< typename CONFIG >
-void LBM_BLOCK<CONFIG>::resetForces(real ifx, real ify, real ifz)
+void LBM_BLOCK<CONFIG>::computeInitialMacro()
 {
-	/// Reset forces - This is necessary since '+=' is used afterwards.
-	#pragma omp parallel for schedule(static) collapse(2)
-	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-	{
-		hmacro(MACRO::e_fx, x, y, z) = ifx;
-		hmacro(MACRO::e_fy, x, y, z) = ify;
-		hmacro(MACRO::e_fz, x, y, z) = ifz;
-	}
+	// extract variables and views for capturing in the lambda function
+	auto SD = data;
+
+	const idx3d begin = {0, 0, 0};
+	const idx3d end = {local.y(), local.z(), local.x()};
+
+	TNL::Algorithms::parallelFor< DeviceType >( begin, end,
+			[SD] __cuda_callable__ ( idx3d yzx ) mutable
+			{
+				const auto& [y, z, x] = yzx;
+				typename CONFIG::template KernelStruct<dreal> KS;
+				for (int i = 0; i < CONFIG::Q; i++)
+					KS.f[i] = SD.df(df_cur, i, x, y, z);
+
+				CONFIG::MACRO::copyQuantities(SD, KS, x, y, z);
+				CONFIG::MACRO::zeroForcesInKS(KS);
+				CONFIG::COLL::computeDensityAndVelocity(KS);
+				CONFIG::MACRO::outputMacro(SD, KS, x, y, z);
+			});
 }
 
 template< typename CONFIG >
@@ -437,43 +455,6 @@ void LBM_BLOCK<CONFIG>::synchronizeMapDevice_start()
 #endif  // HAVE_MPI
 
 template< typename CONFIG >
-void LBM_BLOCK<CONFIG>::computeCPUMacroFromLat()
-{
-	// take Lat, compute KS and then CPU_MACRO
-	if (CPU_MACRO::N > 0)
-	{
-		typename CONFIG::DATA SD;
-		for (uint8_t dfty=0;dfty<DFMAX;dfty++)
-			SD.dfs[dfty] = hfs[dfty].getData();
-		#ifdef HAVE_MPI
-		SD.indexer = hmap.getLocalView().getIndexer();
-		#else
-		SD.indexer = hmap.getIndexer();
-		#endif
-		SD.XYZ = SD.indexer.getStorageSize();
-		SD.dmap = hmap.getData();
-		SD.dmacro = cpumacro.getData();
-
-		#pragma omp parallel for schedule(static) collapse(2)
-		for (idx x=0; x<local.x(); x++)
-		for (idx z=0; z<local.z(); z++)
-		for (idx y=0; y<local.y(); y++)
-		{
-			typename CONFIG::template KernelStruct<dreal> KS;
-			KS.fx=0;
-			KS.fy=0;
-			KS.fz=0;
-			CONFIG::COLL::copyDFcur2KS(SD, KS, x, y, z);
-			CONFIG::COLL::computeDensityAndVelocity(KS);
-			CPU_MACRO::outputMacro(SD, KS, x, y, z);
-//			if (x==128 && y==23 && z==103)
-//			printf("KS: %e %e %e %e vs. cpumacro %e %e %e %e [at %d %d %d]\n", KS.vx, KS.vy, KS.vz, KS.rho, cpumacro[mpos(CPU_MACRO::e_vx,x,y,z)], cpumacro[mpos(CPU_MACRO::e_vy,x,y,z)], cpumacro[mpos(CPU_MACRO::e_vz,x,y,z)],cpumacro[mpos(CPU_MACRO::e_rho,x,y,z)],x,y,z);
-		}
-//                printf("computeCPUMAcroFromLat done.\n");
-	}
-}
-
-template< typename CONFIG >
 void LBM_BLOCK<CONFIG>::allocateHostData()
 {
 	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
@@ -508,7 +489,6 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 #endif
 
 	hmacro.setSizes(0, global.x(), global.y(), global.z());
-	cpumacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	if (local.x() != global.x())
 		hmacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
@@ -520,21 +500,8 @@ void LBM_BLOCK<CONFIG>::allocateHostData()
 	hmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
 	hmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
 	hmacro.allocate();
-	if (local.x() != global.x())
-		cpumacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
-	if (local.y() != global.y())
-		cpumacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
-	if (local.z() != global.z())
-		cpumacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
-	cpumacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
-	cpumacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
-	cpumacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
-	cpumacro.allocate();
 #endif
 	hmacro.setValue(0);
-	// avoid setting empty array
-	if (CPU_MACRO::N)
-		cpumacro.setValue(0);
 }
 
 template< typename CONFIG >

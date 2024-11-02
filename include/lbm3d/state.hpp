@@ -1193,27 +1193,31 @@ bool State<NSE>::estimateMemoryDemands()
 	return true;
 }
 
-// clear Lattice and boundary setup
 template< typename NSE >
 void State<NSE>::reset()
 {
-	nse.resetMap(NSE::BC::GEO_FLUID);
-	resetLattice(1.0, 0, 0, 0);
-//	resetLattice(1.0, lbmInputVelocityX(), lbmInputVelocityY(),lbmInputVelocityZ());
+	// compute initial DFs on GPU
+	resetDFs();
 
-	// setup domain geometry after all resets, including setEqLat,
+	nse.resetMap(NSE::BC::GEO_FLUID);
+
+	// setup domain geometry after all resets, including setEquilibrium,
 	// so it can override the defaults with different initial condition
 	setupBoundaries();
+
+	nse.copyMapToDevice();
+
+	// compute initial macroscopic quantities on GPU and copy to CPU
+	nse.computeInitialMacro();
+	nse.copyMacroToHost();
 }
 
 template< typename NSE >
-void State<NSE>::resetLattice(real rho, real vx, real vy, real vz)
+void State<NSE>::resetDFs()
 {
-	// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
-	// (because GEO_INFLOW and GEO_OUTFLOW_EQ access the ghost layer in streaming)
-	nse.forAllLatticeSites( [&] (BLOCK_NSE& block, idx x, idx y, idx z) {
-		block.setEqLat(x,y,z,rho,vx,vy,vz);
-	} );
+	// compute initial DFs on GPU and copy to CPU
+	nse.setEquilibrium(1, 0, 0, 0);	// rho, vx, vy, vz
+	nse.copyDFsToHost();
 }
 
 template< typename NSE >
@@ -1249,40 +1253,16 @@ void State<NSE>::SimInit()
 		loadState(); // load saved state into CPU memory
 		nse.physStartTime = nse.physTime();
 		nse.allocateDeviceData();
+		copyAllToDevice();
 	}
 	else
 	{
 		// allocate before reset - it might initialize on the GPU...
 		nse.allocateDeviceData();
 
-		// setup map and DFs in CPU memory
+		// initialize map, DFs, and macro both in CPU and GPU memory
 		reset();
-
-		for (auto& block : nse.blocks)
-		{
-			// create LBM_DATA with host pointers
-			typename NSE::DATA SD;
-			for (uint8_t dfty=0;dfty<DFMAX;dfty++)
-				SD.dfs[dfty] = block.hfs[dfty].getData();
-			#ifdef HAVE_MPI
-			SD.indexer = block.hmap.getLocalView().getIndexer();
-			#else
-			SD.indexer = block.hmap.getIndexer();
-			#endif
-			SD.XYZ = SD.indexer.getStorageSize();
-			SD.dmap = block.hmap.getData();
-			SD.dmacro = block.hmacro.getData();
-
-			// initialize macroscopic quantities on CPU
-			#pragma omp parallel for schedule(static) collapse(2)
-			for (idx x = 0; x < block.local.x(); x++)
-			for (idx z = 0; z < block.local.z(); z++)
-			for (idx y = 0; y < block.local.y(); y++)
-				LBMKernelInit<NSE>(SD, x, y, z);
-		}
 	}
-
-	copyAllToDevice();
 
 #ifdef HAVE_MPI
 	if (nse.nproc > 1)
@@ -1293,6 +1273,7 @@ void State<NSE>::SimInit()
 	}
 #endif
 
+	spdlog::info("Finished SimInit");
 	timer_SimInit.stop();
 }
 
@@ -1309,36 +1290,10 @@ void State<NSE>::SimUpdate()
 		return;
 	}
 
-	// flags
-	bool doComputeVelocitiesStar=false;
-	bool doCopyQuantitiesStarToHost=false;
-	bool doZeroForceOnDevice=false;
-	bool doZeroForceOnHost=false;
-	bool doComputeLagrangePhysics=false;
-
-	// determine global flags
 	// NOTE: all Lagrangian points are assumed to be on the first GPU
 	// TODO
 //	if (nse.data.rank == 0 && ibm.LL.size() > 0)
 	if (ibm.LL.size() > 0)
-	{
-		doComputeLagrangePhysics=true;
-		doComputeVelocitiesStar=true;
-		switch (ibm.computeVariant)
-		{
-			case IbmCompute::CPU:
-				doCopyQuantitiesStarToHost=true;
-				doZeroForceOnHost=true;
-				break;
-			case IbmCompute::GPU:
-			case IbmCompute::Hybrid:
-			case IbmCompute::Hybrid_zerocopy:
-				doZeroForceOnDevice=true;
-				break;
-		}
-	}
-
-	if (doComputeVelocitiesStar)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -1347,39 +1302,18 @@ void State<NSE>::SimUpdate()
 			TNL::Backend::LaunchConfiguration launch_config;
 			launch_config.blockSize = block.computeData.at(direction).blockSize;
 			launch_config.gridSize = block.computeData.at(direction).gridSize;
-			if (doZeroForceOnDevice)
-				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
-			else
-				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStar<NSE>, launch_config, block.data, nse.total_blocks);
+			TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
 		#else
 			#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
 			for (idx z = 0; z < block.local.z(); z++)
 			for (idx y = 0; y < block.local.y(); y++)
-			if (doZeroForceOnDevice)
-				LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.total_blocks, x, y, z);
-			else
-				LBMComputeVelocitiesStar< NSE >(block.data, nse.total_blocks, x, y, z);
+			LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.total_blocks, x, y, z);
 		#endif
 		}
 		// synchronize the null-stream after all grids
 		TNL::Backend::streamSynchronize(0);
 
-		if (doCopyQuantitiesStarToHost)
-		{
-			nse.copyMacroToHost();
-		}
-	}
-
-
-	// reset lattice force vectors dfx and dfy
-	if (doZeroForceOnHost)
-	{
-		nse.resetForces();
-	}
-
-	if (doComputeLagrangePhysics)
-	{
 		ibm.computeForces(nse.physTime());
 	}
 
@@ -1511,9 +1445,6 @@ void State<NSE>::SimUpdate()
 	{
 		// common copy
 		nse.copyMacroToHost();
-		// to be able to compute rho, vx, vy, vz etc... based on DFs on CPU to save GPU memory FIXME may not work with ESOTWIST
-		if (NSE::CPU_MACRO::N>0)
-			nse.copyDFsToHost(output_df);
 	}
 
 	timer_SimUpdate.stop();
@@ -1581,8 +1512,6 @@ void State<NSE>::AfterSimUpdate()
 	    nan_detected
 	    )
 	{
-		// cpu macro
-		nse.computeCPUMacroFromLat();
 		// probe1
 		if (cnt[PROBE1].action(nse.physTime()))
 		{

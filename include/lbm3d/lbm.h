@@ -9,7 +9,6 @@ template< typename CONFIG >
 struct LBM
 {
 	using MACRO = typename CONFIG::MACRO;
-	using CPU_MACRO = typename CONFIG::CPU_MACRO;
 	using TRAITS = typename CONFIG::TRAITS;
 	using BLOCK = LBM_BLOCK< CONFIG >;
 	static_assert( std::is_move_constructible<BLOCK>::value, "LBM_BLOCK must be move-constructible" );
@@ -59,9 +58,6 @@ struct LBM
 	real Re(real physvel) { return fabs(physvel) * physCharLength / lat.physViscosity; }
 	real physTime() { return lat.physDt*(real)iterations; }
 
-	void resetForces() { resetForces(0,0,0);}
-	void resetForces(real ifx, real ify, real ifz);
-
 	void copyMapToHost();
 	void copyMapToDevice();
 	void copyMacroToHost();
@@ -70,8 +66,6 @@ struct LBM
 	void copyDFsToDevice(uint8_t dfty);
 	void copyDFsToHost();
 	void copyDFsToDevice();
-
-	void computeCPUMacroFromLat();
 
 	// Helpers for indexing - methods check if the given GLOBAL (multi)index is in the local range
 	bool isAnyLocalIndex(idx x, idx y, idx z);
@@ -86,6 +80,8 @@ struct LBM
 	void setBoundaryZ(idx z, map_t value);
 
 	void resetMap(map_t geo_type);
+	void setEquilibrium(real rho, real vx, real vy, real vz);
+	void computeInitialMacro();
 
 	void allocateHostData();
 	void allocateDeviceData();
