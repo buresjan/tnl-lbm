@@ -37,7 +37,6 @@ features are:
        git clone https://gitlab.com/tnl-project/tnl-lbm.git
 
 3. Install the necessary tools and dependencies:
-
     - [CMake](https://cmake.org/) build system (version 3.24 or newer)
     - [CUDA](https://docs.nvidia.com/cuda/index.html) toolkit (version 11 or newer)
     - compatible host compiler (e.g. [GCC](https://gcc.gnu.org/) or
@@ -46,7 +45,12 @@ features are:
       (tested with [OpenMPI](https://www.open-mpi.org/))
     - [zlib](https://www.zlib.net/) (available in most Linux distributions)
     - [libpng](http://www.libpng.org/pub/png/libpng.html) (available in most Linux distributions)
+
+   The following libraries will be fetched automatically by CMake if they are
+   missing on your system:
     - [fmt](https://github.com/fmtlib/fmt/) – string formatting library
+    - [spdlog](https://github.com/gabime/spdlog) – logging library
+    - [nlohmann_json](https://github.com/nlohmann/json) – JSON parsing and dumping library
 
 4. Configure the build using `cmake` in the root path of the Git repository:
 
