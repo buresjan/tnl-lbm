@@ -812,12 +812,29 @@ void State<NSE>::checkpointState(adios2::Mode mode)
 template< typename NSE >
 void State<NSE>::saveState(bool forced)
 {
-	const std::string filename = fmt::format("results_{}/checkpoint.bp", id);
-	spdlog::info("Saving checkpoint in {}", filename);
-	checkpoint.start(filename, adios2::Mode::Write);
+	// checkpoint to a staging file first to not break the previous checkpoint if we fail to create another one
+	const std::string filename_tmp = fmt::format("results_{}/checkpoint_tmp.bp", id);
+	spdlog::info("Saving checkpoint in {}", filename_tmp);
+	checkpoint.start(filename_tmp, adios2::Mode::Write);
 	checkpointState(adios2::Mode::Write);
 	checkpointStateLocal(adios2::Mode::Write);
 	checkpoint.finalize();
+
+	if (nse.rank == 0) {
+		const std::string filename = fmt::format("results_{}/checkpoint.bp", id);
+		spdlog::info("Moving checkpoint {} to {}", filename_tmp, filename);
+		int status = rename_exchange(filename_tmp.c_str(), filename.c_str());
+		if (status != 0) {
+			spdlog::error("rename_exchange(\"{}\", \"{}\") failed: {}", filename_tmp, filename, strerror(errno));
+			return;
+		}
+		// update the modification timestamp on the checkpoint directory
+		// (it would be weird to keep the old timestamp of a moved directory)
+		status = utimensat(AT_FDCWD, filename.c_str(), NULL, 0);
+		if (status != 0) {
+			spdlog::error("touch(\"{}\") failed: {}", filename, strerror(errno));
+		}
+	}
 
 	// prevent duplicate save
 	if (!forced)

@@ -67,6 +67,8 @@ static int create_parent_directories(const char* fname)
 	return mkdir_p(dir, 0777);
 }
 
+#include <stdio.h>	// FILE, fopen, fclose
+
 // create parent directories and then the file
 static int create_file(const char* fname)
 {
@@ -87,4 +89,47 @@ static int create_file(const char* fname)
 	fclose(fp);
 
 	return 0;
+}
+
+#include <stdio.h>	// renameat2
+#include <fcntl.h>	// open
+#include <unistd.h>	// close
+#include <error.h>	// errno
+
+// swap two filenames on the same filesystem https://lwn.net/Articles/569134/
+static int rename_exchange(const char* oldpath, const char* newpath)
+{
+	// renameat2 is available since glibc 2.28
+	// We need to emulate a workaround for Helios ;-(
+#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28))
+	int result = renameat2(AT_FDCWD, oldpath, AT_FDCWD, newpath, RENAME_EXCHANGE);
+	if (errno == ENOENT) {
+		// newpath does not exist, cannot use RENAME_EXCHANGE
+		result = renameat2(AT_FDCWD, oldpath, AT_FDCWD, newpath, RENAME_NOREPLACE);
+	}
+	return result;
+#else
+	// if the target does not exist, just move it
+	if (!fileExists(newpath))
+		return renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
+	// make a temporary path
+	char buffer[PATH_MAX];
+	strcpy(buffer, newpath);
+	strcat(buffer, "_tmp_for_exchange");
+	if (fileExists(buffer)) {
+		spdlog::error("temporary path {} already exists, cannot exchange files", buffer);
+		return -1;
+	}
+	// move newpath to the buffer
+	int result = renameat(AT_FDCWD, newpath, AT_FDCWD, buffer);
+	if (result != 0)
+		return result;
+	// move oldpath to newpath
+	result = renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
+	if (result != 0)
+		return result;
+	// move buffer to oldpath
+	result = renameat(AT_FDCWD, buffer, AT_FDCWD, oldpath);
+	return result;
+#endif
 }
