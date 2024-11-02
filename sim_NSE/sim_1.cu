@@ -75,30 +75,6 @@ struct StateLocal : State<NSE>
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 		: State<NSE>(id, communicator, lat)
 	{}
-
-	virtual void saveState(bool forced=false)
-	{
-		if (this->flagExists("savestate") || !this->check_savestate_flag || forced)
-		{
-			spdlog::debug("[saveState invoked]");
-			this->saveAndLoadState(MemoryToFile, "current_state");
-			if (this->delete_savestate_flag && !forced)
-			{
-				this->flagDelete("savestate");
-				this->flagCreate("savestate_done");
-			}
-			if (forced) this->flagCreate("loadstate");
-		}
-	}
-
-	virtual void loadState(bool forced=false)
-	{
-		if (this->flagExists("loadstate") || forced)
-		{
-			spdlog::debug("[loadState invoked]");
-			this->saveAndLoadState(FileToMemory, "current_state");
-		}
-	}
 };
 
 template < typename NSE >
@@ -145,13 +121,11 @@ int sim(int RESOLUTION = 2)
 //	state.nse.physFinalTime = 1000*PHYS_DT;
 //	state.cnt[VTK3D].period = 1000*PHYS_DT;
 //	state.cnt[SAVESTATE].period = 600;  // save state every [period] of wall time
-//	state.check_savestate_flag = false;
 //	state.wallTime = 60;
 	// RCI
 //	state.nse.physFinalTime = 0.5;
 //	state.cnt[VTK3D].period = 0.5;
 //	state.cnt[SAVESTATE].period = 3600;  // save state every [period] of wall time
-//	state.check_savestate_flag = false;
 //	state.wallTime = 3600 * 23.5;
 
 	// add cuts

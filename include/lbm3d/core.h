@@ -37,7 +37,6 @@ void execute(STATE& state)
 			quit = true;
 		}
 		// check savestate
-//		else if (state.cnt[SAVESTATE].action(nse.physTime()))
 		else if (state.cnt[SAVESTATE].action(state.getWallTime(true)))
 		{
 			// copy all LBM quantities from device to host

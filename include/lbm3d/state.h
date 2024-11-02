@@ -8,12 +8,14 @@
 
 #include <TNL/Timer.h>
 #include <fmt/core.h>
+#include <adios2.h>
 
 #include "lbm_common/logging.h"
 #include "defs.h"
 #include "kernels.h"
 #include "lbm.h"
 #include "vtk_writer.h"
+#include "checkpoint.h"
 
 // ibm: lagrangian filament/surface
 #include "lagrange_3D.h"
@@ -68,7 +70,6 @@ struct counter
 };
 
 enum { STAT_RESET, STAT2_RESET, PRINT, VTK1D, VTK2D, VTK3D, PROBE1, PROBE2, PROBE3, SAVESTATE, VTK3DCUT, MAX_COUNTER };
-enum { MemoryToFile, FileToMemory };
 
 
 template< typename NSE >
@@ -94,6 +95,9 @@ struct State
 	using T_COUNTER = counter<real>;
 
 	std::string id;
+
+	adios2::ADIOS adios;
+	CheckpointManager checkpoint;
 
 	LBM<NSE> nse;
 
@@ -190,46 +194,13 @@ struct State
 	void flagDelete(const char*flagname);
 	bool flagExists(const char*flagname);
 
-
-	// save & load state
-	void move(const std::string& srcdir, const std::string& dstdir, const std::string& srcfilename, const std::string& dstfilename);
-	template < typename VARTYPE >
-	int saveloadBinaryData(int direction, const std::string& dirname, const std::string& filename, VARTYPE* data, idx length);
-
-	template< typename... ARGS >
-	int saveLoadTextData(int direction, const std::string& subdirname, const std::string& filename, ARGS&... args);
-
-	// old version
-	//template < typename... ARGS >
-	//int saveLoadTextData(int direction, const char*subdirname, const char*filename, const char*fmt, ARGS&... args);
-
-	void saveAndLoadState(int direction, const char*subdirname);
-//	void loadInitState(int direction, const char*subdirname);
-
-	// called periodically thru cnt[SAVESTATE]
-	bool check_savestate_flag=true;         // false = output savestate every cnt[SAVESTATE].period, true = output savestate only if "savestate" file exists
-	bool delete_savestate_flag=true;        // true = delete "savestate" flag file after savestate is completed
-	virtual void saveState(bool forced=false);
-	virtual void loadState(bool forced=false);
-
-	// JK magic starts from here
-	std::string getFmt(short)               { return "%hd"; }
-	std::string getFmt(int)                 { return "%d"; }
-	std::string getFmt(long)                { return "%ld"; }
-	std::string getFmt(long long)           { return "%lld"; }
-	std::string getFmt(unsigned short)      { return "%hu"; }
-	std::string getFmt(unsigned int)        { return "%u"; }
-	std::string getFmt(unsigned long)       { return "%lu"; }
-	std::string getFmt(unsigned long long)  { return "%llu"; }
-	std::string getFmt(float)               { return "%e"; }
-	std::string getFmt(double)              { return "%le"; }
-
-	template< typename ARG0 >
-	std::string getSaveLoadFmt(ARG0 arg0)	{ return getFmt(arg0) + "\n"; }
-
-	template< typename ARG0, typename... ARGS >
-	std::string getSaveLoadFmt(ARG0 arg0, ARGS... args) {	return getFmt(arg0) + "\n" + getSaveLoadFmt(args...); }
-	// JK magic ends here
+	// checkpoint data in the main State class
+	void checkpointState(adios2::Mode mode);
+	// checkpoint additional data in subclasses of State
+	virtual void checkpointStateLocal(adios2::Mode mode) {}
+	// called periodically through cnt[SAVESTATE]
+	void saveState(bool forced=false);
+	void loadState();
 
 	// timers for walltime, GLUPS and ETA calculations
 	TNL::Timer timer_total;
@@ -247,7 +218,15 @@ struct State
 	// constructors
 	template< typename... ARGS >
 	State(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, ARGS&&... args)
-	: id(id), nse(communicator, lat, std::forward<ARGS>(args)...), ibm(nse, id)
+	: id(id),
+	#ifdef HAVE_MPI
+	  adios(communicator),
+	#else
+	  adios(),
+	#endif
+	  checkpoint(adios),
+	  nse(communicator, lat, std::forward<ARGS>(args)...),
+	  ibm(nse, id)
 	{
 		// initialize default spdlog logger
 		init_logging(id, communicator);

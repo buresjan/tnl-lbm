@@ -741,323 +741,104 @@ bool State<NSE>::projectPNG_Z(const std::string& filename, idx z0, bool rotate, 
 
 
 template< typename NSE >
-void State<NSE>::move(const std::string& srcdir, const std::string& dstdir, const std::string& srcfilename, const std::string& dstfilename)
+void State<NSE>::checkpointState(adios2::Mode mode)
 {
-	const std::string src = fmt::format("{}/{}", srcdir, srcfilename);
-	const std::string dst = fmt::format("{}/{}", dstdir, dstfilename);
+	checkpoint.saveLoadAttribute("LBM_total_blocks", nse.total_blocks);
+	checkpoint.saveLoadAttribute("LBM_physCharLength", nse.physCharLength);
+	checkpoint.saveLoadAttribute("LBM_physFinalTime", nse.physFinalTime);
+	checkpoint.saveLoadAttribute("LBM_iterations", nse.iterations);
 
-	// rename works only on the same filesystem
-	if (rename(src.c_str(), dst.c_str()) == 0)
+	// TODO: save/load nse.lat ?
+
+	// save/load all counter states
+	for (int c = 0; c < MAX_COUNTER; c++)
 	{
-		spdlog::debug("renamed {} to {}", src, dst);
-		return;
-	}
-	if (errno != EXDEV)
-	{
-		spdlog::error("move: something went wrong!!!");
-		return;
-	}
-
-	// manual copy data and meta data
-	if (move_file(src.c_str(), dst.c_str()) == 0)
-		spdlog::debug("moved {} to {}", src, dst);
-	else
-		spdlog::error("move: manual move failed");
-}
-
-template< typename NSE >
-template< typename... ARGS >
-int State<NSE>::saveLoadTextData(int direction, const std::string& dirname, const std::string& filename, ARGS&... args)
-{
-	// check if main dir exists
-	mkdir_p(dirname.c_str(), 0777);
-	const std::string fname = fmt::format("{}/{}_rank{:03d}", dirname, filename, nse.rank);
-
-	const std::string fmt = getSaveLoadFmt(args...);
-
-	if (direction==MemoryToFile)
-	{
-		FILE* f = fopen(fname.c_str(), "wt");
-		if (f==0)
-		{
-			spdlog::error("unable to create file {}", fname);
-			return 0;
-		}
-		fprintf(f, fmt.c_str(), args...);
-		fclose(f);
-		spdlog::info("[saveLoadTextData: saved data into {}]", fname);
-	}
-	if (direction==FileToMemory)
-	{
-		FILE* f = fopen(fname.c_str(), "rt");
-		if (f==0)
-		{
-			spdlog::error("unable to access file {}", fname);
-			return 0;
-		}
-		if (fscanf(f, fmt.c_str(), &args...) != sizeof...(args))
-		{
-			spdlog::error("failed to parse text in the file");
-			return 0;
-		}
-		fclose(f);
-		spdlog::info("[saveLoadTextData: read data from {}]", fname);
-	}
-	return 1;
-}
-
-template< typename NSE >
-template< typename VARTYPE >
-int State<NSE>::saveloadBinaryData(int direction, const std::string& dirname, const std::string& filename, VARTYPE* data, idx length)
-{
-	// check if main dir exists
-	mkdir_p(dirname.c_str(), 0777);
-	const std::string fname = fmt::format("{}/{}_rank{:03d}", dirname, filename, nse.rank);
-
-	if (direction==MemoryToFile)
-	{
-		FILE* f = fopen(fname.c_str(), "wb");
-		if (f==0)
-		{
-			spdlog::error("unable to create file {}", fname);
-			return 0;
-		}
-		if (fwrite(data, sizeof(VARTYPE), length, f) != (std::size_t) length)
-		{
-			spdlog::error("failed to write data to the file");
-			return 0;
-		}
-		fclose(f);
-		spdlog::info("[saveLoadBinaryData: saved data into {}]", fname);
-	}
-	if (direction==FileToMemory)
-	{
-		FILE* f = fopen(fname.c_str(), "rb");
-		if (f==0)
-		{
-			spdlog::error("unable to access file {}", fname);
-			return 0;
-		}
-		if (fread(data, sizeof(VARTYPE), length, f) != (std::size_t) length)
-		{
-			spdlog::error("failed to read data from the file");
-			return 0;
-		}
-		fclose(f);
-		spdlog::info("[saveLoadBinaryData: read data from {}]", fname);
-	}
-	return 1;
-}
-
-template< typename NSE >
-void State<NSE>::saveAndLoadState(int direction, const char*subdirname)
-{
-	const std::string final_dirname = fmt::format("results_{}/{}", id, subdirname);
-	mkdir_p(final_dirname.c_str(), 0777);
-
-	std::string tmp_dirname;
-	const char* local_scratch = getenv("LOCAL_SCRATCH");
-	if (direction == FileToMemory || !local_scratch || local_scratch[0] == '\0')
-	{
-		// $LOCAL_SCRATCH is not defined or empty - default to regular subdirectory in results_*
-		tmp_dirname = final_dirname;
-		local_scratch = NULL;
-	}
-	else
-	{
-		// Write files temporarily into the local scratch and move them to final_dirname at
-		// the end, after all MPI processes have completed. This avoids small buffered writes
-		// into the shared filesystem on clusters as well as corruption of previous state due
-		// to MPI errors...
-		tmp_dirname = fmt::format("{}/{}", local_scratch, final_dirname);
+		const std::string name = fmt::format("State_counter_{}", c);
+		checkpoint.saveLoadAttribute(name + "_count", cnt[c].count);
+		checkpoint.saveLoadAttribute(name + "_period", cnt[c].period);
 	}
 
-	char nid[200];
-
-//	saveLoadTextData(direction, tmp_dirname, "config", "%d\n%d\n%d\n%d\n%d\n%d\n%d\n%.20le\n",
-//			nse.iterations, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z(), nse.lat.local.x(), nse.lat.local.y(), nse.lat.local.z(), nse.physFinalTime);
-// FIXME: save and restore number of blocks
-//	saveLoadTextData(direction, tmp_dirname, "config", nse.iterations, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z(), nse.lat.local.x(), nse.lat.local.y(), nse.lat.local.z(), nse.physFinalTime);
-	saveLoadTextData(direction, tmp_dirname, "config", nse.iterations, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z(), nse.physFinalTime);
-//	for (auto& block : nse.blocks)
-//		saveLoadTextData(direction, tmp_dirname, "config", block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
-
-	// save all counter states
-	for (int c=0;c<MAX_COUNTER;c++)
+	// save/load probes
+	for (std::size_t i = 0; i < probe3Dvec.size(); i++)
 	{
-		sprintf(nid,"cnt_%d",c);
-//		saveLoadTextData(direction, tmp_dirname, nid, "%d\n%le\n", cnt[c].count, cnt[c].period);
-		saveLoadTextData(direction, tmp_dirname, nid, cnt[c].count, cnt[c].period);
+		const std::string name = fmt::format("State_probe3D_{}_cycle", i);
+		checkpoint.saveLoadAttribute(name, probe3Dvec[i].cycle);
 	}
-
-	// save probes
-	for (std::size_t i=0;i<probe1Dvec.size();i++)
+	for (std::size_t i = 0; i < probe2Dvec.size(); i++)
 	{
-		sprintf(nid,"probe1D_%lu",i);
-//		saveLoadTextData(direction, tmp_dirname, nid, "%d\n", probe1Dvec[i].cycle);
-		saveLoadTextData(direction, tmp_dirname, nid, probe1Dvec[i].cycle);
+		const std::string name = fmt::format("State_probe2D_{}_cycle", i);
+		checkpoint.saveLoadAttribute(name, probe2Dvec[i].cycle);
 	}
-	for (std::size_t i=0;i<probe1Dlinevec.size();i++)
+	for (std::size_t i = 0; i < probe1Dvec.size(); i++)
 	{
-		sprintf(nid,"probe1Dline_%lu",i);
-//		saveLoadTextData(direction, tmp_dirname, nid, "%d\n", probe1Dlinevec[i].cycle);
-		saveLoadTextData(direction, tmp_dirname, nid, probe1Dlinevec[i].cycle);
+		const std::string name = fmt::format("State_probe1D_{}_cycle", i);
+		checkpoint.saveLoadAttribute(name, probe1Dvec[i].cycle);
 	}
-	for (std::size_t i=0;i<probe2Dvec.size();i++)
+	for (std::size_t i = 0; i < probe1Dlinevec.size(); i++)
 	{
-		sprintf(nid,"probe2D_%lu",i);
-//		saveLoadTextData(direction, tmp_dirname, nid, "%d\n", probe2Dvec[i].cycle);
-		saveLoadTextData(direction, tmp_dirname, nid, probe2Dvec[i].cycle);
+		const std::string name = fmt::format("State_probe1Dline_{}_cycle", i);
+		checkpoint.saveLoadAttribute(name, probe1Dlinevec[i].cycle);
 	}
 
 	for (auto& block : nse.blocks)
 	{
-		// save DFs
-		for (int dfty=0;dfty<DFMAX;dfty++)
+		// save/load map
+		checkpoint.saveLoadVariable("LBM_map", block, block.hmap);
+
+		// save/load DFs
+		for (int dfty = 0; dfty < DFMAX; dfty++)
 		{
-			sprintf(nid,"df_%d",dfty);
-			#ifdef HAVE_MPI
-			saveloadBinaryData(direction, tmp_dirname, nid, block.hfs[dfty].getData(), block.hfs[dfty].getLocalStorageSize());
-			#else
-			saveloadBinaryData(direction, tmp_dirname, nid, block.hfs[dfty].getData(), block.hfs[dfty].getStorageSize());
-			#endif
+			const std::string name = fmt::format("LBM_df_{}", dfty);
+			checkpoint.saveLoadVariable(name, block, block.hfs[dfty]);
 		}
 
-		// save map
-		sprintf(nid,"map");
-		#ifdef HAVE_MPI
-		saveloadBinaryData(direction, tmp_dirname, nid, block.hmap.getData(), block.hmap.getLocalStorageSize());
-		#else
-		saveloadBinaryData(direction, tmp_dirname, nid, block.hmap.getData(), block.hmap.getStorageSize());
-		#endif
+		// save/load macro
+		if constexpr (NSE::MACRO::N > 0)
+			checkpoint.saveLoadVariable("LBM_macro", block, block.hmacro);
 
-		// save macro
-		if (NSE::MACRO::N>0)
-		{
-			sprintf(nid,"macro");
-			#ifdef HAVE_MPI
-			saveloadBinaryData(direction, tmp_dirname, nid, block.hmacro.getData(), block.hmacro.getLocalStorageSize());
-			#else
-			saveloadBinaryData(direction, tmp_dirname, nid, block.hmacro.getData(), block.hmacro.getStorageSize());
-			#endif
-		}
+		// TODO: save/load other arrays that were added later to LBM_BLOCK
 	}
 
-	if (local_scratch)
-	{
-		// move the files from local_scratch into final_dirname and create a backup of the existing files
-		for (int i = 0; i < 2; i++)
-		{
-			// wait for all processes to create temporary files
-			TNL::MPI::Barrier(nse.communicator);
-
-			// first iteration: create temporary files in the destination directory
-			// second iteration: rename the temporary files to the target files
-			std::string src_suffix;
-			std::string dst_suffix;
-			if (i == 0)
-			{
-				spdlog::info("[moving files from local scratch to temporary files in the destination directory]");
-				dst_suffix = ".tmp";
-			}
-			else
-			{
-				spdlog::info("[renaming temporary files to the target files]");
-				src_suffix = ".tmp";
-				tmp_dirname = final_dirname;
-			}
-
-			std::string src = fmt::format("config_rank{:03d}{}", nse.rank, src_suffix);
-			std::string dst = fmt::format("config_rank{:03d}{}", nse.rank, dst_suffix);
-			move(tmp_dirname, final_dirname, src, dst);
-
-			// save all counter states
-			for (int c=0;c<MAX_COUNTER;c++)
-			{
-				src = fmt::format("cnt_{:d}_rank{:03d}{}", c, nse.rank, src_suffix);
-				dst = fmt::format("cnt_{:d}_rank{:03d}{}", c, nse.rank, dst_suffix);
-				move(tmp_dirname, final_dirname, src, dst);
-			}
-
-			// save probes
-			for (std::size_t i=0;i<probe1Dvec.size();i++)
-			{
-				src = fmt::format("probe1D_{:d}_rank{:03d}{}", i, nse.rank, src_suffix);
-				dst = fmt::format("probe1D_{:d}_rank{:03d}{}", i, nse.rank, dst_suffix);
-				move(tmp_dirname, final_dirname, src, dst);
-			}
-			for (std::size_t i=0;i<probe1Dlinevec.size();i++)
-			{
-				src = fmt::format("probe1Dline_{:d}_rank{:03d}{}", i, nse.rank, src_suffix);
-				dst = fmt::format("probe1Dline_{:d}_rank{:03d}{}", i, nse.rank, dst_suffix);
-				move(tmp_dirname, final_dirname, src, dst);
-			}
-			for (std::size_t i=0;i<probe2Dvec.size();i++)
-			{
-				src = fmt::format("probe2D_{:d}_rank{:03d}{}", i, nse.rank, src_suffix);
-				dst = fmt::format("probe2D_{:d}_rank{:03d}{}", i, nse.rank, dst_suffix);
-				move(tmp_dirname, final_dirname, src, dst);
-			}
-
-			// save DFs
-			for (int dfty=0;dfty<DFMAX;dfty++)
-			{
-				src = fmt::format("df_{:d}_rank{:03d}{}", dfty, nse.rank, src_suffix);
-				dst = fmt::format("df_{:d}_rank{:03d}{}", dfty, nse.rank, dst_suffix);
-				move(tmp_dirname, final_dirname, src, dst);
-			}
-
-			// save map
-			src = fmt::format("map_rank{:03d}{}", nse.rank, src_suffix);
-			dst = fmt::format("map_rank{:03d}{}", nse.rank, dst_suffix);
-			move(tmp_dirname, final_dirname, src, dst);
-
-			// save macro
-			if (NSE::MACRO::N>0)
-			{
-				src = fmt::format("macro_rank{:03d}{}", nse.rank, src_suffix);
-				dst = fmt::format("macro_rank{:03d}{}", nse.rank, dst_suffix);
-				move(tmp_dirname, final_dirname, src, dst);
-			}
-		}
+	if (mode == adios2::Mode::Read) {
+		// set physStartTime based on the loaded values - used for ETA calculation only
+		nse.physStartTime = nse.physTime();
+		// set startIterations based on the loaded values - used for GLUPS calculation only
+		nse.startIterations = nse.iterations;
+		glups_prev_iterations = nse.startIterations;
+		glups_prev_time = timer_total.getRealTime();
 	}
 }
 
 template< typename NSE >
 void State<NSE>::saveState(bool forced)
 {
-//	flagCreate("do_save_state");
-	if (flagExists("savestate") || !check_savestate_flag || forced)
-	{
-		spdlog::debug("[saveState invoked]");
-		saveAndLoadState(MemoryToFile, "current_state");
-		if (delete_savestate_flag && !forced)
-		{
-			flagDelete("savestate");
-//			flagRename("savestate","savestate_done");
-			flagCreate("savestate_done");
-		}
-		if (forced) flagCreate("loadstate");
-	}
-	// debug
-//	saveAndLoadState(FileToMemory, "current_state");
+	const std::string filename = fmt::format("results_{}/checkpoint.bp", id);
+	spdlog::info("Saving checkpoint in {}", filename);
+	checkpoint.start(filename, adios2::Mode::Write);
+	checkpointState(adios2::Mode::Write);
+	checkpointStateLocal(adios2::Mode::Write);
+	checkpoint.finalize();
+
+	// prevent duplicate save
+	if (!forced)
+		flagDelete("savestate");
+	// indicate the need to load state after forced save (e.g. due to wallTimeReached)
+	if (forced)
+		flagCreate("loadstate");
 }
 
 template< typename NSE >
-void State<NSE>::loadState(bool forced)
+void State<NSE>::loadState()
 {
-//	flagCreate("do_save_state");
-	if (flagExists("loadstate") || forced)
-	{
-		spdlog::debug("[loadState invoked]");
-//		printf("Provadim cteni df\n");
-		saveAndLoadState(FileToMemory, "current_state");
-//		if (delete_savestate_flag)
-//			flagDelete("savestate");
-//			flagRename("savestate","savestate_saved");
-	}
-	// debug
-//	saveAndLoadState(FileToMemory, "current_state");
+	const std::string filename = fmt::format("results_{}/checkpoint.bp", id);
+	spdlog::info("Loading data from checkpoint in {}", filename);
+	checkpoint.start(filename, adios2::Mode::Read);
+	checkpointState(adios2::Mode::Read);
+	checkpointStateLocal(adios2::Mode::Read);
+	checkpoint.finalize();
+
+	// prevent immediate save after load
+	flagDelete("savestate");
 }
 
 template< typename NSE >
@@ -1210,11 +991,11 @@ void State<NSE>::SimInit()
 	nse.iterations = 0;
 
 	// check for loadState
-//	if(flagExists("current_state/df_0"))
-	if(flagExists("loadstate"))
+	if (flagExists("loadstate"))
 	{
-		loadState(); // load saved state into CPU memory
-		nse.physStartTime = nse.physTime();
+		// load saved state into host memory
+		loadState();
+		// allocate device memory and copy the data
 		nse.allocateDeviceData();
 		copyAllToDevice();
 	}
@@ -1225,16 +1006,16 @@ void State<NSE>::SimInit()
 
 		// initialize map, DFs, and macro both in CPU and GPU memory
 		reset();
-	}
 
 #ifdef HAVE_MPI
-	if (nse.nproc > 1)
-	{
-		// synchronize overlaps with MPI (initial synchronization can be synchronous)
-		nse.synchronizeMapDevice();
-		nse.synchronizeDFsAndMacroDevice(df_cur);
-	}
+		if (nse.nproc > 1)
+		{
+			// synchronize overlaps with MPI (initial synchronization can be synchronous)
+			nse.synchronizeMapDevice();
+			nse.synchronizeDFsAndMacroDevice(df_cur);
+		}
 #endif
+	}
 
 	spdlog::info("Finished SimInit");
 	timer_SimInit.stop();
@@ -1572,9 +1353,11 @@ void State<NSE>::AfterSimUpdate()
 template< typename NSE >
 void State<NSE>::AfterSimFinished()
 {
+	const int iterations = nse.iterations - nse.startIterations;
+
 	// only the first process writes the info
 	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
-	if (nse.iterations > 1)
+	if (iterations > 1)
 	{
 		spdlog::info("total walltime: {:.1f} s, SimInit time: {:.1f} s, SimUpdate time: {:.1f} s, AfterSimUpdate time: {:.1f} s",
 			getWallTime(),
@@ -1588,8 +1371,8 @@ void State<NSE>::AfterSimFinished()
 			timer_wait_communication.getRealTime(),
 			timer_wait_computation.getRealTime()
 		);
-		const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
-		const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (nse.iterations / timer_compute.getRealTime());
+		const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
+		const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (iterations / timer_compute.getRealTime());
 		spdlog::info("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): {:.3f}, based on compute time: {:.3f}",
 			avgLUPS * 1e-9,
 			computeLUPS * 1e-9
