@@ -33,13 +33,6 @@ LBM<CONFIG>::LBM(const TNL::MPI::Comm& communicator, lat_t lat, std::vector<BLOC
 	physCharLength = lat.physDl * (real)lat.global.y();
 }
 
-template< typename CONFIG >
-void LBM<CONFIG>::resetForces(real fx, real fy, real fz)
-{
-	for( auto& block : blocks )
-		block.resetForces(fx, fy, fz);
-}
-
 
 template< typename CONFIG >
 bool LBM<CONFIG>::isAnyLocalIndex(idx x, idx y, idx z)

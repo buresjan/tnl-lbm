@@ -58,8 +58,6 @@ struct LBM
 	real Re(real physvel) { return fabs(physvel) * physCharLength / lat.physViscosity; }
 	real physTime() { return lat.physDt*(real)iterations; }
 
-	void resetForces(real fx = 0, real fy = 0, real fz = 0);
-
 	void copyMapToHost();
 	void copyMapToDevice();
 	void copyMacroToHost();

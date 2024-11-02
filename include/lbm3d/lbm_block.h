@@ -137,9 +137,6 @@ struct LBM_BLOCK
 	void synchronizeMapDevice_start();
 #endif
 
-	void resetForces() { resetForces(0,0,0);}
-	void resetForces(real ifx, real ify, real ifz);
-
 	void copyMapToHost();
 	void copyMapToDevice();
 	void copyMacroToHost();

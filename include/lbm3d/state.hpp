@@ -1290,36 +1290,10 @@ void State<NSE>::SimUpdate()
 		return;
 	}
 
-	// flags
-	bool doComputeVelocitiesStar=false;
-	bool doCopyQuantitiesStarToHost=false;
-	bool doZeroForceOnDevice=false;
-	bool doZeroForceOnHost=false;
-	bool doComputeLagrangePhysics=false;
-
-	// determine global flags
 	// NOTE: all Lagrangian points are assumed to be on the first GPU
 	// TODO
 //	if (nse.data.rank == 0 && ibm.LL.size() > 0)
 	if (ibm.LL.size() > 0)
-	{
-		doComputeLagrangePhysics=true;
-		doComputeVelocitiesStar=true;
-		switch (ibm.computeVariant)
-		{
-			case IbmCompute::CPU:
-				doCopyQuantitiesStarToHost=true;
-				doZeroForceOnHost=true;
-				break;
-			case IbmCompute::GPU:
-			case IbmCompute::Hybrid:
-			case IbmCompute::Hybrid_zerocopy:
-				doZeroForceOnDevice=true;
-				break;
-		}
-	}
-
-	if (doComputeVelocitiesStar)
 	{
 		for (auto& block : nse.blocks)
 		{
@@ -1328,39 +1302,18 @@ void State<NSE>::SimUpdate()
 			TNL::Backend::LaunchConfiguration launch_config;
 			launch_config.blockSize = block.computeData.at(direction).blockSize;
 			launch_config.gridSize = block.computeData.at(direction).gridSize;
-			if (doZeroForceOnDevice)
-				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
-			else
-				TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStar<NSE>, launch_config, block.data, nse.total_blocks);
+			TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
 		#else
 			#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
 			for (idx z = 0; z < block.local.z(); z++)
 			for (idx y = 0; y < block.local.y(); y++)
-			if (doZeroForceOnDevice)
-				LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.total_blocks, x, y, z);
-			else
-				LBMComputeVelocitiesStar< NSE >(block.data, nse.total_blocks, x, y, z);
+			LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.total_blocks, x, y, z);
 		#endif
 		}
 		// synchronize the null-stream after all grids
 		TNL::Backend::streamSynchronize(0);
 
-		if (doCopyQuantitiesStarToHost)
-		{
-			nse.copyMacroToHost();
-		}
-	}
-
-
-	// reset lattice force vectors dfx and dfy
-	if (doZeroForceOnHost)
-	{
-		nse.resetForces();
-	}
-
-	if (doComputeLagrangePhysics)
-	{
 		ibm.computeForces(nse.physTime());
 	}
 

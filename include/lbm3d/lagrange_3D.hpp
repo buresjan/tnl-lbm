@@ -803,9 +803,11 @@ void Lagrange3D<LBM>::computeForces(real time)
 			break;
 		}
 		#endif // USE_CUDA
+
 		case IbmCompute::CPU:
 		{
 			// vx, vy, vz, rho must be copied from the device
+			lbm.copyMacroToHost();
 			ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
 			ws_tnl_hM.vectorProduct(hvy, ws_tnl_hb[1], -1.0);
 			ws_tnl_hM.vectorProduct(hvz, ws_tnl_hb[2], -1.0);
@@ -843,8 +845,6 @@ void Lagrange3D<LBM>::computeForces(real time)
 			};
 			TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, n, kernel);
 			// copy forces to the device
-			// FIXME: this is copied multiple times when there are multiple Lagrange3D objects
-			// (ideally there should be only one Lagrange3D object that comprises all immersed bodies)
 			dfx = hfx;
 			dfy = hfy;
 			dfz = hfz;

@@ -263,21 +263,6 @@ void LBM_BLOCK<CONFIG>::computeInitialMacro()
 }
 
 template< typename CONFIG >
-void LBM_BLOCK<CONFIG>::resetForces(real fx, real fy, real fz)
-{
-	/// Reset forces - This is necessary since '+=' is used afterwards.
-	#pragma omp parallel for schedule(static) collapse(2)
-	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-	{
-		hmacro(MACRO::e_fx, x, y, z) = fx;
-		hmacro(MACRO::e_fy, x, y, z) = fy;
-		hmacro(MACRO::e_fz, x, y, z) = fz;
-	}
-}
-
-template< typename CONFIG >
 bool LBM_BLOCK<CONFIG>::isLocalIndex(idx x, idx y, idx z) const
 {
 	return x >= offset.x() && x < offset.x() + local.x() &&

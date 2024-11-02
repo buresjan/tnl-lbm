@@ -194,55 +194,6 @@ void LBMKernel(
 
 template < typename NSE >
 #ifdef USE_CUDA
-__global__ void cudaLBMComputeVelocitiesStar(
-	typename NSE::DATA SD,
-	short int nproc
-)
-#else
-void LBMComputeVelocitiesStar(
-	typename NSE::DATA SD,
-	typename NSE::TRAITS::idx x,
-	typename NSE::TRAITS::idx y,
-	typename NSE::TRAITS::idx z,
-	short int nproc
-)
-#endif
-{
-	using dreal = typename NSE::TRAITS::dreal;
-	using idx = typename NSE::TRAITS::idx;
-	using map_t = typename NSE::TRAITS::map_t;
-
-	#ifdef USE_CUDA
-	idx x = threadIdx.x + blockIdx.x * blockDim.x;
-	idx y = threadIdx.y + blockIdx.y * blockDim.y;
-	idx z = threadIdx.z + blockIdx.z * blockDim.z;
-
-	if (x >= SD.X() || y >= SD.Y() || z >= SD.Z())
-		return;
-	#endif
-
-	map_t gi_map = SD.map(x, y, z);
-
-	typename NSE::template KernelStruct<dreal> KS;
-
-	// copy quantities
-	NSE::MACRO::copyQuantities(SD, KS, x, y, z);
-
-	idx xp,xm,yp,ym,zp,zm;
-	kernelInitIndices<NSE>(SD,gi_map,nproc,x,y,z,xp,xm,yp,ym,zp,zm);
-
-	KS.fx = 0;
-	KS.fy = 0;
-	KS.fz = 0;
-
-	// do streaming, compute density and velocity
-	NSE::BC::preCollision(SD,KS,gi_map,xm,x,xp,ym,y,yp,zm,z,zp);
-
-	NSE::MACRO::outputMacro(SD, KS, x, y, z);
-}
-
-template < typename NSE >
-#ifdef USE_CUDA
 __global__ void cudaLBMComputeVelocitiesStarAndZeroForce(
 	typename NSE::DATA SD,
 	short int nproc
