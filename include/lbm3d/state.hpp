@@ -1590,7 +1590,7 @@ void State<NSE>::AfterSimUpdate()
 		glups_prev_iterations = nse.iterations;
 
 		// simple estimate of time of accomplishment
-		double ETA = getWallTime() * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
+		double ETA = (getWallTime() - timer_SimInit.getRealTime()) * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
 
 		spdlog::info("GLUPS={:.3f} iter={:d} t={:1.3f}s dt={:1.2e} lbmVisc={:1.2e} WT={:.0f}s ETA={:.0f}s",
 			LUPS * 1e-9,
