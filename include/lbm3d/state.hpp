@@ -6,7 +6,6 @@
 #include "state.h"
 
 #include "lbm_common/png_tool.h"
-#include "lbm_common/fileutils.h"
 
 template< typename NSE >
 bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
@@ -62,22 +61,28 @@ bool State<NSE>::flagExists(const char* flagname)
 }
 
 template< typename NSE >
-bool State<NSE>::isMark()
+bool State<NSE>::canCompute()
 {
 	bool result;
 	if (nse.rank == 0)
 	{
-		const std::string fname = fmt::format("results_{}/mark", id);
-		if (fileExists(fname.c_str()))
-		{
-			spdlog::info("Mark {} already exists.", fname);
+		if (lock_fd < 0) {
+			spdlog::warn("Failed to lock the results_{} directory. Is there another instance of the solver running?", id);
+			result = false;
+		}
+		else if (flagExists("loadstate")) {
 			result = true;
 		}
-		else
-		{
-			spdlog::info("Mark {} does not exist. Creating new mark.", fname);
-			create_file(fname.c_str());
+		else if (flagExists("finished")) {
+			spdlog::info("The simulation results directory is in finished state, there is nothing to compute.");
 			result = false;
+		}
+		else if (flagExists("terminated")) {
+			spdlog::warn("The simulation results directory is in terminated state, there is nothing to compute.");
+			result = false;
+		}
+		else {
+			result = true;
 		}
 	}
 	TNL::MPI::Bcast(&result, 1, 0, nse.communicator);

@@ -11,6 +11,7 @@
 #include <adios2.h>
 
 #include "lbm_common/logging.h"
+#include "lbm_common/fileutils.h"
 #include "defs.h"
 #include "kernels.h"
 #include "lbm.h"
@@ -186,8 +187,27 @@ struct State
 	virtual void copyAllToDevice(); // called from SimInit -- copy the initial state to the GPU
 	virtual void copyAllToHost(); // called from core.h -- inside the time loop before saving state
 
-	// checks/creates mark and returns status
-	bool isMark();
+	/* Checks if the solver can compute the requested simulation. The following
+	 * factors are considered:
+	 *
+	 * 1. If there is another instance of the solver running on the same
+	 *    `results_{id}` directory, this function returns `false`. Otherwise,
+	 * 	  this instance locks the `results_{id}` directory using `flock`.
+	 * 2. If the "loadstate" flag exists in the `results_{id}`, this function
+	 *	  returns `true`.
+	 * 3. If either "finished" or "terminated" flag exists in the `results_{id}`,
+	 *	  this function return `false`.
+	 * 4. Otherwise, this function returns `true`.
+	 *
+	 * All conditions are checked by rank 0 and broadcast to all other ranks.
+	 * Hence, the result is consistent across all MPI ranks.
+	 *
+	 * The "loadstate" flag is checked in `State::SimInit` and created/deleted
+	 * in the `execute` function in `core.h`. The "finished" and "terminated"
+	 * flags are created in the `execute` function in `core.h`.
+	 */
+	bool canCompute();
+	int lock_fd = -1;
 
 	void flagCreate(const char* flagname);
 	void flagDelete(const char* flagname);
@@ -227,8 +247,20 @@ struct State
 	  nse(communicator, lat, std::forward<ARGS>(args)...),
 	  ibm(nse, id)
 	{
-		// initialize default spdlog logger
-		init_logging(id, communicator);
+		// try to lock the results directory
+		if (nse.rank == 0) {
+			const std::string lock_filename = fmt::format("results_{}/lock", id);
+			lock_fd = tryLockFile(lock_filename.c_str());
+		}
+
+		// let all ranks know if we have a lock
+		bool have_lock = lock_fd >= 0;
+		TNL::MPI::Bcast(&have_lock, 1, 0, communicator);
+
+		// initialize default spdlog logger (check the lock to avoid writing
+		// to log files opened by another instance)
+		if (have_lock)
+			init_logging(id, communicator);
 
 		bool local_estimate = estimateMemoryDemands();
 		bool global_result = TNL::MPI::reduce(local_estimate, MPI_LAND, communicator);
@@ -247,6 +279,7 @@ struct State
 	~State()
 	{
 		deinit_logging();
+		releaseLock(lock_fd);
 	}
 };
 

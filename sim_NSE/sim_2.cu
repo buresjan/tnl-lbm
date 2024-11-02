@@ -288,7 +288,7 @@ int sim(int RES=1, bool use_forcing=true, Scaling scaling=STRONG_SCALING)
 	const std::string state_id = fmt::format("sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing)?"forcing":"velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, use_forcing);
 
-	if (state.isMark())
+	if (!state.canCompute())
 		return 0;
 
 	if (state.nse.blocks.front().local.x() <= 2) {

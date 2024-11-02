@@ -324,7 +324,7 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 	const std::string state_id = fmt::format("sim_IBM1_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, method, dirac, RES, Re, discretization_ratio, compute);
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
-	if (state.isMark())
+	if (!state.canCompute())
 		return 0;
 
 	state.phys_input_U_max = Umax;

@@ -133,3 +133,38 @@ static int rename_exchange(const char* oldpath, const char* newpath)
 	return result;
 #endif
 }
+
+#include <sys/file.h>	// flock
+#include <fcntl.h>		// open
+#include <unistd.h>		// close
+
+// Try to get a lock. Returns its file descriptor or -1 if failed.
+static int tryLockFile(const char* lockpath)
+{
+	// temporarily set umask to 0 to ensure that the file is created with
+	// write permissions for the owner
+	mode_t m = umask(0);
+	int fd = open(lockpath, O_RDWR | O_CREAT, 0644);
+	umask(m);
+
+	// check the fd and call flock in exclusive and non-blocking mode
+	if (fd >= 0 && flock(fd, LOCK_EX | LOCK_NB) < 0) {
+		close(fd);
+		fd = -1;
+	}
+
+	return fd;
+}
+
+// Release the lock obtained with `tryLockFile(lockName)`.
+static void releaseLock(int fd)
+{
+	if (fd < 0)
+		return;
+
+	// Note: Just closing the file descriptor releases the lock. Using the
+	// LOCK_UN operation is not necessary and may lead to race conditions when
+	// not handled correctly. Similarly, removing the lock file from disk may
+	// lead to race conditions.
+	close(fd);
+}
