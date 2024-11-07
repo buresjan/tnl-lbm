@@ -18,6 +18,7 @@ struct LBM_Data
 
 	// scalars
 	dreal lbmViscosity;
+	dreal mean_factor = 0;	// factor for computing mean quantities in D3Q27_MACRO_Mean - must be set in StateLocal::updateKernelVelocities
 
 	// array pointers
 	dreal* dfs[DFMAX];
