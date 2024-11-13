@@ -67,7 +67,7 @@ struct D3Q27_MACRO_Mean : D3Q27_MACRO_Base< TRAITS >
 	using dreal = typename TRAITS::dreal;
 	using idx = typename TRAITS::idx;
 
-	enum { e_rho, e_vx, e_vy, e_vz, e_vm_x, e_vm_y, e_vm_z, e_vm2_x, e_vm2_y, e_vm2_z, e_vm2_xy, e_vm2_xz, e_vm2_yz, N };
+	enum { e_rho, e_vx, e_vy, e_vz, e_vm_x, e_vm_y, e_vm_z, e_vm2_xx, e_vm2_yy, e_vm2_zz, e_vm2_xy, e_vm2_xz, e_vm2_yz, N };
 
 	template < typename LBM_DATA, typename LBM_KS >
 	CUDA_HOSTDEV static void outputMacro(LBM_DATA &SD, LBM_KS &KS, idx x, idx y, idx z)
@@ -77,24 +77,52 @@ struct D3Q27_MACRO_Mean : D3Q27_MACRO_Base< TRAITS >
 		SD.macro(e_vx, x, y, z) = KS.vx;
 		SD.macro(e_vy, x, y, z) = KS.vy;
 		SD.macro(e_vz, x, y, z) = KS.vz;
-		// Mean quantities
-		// Each quantity M is averaged as M_mean[n] = mean_factor * M[n] + (1-mean_factor) * M_mean[n-1],
-		// or rather M_mean[n] = M_mean[n-1] + mean_factor * (M[n] - M_mean[n-1]) to eliminate rounding
-		// errors caused by adding up the product of the quantity and a very small number (mean_factor * M[n]).
-		// 1. If mean_factor = 1/n, where n is the number of samples since the averaging started, this
-		//    leads to a simple online algorithm for computing the cumulative average.
-		// 2. If mean_factor = 1 - exp(- ΔT / τ), this leads to the exponential weighted moving averaging
-		//    with the time constant τ (i.e. τ is the amount of time for the smoothed response of a unit
-		//	  step function to reach 1-1/e ≈ 63.2% of the original signal).
-		SD.macro(e_vm_x, x, y, z) += SD.mean_factor * (KS.vx - SD.macro(e_vm_x, x, y, z));
-		SD.macro(e_vm_y, x, y, z) += SD.mean_factor * (KS.vy - SD.macro(e_vm_y, x, y, z));
-		SD.macro(e_vm_z, x, y, z) += SD.mean_factor * (KS.vz - SD.macro(e_vm_z, x, y, z));
-		SD.macro(e_vm2_x, x, y, z) += SD.mean_factor * (KS.vx*KS.vx - SD.macro(e_vm2_x, x, y, z));
-		SD.macro(e_vm2_y, x, y, z) += SD.mean_factor * (KS.vy*KS.vy - SD.macro(e_vm2_y, x, y, z));
-		SD.macro(e_vm2_z, x, y, z) += SD.mean_factor * (KS.vz*KS.vz - SD.macro(e_vm2_z, x, y, z));
-		SD.macro(e_vm2_xy, x, y, z) += SD.mean_factor * (KS.vx*KS.vy - SD.macro(e_vm2_xy, x, y, z));
-		SD.macro(e_vm2_xz, x, y, z) += SD.mean_factor * (KS.vx*KS.vz - SD.macro(e_vm2_xz, x, y, z));
-		SD.macro(e_vm2_yz, x, y, z) += SD.mean_factor * (KS.vy*KS.vz - SD.macro(e_vm2_yz, x, y, z));
+
+		// Mean quantities and (co)variance
+
+		// We use a simple moving average algorithm in the form of
+		// M_mean[n+1] = M_mean[n] + (M[n+1] - M_mean[n]) / (n+1)
+		const dreal denominator = dreal(1) / dreal(SD.stat_counter + 1);
+		const dreal vm_x_old = SD.macro(e_vm_x, x, y, z);
+		const dreal vm_y_old = SD.macro(e_vm_y, x, y, z);
+		const dreal vm_z_old = SD.macro(e_vm_z, x, y, z);
+		const dreal delta_x = KS.vx - vm_x_old;
+		const dreal delta_y = KS.vy - vm_y_old;
+		const dreal delta_z = KS.vz - vm_z_old;
+		const dreal vm_x_new = vm_x_old + delta_x * denominator;
+		const dreal vm_y_new = vm_y_old + delta_y * denominator;
+		const dreal vm_z_new = vm_z_old + delta_z * denominator;
+
+		// We use a Welford-like online algorithm for computing the covariance
+		// based on https://doi.org/10.1145/3221269.3223036
+		// S_ab[n+1] = S_ab[n] + (v_a - vm_a_new) * (v_b - vm_b_old)
+		// then Cov(a,b) = S_ab[n+1] / (n+1) and Var(a) = Cov(a,a)
+		const dreal vm2_xx_old = SD.macro(e_vm2_xx, x, y, z);
+		const dreal vm2_yy_old = SD.macro(e_vm2_yy, x, y, z);
+		const dreal vm2_zz_old = SD.macro(e_vm2_zz, x, y, z);
+		const dreal vm2_xy_old = SD.macro(e_vm2_xy, x, y, z);
+		const dreal vm2_xz_old = SD.macro(e_vm2_xz, x, y, z);
+		const dreal vm2_yz_old = SD.macro(e_vm2_yz, x, y, z);
+		const dreal delta_new_x = KS.vx - vm_x_new;
+		const dreal delta_new_y = KS.vy - vm_y_new;
+		const dreal delta_new_z = KS.vz - vm_z_new;
+		const dreal vm2_xx_new = vm2_xx_old + delta_new_x * delta_x;
+		const dreal vm2_yy_new = vm2_yy_old + delta_new_y * delta_y;
+		const dreal vm2_zz_new = vm2_zz_old + delta_new_z * delta_z;
+		const dreal vm2_xy_new = vm2_xy_old + delta_new_x * delta_y;
+		const dreal vm2_xz_new = vm2_xz_old + delta_new_x * delta_z;
+		const dreal vm2_yz_new = vm2_yz_old + delta_new_y * delta_z;
+
+		// write all results
+		SD.macro(e_vm_x, x, y, z) = vm_x_new;
+		SD.macro(e_vm_y, x, y, z) = vm_y_new;
+		SD.macro(e_vm_z, x, y, z) = vm_z_new;
+		SD.macro(e_vm2_xx, x, y, z) = vm2_xx_new;
+		SD.macro(e_vm2_yy, x, y, z) = vm2_yy_new;
+		SD.macro(e_vm2_zz, x, y, z) = vm2_zz_new;
+		SD.macro(e_vm2_xy, x, y, z) = vm2_xy_new;
+		SD.macro(e_vm2_xz, x, y, z) = vm2_xz_new;
+		SD.macro(e_vm2_yz, x, y, z) = vm2_yz_new;
 	}
 
 	template < typename LBM_DATA, typename LBM_KS >
