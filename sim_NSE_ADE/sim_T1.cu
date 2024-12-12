@@ -1,5 +1,7 @@
 //#define AB_PATTERN
 
+#include <argparse/argparse.hpp>
+
 #include "lbm3d/core.h"
 #include "lbm3d/d3q7/eq.h"
 #include "lbm3d/d3q7/col_srt.h"
@@ -569,16 +571,27 @@ int main(int argc, char **argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
 
-	const int pars=1;
-	if (argc <= pars)
-	{
-		printf("error: required %d parameters:\n %s res[1,...]\n", pars, argv[0]);
+	argparse::ArgumentParser program("sim_T1");
+	program.add_description("Simple coupled D3Q27-D3Q7 simulation example.");
+	program.add_argument("resolution")
+		.help("resolution of the lattice")
+		.scan<'i', int>()
+		.default_value(1);
+
+	try {
+		program.parse_args(argc, argv);
+	}
+	catch (const std::exception& err) {
+		std::cerr << err.what() << std::endl;
+		std::cerr << program;
 		return 1;
 	}
-	int res = atoi(argv[1]);
-	if (res < 1) { printf("error: res=%d out of bounds [1, ...]\n",res); return 1; }
 
-	run(res);
+	const auto resolution = program.get<int>("resolution");
+	if (resolution < 1)
+		throw std::invalid_argument("CLI error: resolution must be at least 1");
+
+	run(resolution);
 
 	return 0;
 }
