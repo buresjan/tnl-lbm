@@ -1,3 +1,5 @@
+#include <argparse/argparse.hpp>
+
 #include "lbm3d/core.h"
 
 // 3D test problem: forcing/input velocity
@@ -436,6 +438,20 @@ void run()
 int main(int argc, char **argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
+
+	argparse::ArgumentParser program("sim_2");
+	program.add_description("Square duct flow with verification against analytical solution.");
+
+	try {
+		program.parse_args(argc, argv);
+	}
+	catch (const std::exception& err) {
+		std::cerr << err.what() << std::endl;
+		std::cerr << program;
+		return 1;
+	}
+
 	run();
+
 	return 0;
 }

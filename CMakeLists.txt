@@ -145,6 +145,16 @@ set(JSON_Install ON)  # needed for adding to the interface target
 set(JSON_SystemInclude ON)
 FetchContent_MakeAvailable(nlohmann_json)
 
+FetchContent_Declare(argparse
+    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+    GIT_TAG master
+    SYSTEM
+    FIND_PACKAGE_ARGS
+)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(ARGPARSE_INSTALL ON)  # needed for adding to the interface target
+FetchContent_MakeAvailable(argparse)
+
 FetchContent_Declare(TNL
     GIT_REPOSITORY https://gitlab.com/tnl-project/tnl.git
     GIT_TAG main
@@ -158,7 +168,7 @@ find_package(OpenMP COMPONENTS CXX)
 find_package(MPI COMPONENTS CXX)
 
 # Add dependencies to the interface target
-target_link_libraries(TNL_LBM INTERFACE TNL::TNL PNG::PNG fmt::fmt spdlog::spdlog nlohmann_json::nlohmann_json)
+target_link_libraries(TNL_LBM INTERFACE TNL::TNL PNG::PNG fmt::fmt spdlog::spdlog nlohmann_json::nlohmann_json argparse::argparse)
 if(OPENMP_FOUND)
     target_compile_definitions(TNL_LBM INTERFACE "-DHAVE_OPENMP")
     target_link_libraries(TNL_LBM INTERFACE OpenMP::OpenMP_CXX)

@@ -1,3 +1,5 @@
+#include <argparse/argparse.hpp>
+
 #include "lbm3d/core.h"
 #include "lbm3d/lagrange_3D.h"
 #include "lbm3d/obstacles_ibm.h"
@@ -284,7 +286,7 @@ struct StateLocal : State<NSE>
 
 
 template < typename NSE >
-int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int method=0, int compute=5)
+int sim(int RES, double Re, double discretization_ratio, const std::string& compute, int dirac, const std::string& method)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -319,7 +321,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	lat.physDt = PHYS_DT;
 	lat.physViscosity = PHYS_VISCOSITY;
 
-	const std::string state_id = fmt::format("sim_IBM1_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, (method>0)?"original":"modified", dirac_delta, RES, Re, nasobek, compute);
+	const std::string state_id = fmt::format("sim_IBM1_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, method, dirac, RES, Re, discretization_ratio, compute);
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
 	if (state.isMark())
@@ -341,16 +343,17 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 
 	// select compute method
 	IbmCompute computeVariant;
-	switch (compute)
-	{
-		case 0: computeVariant = IbmCompute::GPU; break;
-		case 1: computeVariant = IbmCompute::CPU; break;
-		case 2: computeVariant = IbmCompute::Hybrid; break;
-		case 3: computeVariant = IbmCompute::Hybrid_zerocopy; break;
-		default:
-			spdlog::warn("Unknown parameter compute={}, selecting GPU as the default.", compute);
-			computeVariant = IbmCompute::GPU;
-			break;
+	if (compute == "GPU")
+		computeVariant = IbmCompute::GPU;
+	else if (compute == "CPU")
+		computeVariant = IbmCompute::CPU;
+	else if (compute == "hybrid")
+		computeVariant = IbmCompute::Hybrid;
+	else if (compute == "hybrid-zero-copy")
+		computeVariant = IbmCompute::Hybrid_zerocopy;
+	else {
+		spdlog::warn("Unknown parameter compute={}, selecting GPU as the default.", compute);
+		computeVariant = IbmCompute::GPU;
 	}
 
 	// add cuts
@@ -363,17 +366,21 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 	state.cylinder_c[0] = 0.50; //[m]
 	state.cylinder_c[1] = 0; // n/a
 	state.cylinder_c[2] = 0.20; //[m]
-	real sigma = nasobek * PHYS_DL;
+	real sigma = discretization_ratio * PHYS_DL;
 	ibmSetupCylinder(state.ibm, state.cylinder_c, state.cylinder_diameter, sigma);
 	state.writeVTK_Points("cylinder", 0, 0);
 
 	// configure IBM
 	state.ibm.computeVariant = computeVariant;
-	state.ibm.diracDeltaTypeEL = dirac_delta;
-	if (method == 0)
+	state.ibm.diracDeltaTypeEL = dirac;
+	if (method == "modified")
 		state.ibm.methodVariant = IbmMethod::modified;
-	else
+	else if (method == "original")
 		state.ibm.methodVariant = IbmMethod::original;
+	else {
+		spdlog::warn("Unknown parameter method={}, selecting modified as the default.", method);
+		state.ibm.methodVariant = IbmMethod::modified;
+	}
 
 	execute(state);
 
@@ -381,7 +388,7 @@ int sim(int RES=2, double Re=100, double nasobek=2.0, int dirac_delta=2, int met
 }
 
 template < typename TRAITS=TraitsSP >
-void run(int res, double Re, double h, int dirac, int method, int compute)
+void run(int res, double Re, double discretization_ratio, const std::string& compute, int dirac, const std::string& method)
 {
 	using COLL = D3Q27_CUM<TRAITS>;
 	using NSE_CONFIG = LBM_CONFIG<
@@ -395,66 +402,71 @@ void run(int res, double Re, double h, int dirac, int method, int compute)
 				MacroLocal< TRAITS >
 			>;
 
-	sim<NSE_CONFIG>(res, Re, h, dirac, method, compute);
+	sim<NSE_CONFIG>(res, Re, discretization_ratio, compute, dirac, method);
 }
 
 int main(int argc, char **argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
 
-	// here "h" is the Lagrangian/Eulerian spacing ratio
-//	const double hvals[] = { 2.0, 1.5, 1.0, 0.75, 0.50, 0.25 };
-//	const double hvals[] = { 2.0 };
-//	const double hvals[] = { 0.125 };
-	const double hvals[] = { 0.25, 0.5, 0.75, 1.0, 1.5, 2.0 };
-//	const double hvals[] = { 2.0, 1.8, 1.6, 1.4, 1.2, 1.0, 0.9, 0.8, 0.75, 0.50 };
-//	const double hvals[] = { 2.0, 1.8, 1.6, 1.4, 1.2, 1.0, 0.75, 0.50, 0.25, 0.125 };
-//	const double hvals[] = { 3.0, 2.5, 2.0, 1.8, 1.6, 1.4, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1 }; // ostrava
-	int hmax = sizeof(hvals)/sizeof(double);
-	double h=1.0;
+	argparse::ArgumentParser program("sim_IBM1");
+	program.add_description("IBM-LBM simulation with cylinder in 3D - Schafer-Turek problem.");
+	program.add_argument("--resolution")
+		.help("resolution of the lattice")
+		.scan<'i', int>()
+		.default_value(1)
+		.nargs(1);
+	program.add_argument("--Re")
+		.help("desired Reynolds number (affects the inflow velocity)")
+		.scan<'g', double>()
+		.default_value(100.0)
+		.nargs(1);
+	program.add_argument("--discretization-ratio")
+		.help("ratio between the Lagrangian spacing step and the Eulerian spacing step")
+		.scan<'g', double>()
+		.default_value(0.25)
+		.nargs(1);
+	program.add_argument("--compute")
+		.help("IBM compute method")
+		.default_value("GPU")
+		.choices("GPU", "CPU", "hybrid", "hybrid-zero-copy")
+		.nargs(1);
+	program.add_argument("--dirac")
+		.help("Dirac delta function to use in IBM")
+		.scan<'i', int>()
+		.default_value(1)
+		.choices(1, 2, 3, 4)
+		.nargs(1);
+	program.add_argument("--method")
+		.help("IBM method")
+		.default_value("modified")
+		.choices("modified", "original")
+		.nargs(1);
 
-	bool use_command_line=true;
-
-	if (!use_command_line)
-	{
-		int dirac=1;
-		int res=2;
-		int hi=3;
-		int method=0; //0 = modified
-		int Re=100;
-		int compute=5;
-//		for (int Re=20;Re<=100; Re+=80)
-//		for (hi=0;hi<hmax;hi++)
-//		for (method=0;method<=1;method++)
-//		for (res=3;res<=5;res++)
-//		for (dirac=1;dirac<=4;dirac++)
-//		for (compute=1;compute<=6;compute++)
-		{
-			if (hi<hmax) h=hvals[hi];
-			run(res, (double)Re, h, dirac, method, compute);
-		}
-	} else
-	{
-		const int pars=6;
-		if (argc <= pars)
-		{
-			fprintf(stderr, "error: %d parameters required:\n %s method{0,1} dirac{1,2,3,4} Re{100,200} hi[0,%d] res[1,22] compute[1,7]\n", pars, argv[0],hmax-1);
-			return 1;
-		}
-		int method = atoi(argv[1]);	// 0=modified 1=original
-		int dirac = atoi(argv[2]);
-		int Re = atoi(argv[3]);		// type=0,1,2 (geometry selection)
-		int hi = atoi(argv[4]);		// index in the hvals
-		int res = atoi(argv[5]);	// res=1,2,3
-		int compute = atoi(argv[6]); // compute=0,1,2,3
-
-		if (method > 1 || method < 0) { fprintf(stderr, "error: method=%d out of bounds [0, 1]\n",method); return 1; }
-		if (dirac < 1 || dirac > 4) { fprintf(stderr, "error: dirac=%d out of bounds [1,4]\n",dirac); return 1; }
-		if (hi >= hmax || hi < 0) { fprintf(stderr, "error: hi=%d out of bounds [0, %d]\n",hi,hmax-1); return 1; }
-		if (res < 1) { fprintf(stderr, "error: res=%d out of bounds [1, ...]\n",res); return 1; }
-		if (compute < 0 || compute > 3) { fprintf(stderr, "error: compute=%d out of bounds [0,3]\n",compute); return 1; }
-		if (hi<hmax) h=hvals[hi];
-		run(res, (double)Re, h, dirac, method, compute);
+	try {
+		program.parse_args(argc, argv);
 	}
+	catch (const std::exception& err) {
+		std::cerr << err.what() << std::endl;
+		std::cerr << program;
+		return 1;
+	}
+
+	const auto resolution = program.get<int>("--resolution");
+	const auto Re = program.get<double>("--Re");
+	const auto discretization_ratio = program.get<double>("--discretization-ratio");
+	const auto compute = program.get<std::string>("--compute");
+	const auto dirac = program.get<int>("--dirac");
+	const auto method = program.get<std::string>("--method");
+
+	if (resolution < 1)
+		throw std::invalid_argument("CLI error: resolution must be at least 1");
+	if (Re < 1)
+		throw std::invalid_argument("CLI error: Re must be at least 1");
+	if (discretization_ratio <= 0)
+		throw std::invalid_argument("CLI error: discretization-ratio must be positive");
+
+	run(resolution, Re, discretization_ratio, compute, dirac, method);
+
 	return 0;
 }
