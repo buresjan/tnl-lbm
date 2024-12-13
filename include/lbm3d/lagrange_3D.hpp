@@ -386,8 +386,9 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	{
 		loopTimer.reset();
 		loopTimer.start();
-		const std::string output_M = fmt::format("ibm_CPU_matrix-M_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
-		const std::string output_A = fmt::format("ibm_CPU_matrix-A_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		const char* method_id = (methodVariant == IbmMethod::modified) ? "modified" : "original";
+		const std::string output_M = fmt::format("ibm_CPU_matrix-M_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_CPU_matrix-A_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
 		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_M, ws_tnl_hM );
 		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_A, *ws_tnl_hA );
 		loopTimer.stop();
@@ -555,8 +556,9 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	{
 		loopTimer.reset();
 		loopTimer.start();
-		const std::string output_M = fmt::format("ibm_GPU_matrix-M_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
-		const std::string output_A = fmt::format("ibm_GPU_matrix-A_method-{}_dirac-{}.mtx", (int)methodVariant, (int)diracDeltaTypeEL);
+		const char* method_id = (methodVariant == IbmMethod::modified) ? "modified" : "original";
+		const std::string output_M = fmt::format("ibm_GPU_matrix-M_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_GPU_matrix-A_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
 		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_M, ws_tnl_dM );
 		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_A, *ws_tnl_dA );
 		loopTimer.stop();

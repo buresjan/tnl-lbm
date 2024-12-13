@@ -29,8 +29,8 @@ build_Release:
             -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
     - cmake --build build
     # regression tests for LBM-IBM
-    - ./tests/compare-IBM-matrices-CPU.sh
-    - ./tests/compare-IBM-matrices-GPU.sh
+    - ./tests/compare-IBM-matrices.sh CPU
+    - ./tests/compare-IBM-matrices.sh GPU
   tags:
     - docker
     - nvidia
