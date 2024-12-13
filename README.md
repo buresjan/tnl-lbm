@@ -51,6 +51,7 @@ features are:
     - [fmt](https://github.com/fmtlib/fmt/) – string formatting library
     - [spdlog](https://github.com/gabime/spdlog) – logging library
     - [nlohmann_json](https://github.com/nlohmann/json) – JSON parsing and dumping library
+    - [argparse](https://github.com/p-ranav/argparse) – CLI argument parsing library
 
 4. Configure the build using `cmake` in the root path of the Git repository:
 
