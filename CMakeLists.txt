@@ -120,7 +120,8 @@ FetchContent_Declare(fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
     GIT_TAG 11.0.2  # master is often broken :-(
     SYSTEM
-    FIND_PACKAGE_ARGS
+    # FIXME: nvcc V12.6.85 fails to compile code including fmt 11.1.0-11.1.1 https://gitlab.com/-/snippets/4789509
+    #FIND_PACKAGE_ARGS
 )
 set(FMT_INSTALL ON)  # needed for adding to the interface target
 FetchContent_MakeAvailable(fmt)
