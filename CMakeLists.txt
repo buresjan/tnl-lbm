@@ -6,7 +6,8 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 
 project(TNL-LBM
-    LANGUAGES CXX CUDA
+    # FIXME: C is needed only for Adios2 https://github.com/ornladios/ADIOS2/issues/4082
+    LANGUAGES CXX CUDA C
 )
 
 # Declare all CMake options for the project
@@ -167,6 +168,7 @@ FetchContent_MakeAvailable(TNL)
 find_package(PNG REQUIRED)
 find_package(OpenMP COMPONENTS CXX)
 find_package(MPI COMPONENTS CXX)
+find_package(ADIOS2 REQUIRED)
 
 # Add dependencies to the interface target
 target_link_libraries(TNL_LBM INTERFACE TNL::TNL PNG::PNG fmt::fmt spdlog::spdlog nlohmann_json::nlohmann_json argparse::argparse)
@@ -179,7 +181,9 @@ if(OPENMP_FOUND)
 endif()
 if(MPI_FOUND AND TNL_LBM_ENABLE_MPI)
     target_compile_definitions(TNL_LBM INTERFACE "-DHAVE_MPI")
-    target_link_libraries(TNL_LBM INTERFACE MPI::MPI_CXX)
+    target_link_libraries(TNL_LBM INTERFACE MPI::MPI_CXX adios2::cxx11_mpi)
+else()
+    target_link_libraries(TNL_LBM INTERFACE MPI::MPI_CXX adios2::cxx11)
 endif()
 # Add special flags used in lbm3d
 target_compile_definitions(TNL_LBM INTERFACE "-DUSE_CUDA")

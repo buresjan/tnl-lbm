@@ -44,6 +44,7 @@ struct LBM
 	real physFinalTime = 1e10;			// default 1e10
 	real physStartTime = 0;			// used for ETA calculation only (default is 0)
 	int iterations = 0;			// number of lbm iterations
+	int startIterations = 0;	// number of lbm iterations at the start (physStartTime) -- used for GLUPS calculation only
 
 	bool terminate = false;			// flag for terminal error detection
 

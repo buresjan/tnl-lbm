@@ -58,6 +58,17 @@ static int mkdir_p(const char *path, mode_t mode)
 
 #include <libgen.h>   // dirname, basename
 
+// create parent directories of a file path
+static int create_parent_directories(const char* fname)
+{
+	char buffer[PATH_MAX];
+	strcpy(buffer, fname);
+	char* dir = dirname(buffer);
+	return mkdir_p(dir, 0777);
+}
+
+#include <stdio.h>	// FILE, fopen, fclose
+
 // create parent directories and then the file
 static int create_file(const char* fname)
 {
@@ -65,12 +76,8 @@ static int create_file(const char* fname)
 	if (fileExists(fname))
 		return 0;
 
-	char buffer[PATH_MAX];
-	strcpy(buffer, fname);
-	char* dir = dirname(buffer);
-
 	// make sure that the parent directory exists
-	mkdir_p(dir, 0777);
+	create_parent_directories(fname);
 
 	// create the file
 	FILE* fp = fopen(fname, "wb");
@@ -84,66 +91,80 @@ static int create_file(const char* fname)
 	return 0;
 }
 
-#include <stdio.h>         // fopen, fclose, fread, fwrite, BUFSIZ
-#include <sys/sendfile.h>  // sendfile
-#include <fcntl.h>         // open
-#include <unistd.h>        // close
-#include <sys/stat.h>      // fstat
-#include <sys/types.h>     // fstat
+#include <stdio.h>	// renameat2
+#include <fcntl.h>	// open
+#include <unistd.h>	// close
+#include <error.h>	// errno
 
-// manual copy data and meta data
-static int move_file(const char* src, const char* dst)
+// swap two filenames on the same filesystem https://lwn.net/Articles/569134/
+static int rename_exchange(const char* oldpath, const char* newpath)
 {
-	// standard C way
-	/*
-	FILE* in = fopen(src, "rb");
-	FILE* out = fopen(dst, "wb");
-	if (in==0 || out==0)
-	{
-		if (in==0) log("unable to open file %s", in);
-		if (out==0) log("unable to create file %s", out);
-		return;
+	// renameat2 is available since glibc 2.28
+	// We need to emulate a workaround for Helios ;-(
+#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28))
+	int result = renameat2(AT_FDCWD, oldpath, AT_FDCWD, newpath, RENAME_EXCHANGE);
+	if (errno == ENOENT) {
+		// newpath does not exist, cannot use RENAME_EXCHANGE
+		result = renameat2(AT_FDCWD, oldpath, AT_FDCWD, newpath, RENAME_NOREPLACE);
 	}
-	size_t buffer_len = 128*1024;
-	char buffer[buffer_len];
-	size_t len;
-	while( (len = fread(buffer, sizeof(char), buffer_len, in)) > 0 )
-		fwrite(buffer, sizeof(char), len, out);
-	fclose(in);
-	fclose(out);
-	*/
-
-	// Linux way: https://stackoverflow.com/q/10195343  https://stackoverflow.com/a/22374134
-	int source = open(src, O_RDONLY, 0);
-	struct stat stat_source;
-	fstat(source, &stat_source);
-	int dest = open(dst, O_WRONLY | O_CREAT /*| O_TRUNC*/, stat_source.st_mode);
-	off_t offset = 0LL;
-	ssize_t rc = 0;
-	while (offset < stat_source.st_size) {
-		ssize_t count;
-		off_t remaining = stat_source.st_size - offset;
-		if (remaining > SSIZE_MAX)
-			count = SSIZE_MAX;
-		else
-			count = remaining;
-		rc = sendfile(dest, source, &offset, count);
-		if (rc == 0)
-			break;
-		if (rc == -1) {
-			fprintf(stderr, "error from sendfile: %s\n", strerror(errno));
-			return -1;
-		}
-	}
-	if (offset != stat_source.st_size) {
-		fprintf(stderr, "incomplete transfer from sendfile: %lld of %lld bytes\n", (long long)rc, (long long)stat_source.st_size);
+	return result;
+#else
+	// if the target does not exist, just move it
+	if (!fileExists(newpath))
+		return renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
+	// make a temporary path
+	char buffer[PATH_MAX];
+	strcpy(buffer, newpath);
+	strcat(buffer, "_tmp_for_exchange");
+	if (fileExists(buffer)) {
+		spdlog::error("temporary path {} already exists, cannot exchange files", buffer);
 		return -1;
 	}
-	close(source);
-	close(dest);
+	// move newpath to the buffer
+	int result = renameat(AT_FDCWD, newpath, AT_FDCWD, buffer);
+	if (result != 0)
+		return result;
+	// move oldpath to newpath
+	result = renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
+	if (result != 0)
+		return result;
+	// move buffer to oldpath
+	result = renameat(AT_FDCWD, buffer, AT_FDCWD, oldpath);
+	return result;
+#endif
+}
 
-	// remove source file after copy
-	remove(src);
+#include <sys/file.h>	// flock
+#include <fcntl.h>		// open
+#include <unistd.h>		// close
 
-	return 0;
+// Try to get a lock. Returns its file descriptor or -1 if failed.
+static int tryLockFile(const char* lockpath)
+{
+	// temporarily set umask to 0 to ensure that the file is created with
+	// write permissions for the owner
+	mode_t m = umask(0);
+	int fd = open(lockpath, O_RDWR | O_CREAT, 0644);
+	umask(m);
+
+	// check the fd and call flock in exclusive and non-blocking mode
+	if (fd >= 0 && flock(fd, LOCK_EX | LOCK_NB) < 0) {
+		close(fd);
+		fd = -1;
+	}
+
+	return fd;
+}
+
+// Release the lock obtained with `tryLockFile(lockName)`.
+static void releaseLock(int fd)
+{
+	if (fd < 0)
+		return;
+
+	// Note: Just closing the file descriptor releases the lock. Using the
+	// LOCK_UN operation is not necessary and may lead to race conditions when
+	// not handled correctly. Similarly, removing the lock file from disk may
+	// lead to race conditions.
+	close(fd);
 }

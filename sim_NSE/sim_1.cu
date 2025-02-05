@@ -75,30 +75,6 @@ struct StateLocal : State<NSE>
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 		: State<NSE>(id, communicator, lat)
 	{}
-
-	virtual void saveState(bool forced=false)
-	{
-		if (this->flagExists("savestate") || !this->check_savestate_flag || forced)
-		{
-			spdlog::debug("[saveState invoked]");
-			this->saveAndLoadState(MemoryToFile, "current_state");
-			if (this->delete_savestate_flag && !forced)
-			{
-				this->flagDelete("savestate");
-				this->flagCreate("savestate_done");
-			}
-			if (forced) this->flagCreate("loadstate");
-		}
-	}
-
-	virtual void loadState(bool forced=false)
-	{
-		if (this->flagExists("loadstate") || forced)
-		{
-			spdlog::debug("[loadState invoked]");
-			this->saveAndLoadState(FileToMemory, "current_state");
-		}
-	}
 };
 
 template < typename NSE >
@@ -135,6 +111,9 @@ int sim(int RESOLUTION = 2)
 	const std::string state_id = fmt::format("sim_1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
 	StateLocal< NSE > state(state_id, MPI_COMM_WORLD, lat);
 
+	if (!state.canCompute())
+		return 0;
+
 	// problem parameters
 	state.lbm_inflow_vx = lat.phys2lbmVelocity(PHYS_VELOCITY);
 
@@ -145,13 +124,11 @@ int sim(int RESOLUTION = 2)
 //	state.nse.physFinalTime = 1000*PHYS_DT;
 //	state.cnt[VTK3D].period = 1000*PHYS_DT;
 //	state.cnt[SAVESTATE].period = 600;  // save state every [period] of wall time
-//	state.check_savestate_flag = false;
 //	state.wallTime = 60;
 	// RCI
 //	state.nse.physFinalTime = 0.5;
 //	state.cnt[VTK3D].period = 0.5;
 //	state.cnt[SAVESTATE].period = 3600;  // save state every [period] of wall time
-//	state.check_savestate_flag = false;
 //	state.wallTime = 3600 * 23.5;
 
 	// add cuts
@@ -160,8 +137,9 @@ int sim(int RESOLUTION = 2)
 	state.add2Dcut_Y(Y/2,"cutsY/cut_Y");
 	state.add2Dcut_Z(Z/2,"cutsZ/cut_Z");
 
-//	state.cnt[VTK3DCUT].period = 0.01;
-//	state.add3Dcut(X/4,Y/4,Z/4, X/2,Y/2,Z/2, 2, "box");
+	state.cnt[VTK3D].period = 0.1;
+	state.cnt[VTK3DCUT].period = 0.1;
+	state.add3Dcut(X/4,Y/4,Z/4, X/2,Y/2,Z/2, 2, "box");
 
 	execute(state);
 

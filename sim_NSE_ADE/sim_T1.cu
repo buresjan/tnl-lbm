@@ -496,6 +496,9 @@ int simT1_test(int RESOLUTION = 2)
 	const std::string state_id = fmt::format("sim_T1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
 	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade);
 
+	if (!state.canCompute())
+		return 0;
+
 	// problem parameters
 	state.lbm_inflow_vx = lat_nse.phys2lbmVelocity(PHYS_VELOCITY);
 

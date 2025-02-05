@@ -43,6 +43,7 @@ features are:
       [Clang](https://clang.llvm.org/))
     - [CUDA-aware][CUDA-aware MPI] MPI library – for distributed computing
       (tested with [OpenMPI](https://www.open-mpi.org/))
+    - [ADIOS2](https://adios2.readthedocs.io/) – a unified high-performance I/O framework
     - [zlib](https://www.zlib.net/) (available in most Linux distributions)
     - [libpng](http://www.libpng.org/pub/png/libpng.html) (available in most Linux distributions)
 
