@@ -5,13 +5,13 @@
 #include "lbm_block.h"
 #include <type_traits>
 
-template< typename CONFIG >
+template <typename CONFIG>
 struct LBM
 {
 	using MACRO = typename CONFIG::MACRO;
 	using TRAITS = typename CONFIG::TRAITS;
-	using BLOCK = LBM_BLOCK< CONFIG >;
-	static_assert( std::is_move_constructible<BLOCK>::value, "LBM_BLOCK must be move-constructible" );
+	using BLOCK = LBM_BLOCK<CONFIG>;
+	static_assert(std::is_move_constructible<BLOCK>::value, "LBM_BLOCK must be move-constructible");
 
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
@@ -30,7 +30,7 @@ struct LBM
 	lat_t lat;
 
 	// local lattice blocks (subdomains)
-	std::vector< BLOCK > blocks;
+	std::vector<BLOCK> blocks;
 	int total_blocks = 0;
 
 #ifdef HAVE_MPI
@@ -40,14 +40,13 @@ struct LBM
 #endif
 
 	// input parameters: constant in time
-	real physCharLength;			// characteristic length used for Re calculation, default is physDl * (real)Y but you can specify that manually
-	real physFinalTime = 1e10;			// default 1e10
-	real physStartTime = 0;			// used for ETA calculation only (default is 0)
+	real physCharLength;		// characteristic length used for Re calculation, default is physDl * (real)Y but you can specify that manually
+	real physFinalTime = 1e10;	// default 1e10
+	real physStartTime = 0;		// used for ETA calculation only (default is 0)
 	int iterations = 0;			// number of lbm iterations
 	int startIterations = 0;	// number of lbm iterations at the start (physStartTime) -- used for GLUPS calculation only
 
-	bool terminate = false;			// flag for terminal error detection
-
+	bool terminate = false;	 // flag for terminal error detection
 
 	// constructors
 	LBM() = delete;
@@ -56,8 +55,14 @@ struct LBM
 	LBM(const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice = false);
 	LBM(const TNL::MPI::Comm& communicator, lat_t lat, std::vector<BLOCK>&& blocks);
 
-	real Re(real physvel) { return fabs(physvel) * physCharLength / lat.physViscosity; }
-	real physTime() { return lat.physDt*(real)iterations; }
+	real Re(real physvel)
+	{
+		return fabs(physvel) * physCharLength / lat.physViscosity;
+	}
+	real physTime()
+	{
+		return lat.physDt * (real) iterations;
+	}
 
 	void copyMapToHost();
 	void copyMapToDevice();
@@ -88,12 +93,12 @@ struct LBM
 	void allocateDeviceData();
 	void allocateDiffusionCoefficientArrays();
 	void allocatePhiTransferDirectionArrays();
-	void updateKernelData();		// copy physical parameters to data structure accessible by the CUDA kernel
+	void updateKernelData();  // copy physical parameters to data structure accessible by the CUDA kernel
 
-	template< typename F >
+	template <typename F>
 	void forLocalLatticeSites(F f);
 
-	template< typename F >
+	template <typename F>
 	void forAllLatticeSites(F f);
 
 	~LBM() = default;

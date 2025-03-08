@@ -14,20 +14,20 @@
  *
  * The value of max_threads=256 seems to be the best value (at least on GTX 1080, V100 and A100 cards).
  */
-template< typename Permutation, typename idx3d >
+template <typename Permutation, typename idx3d>
 idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_size = 32)
 {
 	using idx = typename idx3d::ValueType;
 
 	// leading dimension
-	int i = TNL::Containers::detail::get< 2 >( Permutation{} );
+	int i = TNL::Containers::detail::get<2>(Permutation{});
 	// second dimension for optimization
-	int j = TNL::Containers::detail::get< 1 >( Permutation{} );
+	int j = TNL::Containers::detail::get<1>(Permutation{});
 	// last dimension
-	int k = TNL::Containers::detail::get< 0 >( Permutation{} );
+	int k = TNL::Containers::detail::get<0>(Permutation{});
 
 	// optimize the selection of leading dimensions for boundaries
-	if( domain_size[i] <= 4 && domain_size[j] >= 32 ) {
+	if (domain_size[i] <= 4 && domain_size[j] >= 32) {
 		i = j;
 		j = k;
 	}
@@ -66,34 +66,46 @@ idx3d get_optimal_block_size(idx3d domain_size, int max_threads = 256, int warp_
 		}
 	}
 #else
-/* New algorithm which does not impose any restrictions on the domain, but
- * assumes that the LBM kernel contains a condition where each thread checks
- * if it is inside the domain or out of bounds.
- */
+	/* New algorithm which does not impose any restrictions on the domain, but
+	 * assumes that the LBM kernel contains a condition where each thread checks
+	 * if it is inside the domain or out of bounds.
+	 */
 	// the domain size should be a multiple of the warp size in the leading
 	// dimension, otherwise the LBM kernel may be slow
 	const idx multiple = domain_size[i] / warp_size;
-	if( multiple * warp_size != domain_size[i] )
+	if (multiple * warp_size != domain_size[i])
 		spdlog::warn(
 			"the domain size [{},{},{}] is not a multiple of 32 in its {}-th component, "
-			"the execution of the LBM kernel may be slow.", domain_size.x(), domain_size.y(), domain_size.z(), i
+			"the execution of the LBM kernel may be slow.",
+			domain_size.x(),
+			domain_size.y(),
+			domain_size.z(),
+			i
 		);
 
 	idx3d best = {1, 1, 1};
 	best[i] = max_threads;
 	// TODO: it would be better to apply the permutation in the CUDA kernel...
-	if( i == 2 ) {
+	if (i == 2) {
 		// CUDA limitation - max block dimension for z-axis is 64
 		best[i] = 64;
 		best[j] = max_threads / best[i];
 	}
-	while( best[i] > warp_size && domain_size[i] <= best[i] / 2 ) {
+	while (best[i] > warp_size && domain_size[i] <= best[i] / 2) {
 		best[i] /= 2;
-		if( best[j] < domain_size[j] )
+		if (best[j] < domain_size[j])
 			best[j] *= 2;
 	}
 #endif
 
-	spdlog::info("CUDA block size optimizer: using block size [{},{},{}] for subdomain size [{},{},{}]", best.x(), best.y(), best.z(), domain_size.x(), domain_size.y(), domain_size.z());
+	spdlog::info(
+		"CUDA block size optimizer: using block size [{},{},{}] for subdomain size [{},{},{}]",
+		best.x(),
+		best.y(),
+		best.z(),
+		domain_size.x(),
+		domain_size.y(),
+		domain_size.z()
+	);
 	return best;
 }

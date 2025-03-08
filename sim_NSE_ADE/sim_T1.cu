@@ -19,8 +19,8 @@
 #include "lbm3d/state_NSE_ADE.h"
 #include "lbm3d/obstacles_lbm.h"
 
-template < typename TRAITS >
-struct NSE_Data_FreeRhoConstInflow : NSE_Data< TRAITS >
+template <typename TRAITS>
+struct NSE_Data_FreeRhoConstInflow : NSE_Data<TRAITS>
 {
 	using dreal = typename TRAITS::dreal;
 	using idx = typename TRAITS::idx;
@@ -29,24 +29,24 @@ struct NSE_Data_FreeRhoConstInflow : NSE_Data< TRAITS >
 	dreal inflow_vy = 0;
 	dreal inflow_vz = 0;
 
-	template < typename LBM_KS >
-	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
+	template <typename LBM_KS>
+	CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
 	{
-		KS.vx  = inflow_vx;
-		KS.vy  = inflow_vy;
-		KS.vz  = inflow_vz;
+		KS.vx = inflow_vx;
+		KS.vy = inflow_vy;
+		KS.vz = inflow_vz;
 	}
 };
 
 #if 0
 template < typename NSE >
-#ifdef USE_CUDA
+	#ifdef USE_CUDA
 __global__ void cudaLBMComputeQCriterion(
 	typename NSE::DATA SD,
 	short int rank,
 	short int nproc
 )
-#else
+	#else
 void LBMComputeQCriterion(
 	typename NSE::DATA SD,
 	typename NSE::TRAITS::idx x,
@@ -55,7 +55,7 @@ void LBMComputeQCriterion(
 	short int rank,
 	short int nproc
 )
-#endif
+	#endif
 {
 	using dreal = typename NSE::TRAITS::dreal;
 	using idx = typename NSE::TRAITS::idx;
@@ -72,8 +72,8 @@ void LBMComputeQCriterion(
 	if (NSE::BC::isPeriodic(gi_map))
 	{
 		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
+		//xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
+		//xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
 		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
 		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
 		yp = (y == SD.Y()-1) ? 0 : (y+1);
@@ -158,13 +158,13 @@ void LBMComputeQCriterion(
 }
 
 template < typename ADE >
-#ifdef USE_CUDA
+	#ifdef USE_CUDA
 __global__ void cudaLBMComputePhiGradMag(
 	typename ADE::DATA SD,
 	short int rank,
 	short int nproc
 )
-#else
+	#else
 void cudaLBMComputePhiGradMag(
 	typename ADE::DATA SD,
 	typename ADE::TRAITS::idx x,
@@ -173,7 +173,7 @@ void cudaLBMComputePhiGradMag(
 	short int rank,
 	short int nproc
 )
-#endif
+	#endif
 {
 	using dreal = typename ADE::TRAITS::dreal;
 	using idx = typename ADE::TRAITS::idx;
@@ -190,8 +190,8 @@ void cudaLBMComputePhiGradMag(
 	if (ADE::BC::isPeriodic(gi_map))
 	{
 		// handle overlaps between GPUs
-//		xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
-//		xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
+		//xp = (!SD.overlap_right && x == SD.X-1) ? 0 : (x+1);
+		//xm = (!SD.overlap_left && x == 0) ? (SD.X-1) : (x-1);
 		xp = (nproc == 1 && x == SD.X()-1) ? 0 : (x+1);
 		xm = (nproc == 1 && x == 0) ? (SD.X()-1) : (x-1);
 		yp = (y == SD.Y()-1) ? 0 : (y+1);
@@ -275,12 +275,12 @@ struct D3Q27_MACRO_QCriterion : D3Q27_MACRO_Base< TRAITS >
 };
 #endif
 
-template < typename NSE, typename ADE >
+template <typename NSE, typename ADE>
 struct StateLocal : State_NSE_ADE<NSE, ADE>
 {
 	using TRAITS = typename NSE::TRAITS;
-	using BLOCK_NSE = LBM_BLOCK< NSE >;
-	using BLOCK_ADE = LBM_BLOCK< ADE >;
+	using BLOCK_NSE = LBM_BLOCK<NSE>;
+	using BLOCK_ADE = LBM_BLOCK<ADE>;
 
 	using State<NSE>::nse;
 	using State_NSE_ADE<NSE, ADE>::ade;
@@ -298,7 +298,7 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 
 	// constructor
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat_nse, lat_t lat_ade)
-		: State_NSE_ADE<NSE, ADE>(id, communicator, lat_nse, lat_ade)
+	: State_NSE_ADE<NSE, ADE>(id, communicator, lat_nse, lat_ade)
 	{}
 
 	void setupBoundaries() override
@@ -308,49 +308,47 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 		//lbmDrawSphere(nse, NSE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
 		//lbmDrawSphere(ade, ADE::BC::GEO_WALL, {0.45, 0.2, 0.2}, 0.05);
 
-		nse.setBoundaryX(0, NSE::BC::GEO_INFLOW); 		// left
-		nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_EQ);
-//		nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_RIGHT);
+		nse.setBoundaryX(0, NSE::BC::GEO_INFLOW);  // left
+		nse.setBoundaryX(nse.lat.global.x() - 1, NSE::BC::GEO_OUTFLOW_EQ);
+		//nse.setBoundaryX(nse.lat.global.x()-1, NSE::BC::GEO_OUTFLOW_RIGHT);
 
-		nse.setBoundaryZ(1, NSE::BC::GEO_WALL);		// top
-		nse.setBoundaryZ(nse.lat.global.z()-2, NSE::BC::GEO_WALL);	// bottom
-		nse.setBoundaryY(1, NSE::BC::GEO_WALL); 		// back
-		nse.setBoundaryY(nse.lat.global.y()-2, NSE::BC::GEO_WALL);		// front
+		nse.setBoundaryZ(1, NSE::BC::GEO_WALL);						  // top
+		nse.setBoundaryZ(nse.lat.global.z() - 2, NSE::BC::GEO_WALL);  // bottom
+		nse.setBoundaryY(1, NSE::BC::GEO_WALL);						  // back
+		nse.setBoundaryY(nse.lat.global.y() - 2, NSE::BC::GEO_WALL);  // front
 
 		// extra layer needed due to A-A pattern
-		nse.setBoundaryZ(0, NSE::BC::GEO_NOTHING);		// top
-		nse.setBoundaryZ(nse.lat.global.z()-1, NSE::BC::GEO_NOTHING);	// bottom
-		nse.setBoundaryY(0, NSE::BC::GEO_NOTHING); 		// back
-		nse.setBoundaryY(nse.lat.global.y()-1, NSE::BC::GEO_NOTHING);		// front
+		nse.setBoundaryZ(0, NSE::BC::GEO_NOTHING);						 // top
+		nse.setBoundaryZ(nse.lat.global.z() - 1, NSE::BC::GEO_NOTHING);	 // bottom
+		nse.setBoundaryY(0, NSE::BC::GEO_NOTHING);						 // back
+		nse.setBoundaryY(nse.lat.global.y() - 1, NSE::BC::GEO_NOTHING);	 // front
 
 		// ADE boundaries
-		ade.setBoundaryX(0, ADE::BC::GEO_INFLOW); 		// left
-		ade.setBoundaryX(ade.lat.global.x()-1, ADE::BC::GEO_OUTFLOW_RIGHT);
+		ade.setBoundaryX(0, ADE::BC::GEO_INFLOW);  // left
+		ade.setBoundaryX(ade.lat.global.x() - 1, ADE::BC::GEO_OUTFLOW_RIGHT);
 
-		ade.setBoundaryZ(1, ADE::BC::GEO_WALL);		// top
-		ade.setBoundaryZ(ade.lat.global.z()-2, ADE::BC::GEO_WALL);	// bottom
-		ade.setBoundaryY(1, ADE::BC::GEO_WALL); 		// back
-		ade.setBoundaryY(ade.lat.global.y()-2, ADE::BC::GEO_WALL);		// front
+		ade.setBoundaryZ(1, ADE::BC::GEO_WALL);						  // top
+		ade.setBoundaryZ(ade.lat.global.z() - 2, ADE::BC::GEO_WALL);  // bottom
+		ade.setBoundaryY(1, ADE::BC::GEO_WALL);						  // back
+		ade.setBoundaryY(ade.lat.global.y() - 2, ADE::BC::GEO_WALL);  // front
 
 		// extra layer needed due to A-A pattern
-		ade.setBoundaryZ(0, ADE::BC::GEO_NOTHING);		// top
-		ade.setBoundaryZ(ade.lat.global.z()-1, ADE::BC::GEO_NOTHING);	// bottom
-		ade.setBoundaryY(0, ADE::BC::GEO_NOTHING); 		// back
-		ade.setBoundaryY(ade.lat.global.y()-1, ADE::BC::GEO_NOTHING);		// front
+		ade.setBoundaryZ(0, ADE::BC::GEO_NOTHING);						 // top
+		ade.setBoundaryZ(ade.lat.global.z() - 1, ADE::BC::GEO_NOTHING);	 // bottom
+		ade.setBoundaryY(0, ADE::BC::GEO_NOTHING);						 // back
+		ade.setBoundaryY(ade.lat.global.y() - 1, ADE::BC::GEO_NOTHING);	 // front
 	}
 
 	void updateKernelVelocities() override
 	{
-		for (auto& block : nse.blocks)
-		{
-//			block.data.inflow_rho = lbm_inflow_density;
+		for (auto& block : nse.blocks) {
+			//block.data.inflow_rho = lbm_inflow_density;
 			block.data.inflow_vx = lbm_inflow_vx;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
 		}
 
-		for (auto& block : ade.blocks)
-		{
+		for (auto& block : ade.blocks) {
 			// TODO: phys -> lbm conversion for concentration?
 			block.data.inflow_phi = 1e-3;
 		}
@@ -359,7 +357,7 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 #if 0
 	void computeBeforeLBMKernel() override
 	{
-		#ifdef USE_CUDA
+	#ifdef USE_CUDA
 		auto get_grid_size = [] (const auto& block, idx x = 0, idx y = 0, idx z = 0) -> dim3
 		{
 			dim3 gridSize;
@@ -378,87 +376,88 @@ struct StateLocal : State_NSE_ADE<NSE, ADE>
 
 			return gridSize;
 		};
-		#endif
+	#endif
 
 		for (auto& block : nse.blocks)
 		{
-		#ifdef USE_CUDA
+	#ifdef USE_CUDA
 			const dim3 gridSize = get_grid_size(block);
 			cudaLBMComputeQCriterion< NSE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
 			cudaStreamSynchronize(0);
 			TNL_CHECK_CUDA_DEVICE;
-		#else
-			#pragma omp parallel for schedule(static) collapse(2)
+	#else
+		#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
 			for (idx z = 0; z < block.local.z(); z++)
 			for (idx y = 0; y < block.local.y(); y++)
 				LBMComputeQCriterion< NSE >(block.data, nse.rank, nse.nproc, x, y, z);
-		#endif
+	#endif
 		}
 
 		for (auto& block : ade.blocks)
 		{
-		#ifdef USE_CUDA
+	#ifdef USE_CUDA
 			const dim3 gridSize = get_grid_size(block);
 			cudaLBMComputePhiGradMag< ADE ><<<gridSize, block.block_size>>>(block.data, nse.rank, nse.nproc);
 			cudaStreamSynchronize(0);
 			TNL_CHECK_CUDA_DEVICE;
-		#else
-			#pragma omp parallel for schedule(static) collapse(2)
+	#else
+		#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
 			for (idx z = 0; z < block.local.z(); z++)
 			for (idx y = 0; y < block.local.y(); y++)
 				cudaLBMComputePhiGradMag< ADE >(block.data, nse.rank, nse.nproc, x, y, z);
-		#endif
+	#endif
 		}
 	}
 #endif
 
-	bool outputData(const BLOCK_NSE& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) override
+	bool outputData(const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
-		int k=0;
-		if (index==k++) return vtk_helper("lbm_density", block.hmacro(NSE::MACRO::e_rho,x,y,z), 1, desc, value, dofs);
-		if (index==k++)
-		{
-			switch (dof)
-			{
-				case 0: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vx,x,y,z)), 3, desc, value, dofs);
-				case 1: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vy,x,y,z)), 3, desc, value, dofs);
-				case 2: return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vz,x,y,z)), 3, desc, value, dofs);
+		int k = 0;
+		if (index == k++)
+			return vtk_helper("lbm_density", block.hmacro(NSE::MACRO::e_rho, x, y, z), 1, desc, value, dofs);
+		if (index == k++) {
+			switch (dof) {
+				case 0:
+					return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vx, x, y, z)), 3, desc, value, dofs);
+				case 1:
+					return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vy, x, y, z)), 3, desc, value, dofs);
+				case 2:
+					return vtk_helper("velocity", nse.lat.lbm2physVelocity(block.hmacro(NSE::MACRO::e_vz, x, y, z)), 3, desc, value, dofs);
 			}
 		}
-//		if (index==k++) return vtk_helper("lbm_qcriterion", block.hmacro(NSE::MACRO::e_qcrit,x,y,z), 1, desc, value, dofs);
+		//if (index==k++) return vtk_helper("lbm_qcriterion", block.hmacro(NSE::MACRO::e_qcrit,x,y,z), 1, desc, value, dofs);
 		return false;
 	}
 
-	bool outputData(const BLOCK_ADE& block, int index, int dof, char *desc, idx x, idx y, idx z, real &value, int &dofs) override
+	bool outputData(const BLOCK_ADE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
-		int k=0;
-		if (index==k++) return vtk_helper("lbm_phi", block.hmacro(ADE::MACRO::e_phi,x,y,z), 1, desc, value, dofs);
-//		if (index==k++) return vtk_helper("lbm_phigradmag2", block.hmacro(ADE::MACRO::e_phigradmag2,x,y,z), 1, desc, value, dofs);
+		int k = 0;
+		if (index == k++)
+			return vtk_helper("lbm_phi", block.hmacro(ADE::MACRO::e_phi, x, y, z), 1, desc, value, dofs);
+		//if (index==k++) return vtk_helper("lbm_phigradmag2", block.hmacro(ADE::MACRO::e_phigradmag2,x,y,z), 1, desc, value, dofs);
 		return false;
 	}
 
 	void probe1() override
 	{
-		if (nse.iterations != 0)
-		{
+		if (nse.iterations != 0) {
 			// inflow density extrapolation
 			idx x = 5;
-			idx y = nse.lat.global.y()/2;
-			idx z = nse.lat.global.z()/2;
+			idx y = nse.lat.global.y() / 2;
+			idx z = nse.lat.global.z() / 2;
 			for (auto& block : nse.blocks)
-			if (block.isLocalIndex(x, y, z))
-			{
-				real old_lbm_inflow_density = lbm_inflow_density;
-				lbm_inflow_density = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
-				spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
-			}
+				if (block.isLocalIndex(x, y, z)) {
+					real old_lbm_inflow_density = lbm_inflow_density;
+					lbm_inflow_density = block.dmacro.getElement(NSE::MACRO::e_rho, x, y, z);
+					spdlog::info("probe: lbm inflow density changed from {:e} to {:e}", old_lbm_inflow_density, lbm_inflow_density);
+				}
 		}
 	}
 };
 
-template < typename NSE, typename ADE >
+template <typename NSE, typename ADE>
 int simT1_test(int RESOLUTION = 2)
 {
 	using idx = typename NSE::TRAITS::idx;
@@ -466,24 +465,24 @@ int simT1_test(int RESOLUTION = 2)
 	using point_t = typename NSE::TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	int block_size=32;
-	int X = 128*RESOLUTION;// width in pixels
-	//	int Y = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
-	//	int Z = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
-	int Y = block_size*RESOLUTION;// height in pixels --- top and bottom walls 1px
-	int Z = Y;// height in pixels --- top and bottom walls 1px
-	real LBM_VISCOSITY = 0.001/3.0;//1.0/6.0; /// GIVEN: optimal is 1/6
-	real PHYS_HEIGHT = 0.41; // [m] domain height (physical)
-	real PHYS_VISCOSITY = 1.552e-5; // [m^2/s] fluid viscosity of air
+	int block_size = 32;
+	int X = 128 * RESOLUTION;  // width in pixels
+	//int Y = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
+	//int Z = 41*RESOLUTION;// height in pixels --- top and bottom walls 1px
+	int Y = block_size * RESOLUTION;   // height in pixels --- top and bottom walls 1px
+	int Z = Y;						   // height in pixels --- top and bottom walls 1px
+	real LBM_VISCOSITY = 0.001 / 3.0;  //1.0/6.0; /// GIVEN: optimal is 1/6
+	real PHYS_HEIGHT = 0.41;		   // [m] domain height (physical)
+	real PHYS_VISCOSITY = 1.552e-5;	   // [m^2/s] fluid viscosity of air
 	real PHYS_VELOCITY = 1.0;
-	real PHYS_DL = PHYS_HEIGHT/((real)Y-2);
-	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY*PHYS_DL*PHYS_DL;//PHYS_HEIGHT/(real)LBM_HEIGHT;
-	real PHYS_DIFFUSION = 2.552e-05; // [m^2/s] diffusion coeff for the ADE
+	real PHYS_DL = PHYS_HEIGHT / ((real) Y - 2);
+	real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY * PHYS_DL * PHYS_DL;	//PHYS_HEIGHT/(real)LBM_HEIGHT;
+	real PHYS_DIFFUSION = 2.552e-05;									// [m^2/s] diffusion coeff for the ADE
 	point_t PHYS_ORIGIN = {0., 0., 0.};
 
 	// initialize the lattice
 	lat_t lat_nse;
-	lat_nse.global = typename lat_t::CoordinatesType( X, Y, Z );
+	lat_nse.global = typename lat_t::CoordinatesType(X, Y, Z);
 	lat_nse.physOrigin = PHYS_ORIGIN;
 	lat_nse.physDl = PHYS_DL;
 	lat_nse.physDt = PHYS_DT;
@@ -494,9 +493,9 @@ int simT1_test(int RESOLUTION = 2)
 	lat_ade.physViscosity = PHYS_DIFFUSION;
 
 	const std::string state_id = fmt::format("sim_T1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
-	StateLocal< NSE, ADE > state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade);
+	StateLocal<NSE, ADE> state(state_id, MPI_COMM_WORLD, lat_nse, lat_ade);
 
-	if (!state.canCompute())
+	if (! state.canCompute())
 		return 0;
 
 	// problem parameters
@@ -504,82 +503,78 @@ int simT1_test(int RESOLUTION = 2)
 
 	state.nse.physFinalTime = 10.0;
 	state.cnt[PRINT].period = 0.01;
-//	state.cnt[PROBE1].period = 0.001;
+	//state.cnt[PROBE1].period = 0.001;
 	// test
-//	state.cnt[PRINT].period = 100*PHYS_DT;
-//	state.nse.physFinalTime = 1000*PHYS_DT;
-//	state.cnt[VTK3D].period = 1000*PHYS_DT;
-//	state.cnt[SAVESTATE].period = 600;  // save state every [period] of wall time
-//	state.check_savestate_flag = false;
-//	state.wallTime = 60;
+	//state.cnt[PRINT].period = 100*PHYS_DT;
+	//state.nse.physFinalTime = 1000*PHYS_DT;
+	//state.cnt[VTK3D].period = 1000*PHYS_DT;
+	//state.cnt[SAVESTATE].period = 600;  // save state every [period] of wall time
+	//state.check_savestate_flag = false;
+	//state.wallTime = 60;
 	// RCI
-//	state.nse.physFinalTime = 0.5;
-//	state.cnt[VTK3D].period = 0.5;
-//	state.cnt[SAVESTATE].period = 3600;  // save state every [period] of wall time
-//	state.check_savestate_flag = false;
-//	state.wallTime = 3600 * 23.5;
+	//state.nse.physFinalTime = 0.5;
+	//state.cnt[VTK3D].period = 0.5;
+	//state.cnt[SAVESTATE].period = 3600;  // save state every [period] of wall time
+	//state.check_savestate_flag = false;
+	//state.wallTime = 3600 * 23.5;
 
 	// add cuts
 	state.cnt[VTK2D].period = 0.01;
-	state.add2Dcut_X(X/2,"cutsX/cut_X");
-	state.add2Dcut_Y(Y/2,"cutsY/cut_Y");
-	state.add2Dcut_Z(Z/2,"cutsZ/cut_Z");
+	state.add2Dcut_X(X / 2, "cutsX/cut_X");
+	state.add2Dcut_Y(Y / 2, "cutsY/cut_Y");
+	state.add2Dcut_Z(Z / 2, "cutsZ/cut_Z");
 
-//	state.cnt[VTK3D].period = 0.001;
-//	state.cnt[VTK3DCUT].period = 0.001;
-//	state.add3Dcut(X/4,Y/4,Z/4, X/2,Y/2,Z/2, 2, "box");
+	//state.cnt[VTK3D].period = 0.001;
+	//state.cnt[VTK3DCUT].period = 0.001;
+	//state.add3Dcut(X/4,Y/4,Z/4, X/2,Y/2,Z/2, 2, "box");
 
 	execute(state);
 
 	return 0;
 }
 
-//template < typename TRAITS=TraitsSP >
-template < typename TRAITS=TraitsDP >
+//template <typename TRAITS=TraitsSP>
+template <typename TRAITS = TraitsDP>
 void run(int RES)
 {
-	using NSE_COLL = D3Q27_CUM< TRAITS, D3Q27_EQ_INV_CUM<TRAITS> >;
+	using NSE_COLL = D3Q27_CUM<TRAITS, D3Q27_EQ_INV_CUM<TRAITS>>;
 	using NSE_CONFIG = LBM_CONFIG<
-				TRAITS,
-				D3Q27_KernelStruct,
-//				NSE_Data_ConstInflow< TRAITS >,
-				// FIXME: FreeRho inflow condition leads to lower velocity in the domain (approx 70%)
-				NSE_Data_FreeRhoConstInflow< TRAITS >,
-				NSE_COLL,
-				typename NSE_COLL::EQ,
-				D3Q27_STREAMING< TRAITS >,
-				D3Q27_BC_All,
-				D3Q27_MACRO_Default< TRAITS >
-//				D3Q27_MACRO_QCriterion< TRAITS >
-			>;
+		TRAITS,
+		D3Q27_KernelStruct,
+		//NSE_Data_ConstInflow<TRAITS>,
+		// FIXME: FreeRho inflow condition leads to lower velocity in the domain (approx 70%)
+		NSE_Data_FreeRhoConstInflow<TRAITS>,
+		NSE_COLL,
+		typename NSE_COLL::EQ,
+		D3Q27_STREAMING<TRAITS>,
+		D3Q27_BC_All,
+		D3Q27_MACRO_Default<TRAITS>
+		//D3Q27_MACRO_QCriterion<TRAITS>
+		>;
 
-//	using ADE_COLL = D3Q7_SRT< TRAITS >;
-//	using ADE_COLL = D3Q7_MRT< TRAITS >;
-	using ADE_COLL = D3Q7_CLBM< TRAITS >;
+	//using ADE_COLL = D3Q7_SRT<TRAITS>;
+	//using ADE_COLL = D3Q7_MRT<TRAITS>;
+	using ADE_COLL = D3Q7_CLBM<TRAITS>;
 	using ADE_CONFIG = LBM_CONFIG<
-				TRAITS,
-				D3Q7_KernelStruct,
-				ADE_Data_ConstInflow< TRAITS >,
-				ADE_COLL,
-				typename ADE_COLL::EQ,
-				D3Q7_STREAMING< TRAITS >,
-				D3Q7_BC_All,
-				D3Q7_MACRO_Default< TRAITS >
-			>;
+		TRAITS,
+		D3Q7_KernelStruct,
+		ADE_Data_ConstInflow<TRAITS>,
+		ADE_COLL,
+		typename ADE_COLL::EQ,
+		D3Q7_STREAMING<TRAITS>,
+		D3Q7_BC_All,
+		D3Q7_MACRO_Default<TRAITS>>;
 
-	simT1_test< NSE_CONFIG, ADE_CONFIG >(RES);
+	simT1_test<NSE_CONFIG, ADE_CONFIG>(RES);
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
 	TNLMPI_INIT mpi(argc, argv);
 
 	argparse::ArgumentParser program("sim_T1");
 	program.add_description("Simple coupled D3Q27-D3Q7 simulation example.");
-	program.add_argument("resolution")
-		.help("resolution of the lattice")
-		.scan<'i', int>()
-		.default_value(1);
+	program.add_argument("resolution").help("resolution of the lattice").scan<'i', int>().default_value(1);
 
 	try {
 		program.parse_args(argc, argv);

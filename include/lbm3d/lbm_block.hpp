@@ -4,21 +4,26 @@
 #include "adios_writer.h"
 #include "block_size_optimizer.h"
 
-template< typename CONFIG >
+template <typename CONFIG>
 LBM_BLOCK<CONFIG>::LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int this_id)
-: communicator(communicator), global(global), local(local), offset(offset), id(this_id)
+: communicator(communicator),
+  global(global),
+  local(local),
+  offset(offset),
+  id(this_id)
 {
 	// initialize MPI info
 	rank = communicator.rank();
 	nproc = communicator.size();
 }
 
-template< typename CONFIG >
-template< typename Pattern >
+template <typename CONFIG>
+template <typename Pattern>
 void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	const Pattern& pattern,
-	const std::map< TNL::Containers::SyncDirection, int >& neighborIDs,
-	const std::map< TNL::Containers::SyncDirection, int >& neighborRanks)
+	const std::map<TNL::Containers::SyncDirection, int>& neighborIDs,
+	const std::map<TNL::Containers::SyncDirection, int>& neighborRanks
+)
 {
 	this->neighborIDs = neighborIDs;
 	this->neighborRanks = neighborRanks;
@@ -36,7 +41,7 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 			dreal_sync[i].setNeighbor(direction, rank);
 	}
 
-	auto isPrimaryDirection = [] (TNL::Containers::SyncDirection direction) -> bool
+	auto isPrimaryDirection = [](TNL::Containers::SyncDirection direction) -> bool
 	{
 		if ((direction & TNL::Containers::SyncDirection::Left) != TNL::Containers::SyncDirection::None)
 			return true;
@@ -48,7 +53,7 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 			return false;
 		else if ((direction & TNL::Containers::SyncDirection::Back) != TNL::Containers::SyncDirection::None)
 			return true;
-		else // direction & TNL::Containers::SyncDirection::Front
+		else  // direction & TNL::Containers::SyncDirection::Front
 			return false;
 	};
 
@@ -66,7 +71,7 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 		else
 			map_sync.setTags(direction, neighbor_id, blocks_per_rank * nproc + this->id);
 		// disable DistributedNDArraySynchronizer initializing explicit -1 tags based on the tag_offset
-		map_sync.setTagOffset( -1 );
+		map_sync.setTagOffset(-1);
 	}
 
 	// set tags
@@ -85,7 +90,7 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 					dreal_sync[i].setTags(direction, offset0 + neighbor_id, offset1 + this->id);
 			}
 			// disable DistributedNDArraySynchronizer initializing explicit -1 tags based on the tag_offset
-			dreal_sync[i].setTagOffset( -1 );
+			dreal_sync[i].setTagOffset(-1);
 		}
 	}
 #endif
@@ -106,11 +111,11 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	// high-priority streams for boundaries
 	for (auto direction : pattern) {
 		computeData.at(direction).stream = TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_high);
-		#ifdef HAVE_MPI
+	#ifdef HAVE_MPI
 		// set the stream to the synchronizer
 		for (int i = 0; i < CONFIG::Q + MACRO::N; i++)
 			dreal_sync[i].setCudaStream(direction, computeData.at(direction).stream);
-		#endif
+	#endif
 	}
 #endif
 
@@ -160,7 +165,8 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 		interior_offset.z()++;
 		interior_size.z() -= computeData.at(direction).size.z();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, overlap_width);
+		computeData.at(direction).gridSize =
+			getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, overlap_width);
 	}
 	direction = TNL::Containers::SyncDirection::Front;
 	if (auto search = neighborIDs.find(direction); search != neighborIDs.end() && search->second >= 0) {
@@ -168,7 +174,8 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 		computeData.at(direction).size = idx3d{interior_size.x(), interior_size.y(), overlap_width};
 		interior_size.z() -= computeData.at(direction).size.z();
 		computeData.at(direction).blockSize = getCudaBlockSize(computeData.at(direction).size);
-		computeData.at(direction).gridSize = getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, overlap_width);
+		computeData.at(direction).gridSize =
+			getCudaGridSize(computeData.at(direction).size, computeData.at(direction).blockSize, 0, 0, overlap_width);
 	}
 
 	// for compute on interior lattice sites
@@ -179,17 +186,17 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	computeData.at(direction).gridSize = getCudaGridSize(interior_size, computeData.at(direction).blockSize);
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 dim3 LBM_BLOCK<CONFIG>::getCudaBlockSize(const idx3d& local_size)
 {
 	// find optimal thread block size for the LBM kernel
 	// use 256 threads for SP and 128 threads for DP
 	constexpr int max_threads = 256 / (sizeof(dreal) / sizeof(float));
-	const idx3d result = get_optimal_block_size< typename TRAITS::xyz_permutation >(local_size, max_threads);
+	const idx3d result = get_optimal_block_size<typename TRAITS::xyz_permutation>(local_size, max_threads);
 	return {unsigned(result.x()), unsigned(result.y()), unsigned(result.z())};
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 dim3 LBM_BLOCK<CONFIG>::getCudaGridSize(const idx3d& local_size, const dim3& block_size, idx x, idx y, idx z)
 {
 	dim3 gridSize;
@@ -208,37 +215,40 @@ dim3 LBM_BLOCK<CONFIG>::getCudaGridSize(const idx3d& local_size, const dim3& blo
 	return gridSize;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::setEquilibrium(real rho, real vx, real vy, real vz)
 {
-	// extract variables and views for capturing in the lambda function
-	#ifdef HAVE_MPI
+// extract variables and views for capturing in the lambda function
+#ifdef HAVE_MPI
 	auto local_df = dfs[0].getLocalView();
-	#else
+#else
 	auto local_df = dfs[0].getView();
-	#endif
+#endif
 
 	// NOTE: it is important to reset *all* lattice sites (i.e. including ghost layers) when using the A-A pattern
 	// (because GEO_INFLOW and GEO_OUTFLOW_EQ access the ghost layer in streaming)
-	const int overlap_x = local_df.template getOverlap< 0 >();
-	const int overlap_y = local_df.template getOverlap< 1 >();
-	const int overlap_z = local_df.template getOverlap< 2 >();
+	const int overlap_x = local_df.template getOverlap<0>();
+	const int overlap_y = local_df.template getOverlap<1>();
+	const int overlap_z = local_df.template getOverlap<2>();
 	const idx3d begin = {-overlap_y, -overlap_z, -overlap_x};
 	const idx3d end = {local.y() + overlap_y, local.z() + overlap_z, local.x() + overlap_x};
 
-	TNL::Algorithms::parallelFor< DeviceType >( begin, end,
-			[local_df, rho, vx, vy, vz] __cuda_callable__ ( idx3d yzx ) mutable
-			{
-				const auto& [y, z, x] = yzx;
-				CONFIG::COLL::setEquilibriumLat(local_df, x, y, z, rho, vx, vy, vz);
-			});
+	TNL::Algorithms::parallelFor<DeviceType>(
+		begin,
+		end,
+		[local_df, rho, vx, vy, vz] __cuda_callable__(idx3d yzx) mutable
+		{
+			const auto& [y, z, x] = yzx;
+			CONFIG::COLL::setEquilibriumLat(local_df, x, y, z, rho, vx, vy, vz);
+		}
+	);
 
 	// copy the initialized DFs so that they are not overridden
 	for (uint8_t dftype = 1; dftype < DFMAX; dftype++)
 		dfs[dftype] = dfs[0];
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::computeInitialMacro()
 {
 	// extract variables and views for capturing in the lambda function
@@ -247,116 +257,118 @@ void LBM_BLOCK<CONFIG>::computeInitialMacro()
 	const idx3d begin = {0, 0, 0};
 	const idx3d end = {local.y(), local.z(), local.x()};
 
-	TNL::Algorithms::parallelFor< DeviceType >( begin, end,
-			[SD] __cuda_callable__ ( idx3d yzx ) mutable
-			{
-				const auto& [y, z, x] = yzx;
-				typename CONFIG::template KernelStruct<dreal> KS;
-				for (int i = 0; i < CONFIG::Q; i++)
-					KS.f[i] = SD.df(df_cur, i, x, y, z);
+	TNL::Algorithms::parallelFor<DeviceType>(
+		begin,
+		end,
+		[SD] __cuda_callable__(idx3d yzx) mutable
+		{
+			const auto& [y, z, x] = yzx;
+			typename CONFIG::template KernelStruct<dreal> KS;
+			for (int i = 0; i < CONFIG::Q; i++)
+				KS.f[i] = SD.df(df_cur, i, x, y, z);
 
-				CONFIG::MACRO::copyQuantities(SD, KS, x, y, z);
-				CONFIG::MACRO::zeroForcesInKS(KS);
-				CONFIG::COLL::computeDensityAndVelocity(KS);
-				CONFIG::MACRO::outputMacro(SD, KS, x, y, z);
-			});
+			CONFIG::MACRO::copyQuantities(SD, KS, x, y, z);
+			CONFIG::MACRO::zeroForcesInKS(KS);
+			CONFIG::COLL::computeDensityAndVelocity(KS);
+			CONFIG::MACRO::outputMacro(SD, KS, x, y, z);
+		}
+	);
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 bool LBM_BLOCK<CONFIG>::isLocalIndex(idx x, idx y, idx z) const
 {
-	return x >= offset.x() && x < offset.x() + local.x() &&
-		y >= offset.y() && y < offset.y() + local.y() &&
-		z >= offset.z() && z < offset.z() + local.z();
+	return x >= offset.x() && x < offset.x() + local.x() && y >= offset.y() && y < offset.y() + local.y() && z >= offset.z()
+		&& z < offset.z() + local.z();
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 bool LBM_BLOCK<CONFIG>::isLocalX(idx x) const
 {
 	return x >= offset.x() && x < offset.x() + local.x();
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 bool LBM_BLOCK<CONFIG>::isLocalY(idx y) const
 {
 	return y >= offset.y() && y < offset.y() + local.y();
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 bool LBM_BLOCK<CONFIG>::isLocalZ(idx z) const
 {
 	return z >= offset.z() && z < offset.z() + local.z();
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::setMap(idx x, idx y, idx z, map_t value)
 {
-	if (isLocalIndex(x, y, z)) hmap(x, y, z) = value;
+	if (isLocalIndex(x, y, z))
+		hmap(x, y, z) = value;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::setBoundaryX(idx x, map_t value)
 {
 	if (isLocalX(x))
 		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			hmap(x, y, z) = value;
+			for (idx z = offset.z(); z < offset.z() + local.z(); z++)
+				hmap(x, y, z) = value;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::setBoundaryY(idx y, map_t value)
 {
 	if (isLocalY(y))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			hmap(x, y, z) = value;
+			for (idx z = offset.z(); z < offset.z() + local.z(); z++)
+				hmap(x, y, z) = value;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::setBoundaryZ(idx z, map_t value)
 {
 	if (isLocalZ(z))
 		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-			hmap(x, y, z) = value;
+			for (idx y = offset.y(); y < offset.y() + local.y(); y++)
+				hmap(x, y, z) = value;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::resetMap(map_t geo_type)
 {
 	hmap.setValue(geo_type);
 }
 
-
-template< typename CONFIG >
-void  LBM_BLOCK<CONFIG>::copyMapToHost()
+template <typename CONFIG>
+void LBM_BLOCK<CONFIG>::copyMapToHost()
 {
 	hmap = dmap;
 	hdiffusionCoeff = ddiffusionCoeff;
 	hphiTransferDirection = dphiTransferDirection;
 }
 
-template< typename CONFIG >
-void  LBM_BLOCK<CONFIG>::copyMapToDevice()
+template <typename CONFIG>
+void LBM_BLOCK<CONFIG>::copyMapToDevice()
 {
 	dmap = hmap;
 	ddiffusionCoeff = hdiffusionCoeff;
 	dphiTransferDirection = hphiTransferDirection;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::copyMacroToHost()
 {
 	hmacro = dmacro;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::copyMacroToDevice()
 {
 	dmacro = hmacro;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::copyDFsToHost(uint8_t dfty)
 {
 	dlat_view_t df = dfs[0].getView();
@@ -364,7 +376,7 @@ void LBM_BLOCK<CONFIG>::copyDFsToHost(uint8_t dfty)
 	hfs[dfty] = df;
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::copyDFsToDevice(uint8_t dfty)
 {
 	dlat_view_t df = dfs[0].getView();
@@ -372,30 +384,30 @@ void LBM_BLOCK<CONFIG>::copyDFsToDevice(uint8_t dfty)
 	df = hfs[dfty];
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::copyDFsToHost()
 {
-	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
+	for (uint8_t dfty = 0; dfty < DFMAX; dfty++)
 		hfs[dfty] = dfs[dfty];
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::copyDFsToDevice()
 {
-	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
+	for (uint8_t dfty = 0; dfty < DFMAX; dfty++)
 		dfs[dfty] = hfs[dfty];
 }
 
 #ifdef HAVE_MPI
 
-template< typename CONFIG >
-	template< typename Array >
+template <typename CONFIG>
+template <typename Array>
 void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_offset)
 {
-	static_assert( Array::getDimension() == 4, "4D array expected" );
+	static_assert(Array::getDimension() == 4, "4D array expected");
 	constexpr int N = Array::SizesHolderType::template getStaticSize<0>();
-	static_assert( N > 0, "the first dimension must be static" );
-	constexpr bool is_df = std::is_same< typename Array::ConstViewType, typename dlat_array_t::ConstViewType >::value;
+	static_assert(N > 0, "the first dimension must be static");
+	constexpr bool is_df = std::is_same<typename Array::ConstViewType, typename dlat_array_t::ConstViewType>::value;
 
 	// empty view, but with correct sizes
 	typename sync_array_t::LocalViewType localView(nullptr, data.indexer);
@@ -406,7 +418,7 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 		view.bind(array.getData() + i * data.indexer.getStorageSize());
 		// determine sync direction
 		TNL::Containers::SyncDirection sync_direction = (is_df) ? df_sync_directions[i] : TNL::Containers::SyncDirection::All;
-		#ifdef AA_PATTERN
+	#ifdef AA_PATTERN
 		// reset shift of the lattice sites
 		dreal_sync[i + sync_offset].setBufferOffsets(0);
 		if (is_df) {
@@ -420,7 +432,7 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 				dreal_sync[i + sync_offset].setBufferOffsets(1);
 			}
 		}
-		#endif
+	#endif
 		// start the synchronization
 		// NOTE: we don't use synchronize with policy because we need pipelining
 		// NOTE: we could use only synchronize with policy=deferred, because threadpool and async require MPI_THREAD_MULTIPLE which is slow
@@ -431,7 +443,7 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 	}
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::synchronizeDFsDevice_start(uint8_t dftype)
 {
 	auto df = dfs[0].getView();
@@ -439,72 +451,71 @@ void LBM_BLOCK<CONFIG>::synchronizeDFsDevice_start(uint8_t dftype)
 	startDrealArraySynchronization(df, 0);
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::synchronizeMacroDevice_start()
 {
 	startDrealArraySynchronization(dmacro, CONFIG::Q);
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::synchronizeMapDevice_start()
 {
 	// NOTE: threadpool and async require MPI_THREAD_MULTIPLE which is slow
 	constexpr auto policy = std::decay_t<decltype(map_sync)>::AsyncPolicy::deferred;
 	map_sync.synchronize(policy, dmap);
 }
-#endif  // HAVE_MPI
+#endif	// HAVE_MPI
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::allocateHostData()
 {
-	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
-	{
+	for (uint8_t dfty = 0; dfty < DFMAX; dfty++) {
 		hfs[dfty].setSizes(0, global.x(), global.y(), global.z());
-		#ifdef HAVE_MPI
+#ifdef HAVE_MPI
 		if (local.x() != global.x())
-			hfs[dfty].getOverlaps().template setSize< 1 >( overlap_width );
+			hfs[dfty].getOverlaps().template setSize<1>(overlap_width);
 		if (local.y() != global.y())
-			hfs[dfty].getOverlaps().template setSize< 2 >( overlap_width );
+			hfs[dfty].getOverlaps().template setSize<2>(overlap_width);
 		if (local.z() != global.z())
-			hfs[dfty].getOverlaps().template setSize< 3 >( overlap_width );
-		hfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
-		hfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
-		hfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
+			hfs[dfty].getOverlaps().template setSize<3>(overlap_width);
+		hfs[dfty].template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+		hfs[dfty].template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+		hfs[dfty].template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
 		hfs[dfty].allocate();
-		#endif
+#endif
 	}
 
 	hmap.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	if (local.x() != global.x())
-		hmap.getOverlaps().template setSize< 0 >( overlap_width );
+		hmap.getOverlaps().template setSize<0>(overlap_width);
 	if (local.y() != global.y())
-		hmap.getOverlaps().template setSize< 1 >( overlap_width );
+		hmap.getOverlaps().template setSize<1>(overlap_width);
 	if (local.z() != global.z())
-		hmap.getOverlaps().template setSize< 2 >( overlap_width );
-	hmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
-	hmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
-	hmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
+		hmap.getOverlaps().template setSize<2>(overlap_width);
+	hmap.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
+	hmap.template setDistribution<1>(offset.y(), offset.y() + local.y(), communicator);
+	hmap.template setDistribution<2>(offset.z(), offset.z() + local.z(), communicator);
 	hmap.allocate();
 #endif
 
 	hmacro.setSizes(0, global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
 	if (local.x() != global.x())
-		hmacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
+		hmacro.getOverlaps().template setSize<1>(macro_overlap_width);
 	if (local.y() != global.y())
-		hmacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
+		hmacro.getOverlaps().template setSize<2>(macro_overlap_width);
 	if (local.z() != global.z())
-		hmacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
-	hmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
-	hmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
-	hmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
+		hmacro.getOverlaps().template setSize<3>(macro_overlap_width);
+	hmacro.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+	hmacro.template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+	hmacro.template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
 	hmacro.allocate();
 #endif
 	hmacro.setValue(0);
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::allocateDeviceData()
 {
 //#ifdef USE_CUDA
@@ -512,45 +523,44 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmap.setSizes(global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 	if (local.x() != global.x())
-		dmap.getOverlaps().template setSize< 0 >( overlap_width );
+		dmap.getOverlaps().template setSize<0>(overlap_width);
 	if (local.y() != global.y())
-		dmap.getOverlaps().template setSize< 1 >( overlap_width );
+		dmap.getOverlaps().template setSize<1>(overlap_width);
 	if (local.z() != global.z())
-		dmap.getOverlaps().template setSize< 2 >( overlap_width );
-	dmap.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
-	dmap.template setDistribution< 1 >(offset.y(), offset.y() + local.y(), communicator);
-	dmap.template setDistribution< 2 >(offset.z(), offset.z() + local.z(), communicator);
+		dmap.getOverlaps().template setSize<2>(overlap_width);
+	dmap.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
+	dmap.template setDistribution<1>(offset.y(), offset.y() + local.y(), communicator);
+	dmap.template setDistribution<2>(offset.z(), offset.z() + local.z(), communicator);
 	dmap.allocate();
 	#endif
 
-	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
-	{
+	for (uint8_t dfty = 0; dfty < DFMAX; dfty++) {
 		dfs[dfty].setSizes(0, global.x(), global.y(), global.z());
-		#ifdef HAVE_MPI
+	#ifdef HAVE_MPI
 		if (local.x() != global.x())
-			dfs[dfty].getOverlaps().template setSize< 1 >( overlap_width );
+			dfs[dfty].getOverlaps().template setSize<1>(overlap_width);
 		if (local.y() != global.y())
-			dfs[dfty].getOverlaps().template setSize< 2 >( overlap_width );
+			dfs[dfty].getOverlaps().template setSize<2>(overlap_width);
 		if (local.z() != global.z())
-			dfs[dfty].getOverlaps().template setSize< 3 >( overlap_width );
-		dfs[dfty].template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
-		dfs[dfty].template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
-		dfs[dfty].template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
+			dfs[dfty].getOverlaps().template setSize<3>(overlap_width);
+		dfs[dfty].template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+		dfs[dfty].template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+		dfs[dfty].template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
 		dfs[dfty].allocate();
-		#endif
+	#endif
 	}
 
 	dmacro.setSizes(0, global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 	if (local.x() != global.x())
-		dmacro.getOverlaps().template setSize< 1 >( macro_overlap_width );
+		dmacro.getOverlaps().template setSize<1>(macro_overlap_width);
 	if (local.y() != global.y())
-		dmacro.getOverlaps().template setSize< 2 >( macro_overlap_width );
+		dmacro.getOverlaps().template setSize<2>(macro_overlap_width);
 	if (local.z() != global.z())
-		dmacro.getOverlaps().template setSize< 3 >( macro_overlap_width );
-	dmacro.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
-	dmacro.template setDistribution< 2 >(offset.y(), offset.y() + local.y(), communicator);
-	dmacro.template setDistribution< 3 >(offset.z(), offset.z() + local.z(), communicator);
+		dmacro.getOverlaps().template setSize<3>(macro_overlap_width);
+	dmacro.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+	dmacro.template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+	dmacro.template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
 	dmacro.allocate();
 	#endif
 #else
@@ -564,32 +574,32 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 #endif
 
 	// initialize data pointers
-	for (uint8_t dfty=0;dfty<DFMAX;dfty++)
+	for (uint8_t dfty = 0; dfty < DFMAX; dfty++)
 		data.dfs[dfty] = dfs[dfty].getData();
-	#ifdef HAVE_MPI
+#ifdef HAVE_MPI
 	data.indexer = dmap.getLocalView().getIndexer();
-	#else
+#else
 	data.indexer = dmap.getIndexer();
-	#endif
+#endif
 	data.XYZ = data.indexer.getStorageSize();
 	data.dmap = dmap.getData();
 	data.dmacro = dmacro.getData();
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::allocateDiffusionCoefficientArrays()
 {
 	hdiffusionCoeff.setSizes(global.x(), global.y(), global.z());
 	ddiffusionCoeff.setSizes(global.x(), global.y(), global.z());
 #ifdef HAVE_MPI
-	hdiffusionCoeff.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	hdiffusionCoeff.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
 	hdiffusionCoeff.allocate();
-	ddiffusionCoeff.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	ddiffusionCoeff.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
 	ddiffusionCoeff.allocate();
 #endif
 }
 
-template< typename CONFIG >
+template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::allocatePhiTransferDirectionArrays()
 {
 	using hbool_array_t = typename CONFIG::hbool_array_t;
@@ -600,14 +610,14 @@ void LBM_BLOCK<CONFIG>::allocatePhiTransferDirectionArrays()
 	TransferSF.setSizes(global.x(), global.y(), global.z());
 	TransferSW.setSizes(global.x(), global.y(), global.z());
 
-	#ifdef HAVE_MPI
-	TransferFS.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+#ifdef HAVE_MPI
+	TransferFS.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
 	TransferFS.allocate();
-	TransferSF.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	TransferSF.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
 	TransferSF.allocate();
-	TransferSW.template setDistribution< 0 >(offset.x(), offset.x() + local.x(), communicator);
+	TransferSW.template setDistribution<0>(offset.x(), offset.x() + local.x(), communicator);
 	TransferSW.allocate();
-	#endif
+#endif
 
 	TransferFS.setValue(false);
 	TransferSF.setValue(false);
@@ -615,192 +625,202 @@ void LBM_BLOCK<CONFIG>::allocatePhiTransferDirectionArrays()
 
 	hphiTransferDirection.setSizes(0, global.x(), global.y(), global.z());
 	dphiTransferDirection.setSizes(0, global.x(), global.y(), global.z());
-	#ifdef HAVE_MPI
-	hphiTransferDirection.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+#ifdef HAVE_MPI
+	hphiTransferDirection.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
 	hphiTransferDirection.allocate();
-	dphiTransferDirection.template setDistribution< 1 >(offset.x(), offset.x() + local.x(), communicator);
+	dphiTransferDirection.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
 	dphiTransferDirection.allocate();
-	#endif
+#endif
 
-	forLocalLatticeSites( [&] (LBM_BLOCK& block, idx x, idx y, idx z) {
-		if (CONFIG::BC::isFluid(hmap(x, y, z))) {
-			if (CONFIG::BC::isSolid(hmap(x+1, y, z))) {
-				TransferFS(x, y, z) = true;
-				hphiTransferDirection(pzz, x, y, z) = true;
+	forLocalLatticeSites(
+		[&](LBM_BLOCK& block, idx x, idx y, idx z)
+		{
+			if (CONFIG::BC::isFluid(hmap(x, y, z))) {
+				if (CONFIG::BC::isSolid(hmap(x + 1, y, z))) {
+					TransferFS(x, y, z) = true;
+					hphiTransferDirection(pzz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isSolid(hmap(x, y + 1, z))) {
+					TransferFS(x, y, z) = true;
+					hphiTransferDirection(zpz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isSolid(hmap(x, y, z + 1))) {
+					TransferFS(x, y, z) = true;
+					hphiTransferDirection(zzp, x, y, z) = true;
+				}
+				if (CONFIG::BC::isSolid(hmap(x - 1, y, z))) {
+					TransferFS(x, y, z) = true;
+					hphiTransferDirection(mzz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isSolid(hmap(x, y - 1, z))) {
+					TransferFS(x, y, z) = true;
+					hphiTransferDirection(zmz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isSolid(hmap(x, y, z - 1))) {
+					TransferFS(x, y, z) = true;
+					hphiTransferDirection(zzm, x, y, z) = true;
+				}
 			}
-			if (CONFIG::BC::isSolid(hmap(x, y+1, z))) {
-				TransferFS(x, y, z) = true;
-				hphiTransferDirection(zpz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isSolid(hmap(x, y, z+1))) {
-				TransferFS(x, y, z) = true;
-				hphiTransferDirection(zzp, x, y, z) = true;
-			}
-			if (CONFIG::BC::isSolid(hmap(x-1, y, z))) {
-				TransferFS(x, y, z) = true;
-				hphiTransferDirection(mzz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isSolid(hmap(x, y-1, z))) {
-				TransferFS(x, y, z) = true;
-				hphiTransferDirection(zmz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isSolid(hmap(x, y, z-1))) {
-				TransferFS(x, y, z) = true;
-				hphiTransferDirection(zzm, x, y, z) = true;
+			if (CONFIG::BC::isSolid(hmap(x, y, z))) {
+				if (CONFIG::BC::isFluid(hmap(x + 1, y, z))) {
+					TransferSF(x, y, z) = true;
+					hphiTransferDirection(pzz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isFluid(hmap(x, y + 1, z))) {
+					TransferSF(x, y, z) = true;
+					hphiTransferDirection(zpz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isFluid(hmap(x, y, z + 1))) {
+					TransferSF(x, y, z) = true;
+					hphiTransferDirection(zzp, x, y, z) = true;
+				}
+				if (CONFIG::BC::isFluid(hmap(x - 1, y, z))) {
+					TransferSF(x, y, z) = true;
+					hphiTransferDirection(mzz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isFluid(hmap(x, y - 1, z))) {
+					TransferSF(x, y, z) = true;
+					hphiTransferDirection(zmz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isFluid(hmap(x, y, z - 1))) {
+					TransferSF(x, y, z) = true;
+					hphiTransferDirection(zzm, x, y, z) = true;
+				}
+
+				if (CONFIG::BC::isWall(hmap(x + 1, y, z))) {
+					TransferSW(x, y, z) = true;
+					hphiTransferDirection(pzz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isWall(hmap(x, y + 1, z))) {
+					TransferSW(x, y, z) = true;
+					hphiTransferDirection(zpz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isWall(hmap(x, y, z + 1))) {
+					TransferSW(x, y, z) = true;
+					hphiTransferDirection(zzp, x, y, z) = true;
+				}
+				if (CONFIG::BC::isWall(hmap(x - 1, y, z))) {
+					TransferSW(x, y, z) = true;
+					hphiTransferDirection(mzz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isWall(hmap(x, y - 1, z))) {
+					TransferSW(x, y, z) = true;
+					hphiTransferDirection(zmz, x, y, z) = true;
+				}
+				if (CONFIG::BC::isWall(hmap(x, y, z - 1))) {
+					TransferSW(x, y, z) = true;
+					hphiTransferDirection(zzm, x, y, z) = true;
+				}
 			}
 		}
-		if (CONFIG::BC::isSolid(hmap(x, y, z))) {
-			if (CONFIG::BC::isFluid(hmap(x+1, y, z))) {
-				TransferSF(x, y, z) = true;
-				hphiTransferDirection(pzz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isFluid(hmap(x, y+1, z))) {
-				TransferSF(x, y, z) = true;
-				hphiTransferDirection(zpz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isFluid(hmap(x, y, z+1))) {
-				TransferSF(x, y, z) = true;
-				hphiTransferDirection(zzp, x, y, z) = true;
-			}
-			if (CONFIG::BC::isFluid(hmap(x-1, y, z))) {
-				TransferSF(x, y, z) = true;
-				hphiTransferDirection(mzz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isFluid(hmap(x, y-1, z))) {
-				TransferSF(x, y, z) = true;
-				hphiTransferDirection(zmz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isFluid(hmap(x, y, z-1))) {
-				TransferSF(x, y, z) = true;
-				hphiTransferDirection(zzm, x, y, z) = true;
-			}
+	);
 
-			if (CONFIG::BC::isWall(hmap(x+1, y, z))) {
-				TransferSW(x, y, z) = true;
-				hphiTransferDirection(pzz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isWall(hmap(x, y+1, z))) {
-				TransferSW(x, y, z) = true;
-				hphiTransferDirection(zpz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isWall(hmap(x, y, z+1))) {
-				TransferSW(x, y, z) = true;
-				hphiTransferDirection(zzp, x, y, z) = true;
-			}
-			if (CONFIG::BC::isWall(hmap(x-1, y, z))) {
-				TransferSW(x, y, z) = true;
-				hphiTransferDirection(mzz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isWall(hmap(x, y-1, z))) {
-				TransferSW(x, y, z) = true;
-				hphiTransferDirection(zmz, x, y, z) = true;
-			}
-			if (CONFIG::BC::isWall(hmap(x, y, z-1))) {
-				TransferSW(x, y, z) = true;
-				hphiTransferDirection(zzm, x, y, z) = true;
-			}
+	forLocalLatticeSites(
+		[&](LBM_BLOCK& block, idx x, idx y, idx z)
+		{
+			if (TransferFS(x, y, z))
+				hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_FS;
+			if (TransferSF(x, y, z))
+				hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SF;
+			if (TransferSW(x, y, z))
+				hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SW;
 		}
-	} );
-
-	forLocalLatticeSites( [&] (LBM_BLOCK& block, idx x, idx y, idx z) {
-		if (TransferFS(x, y, z))
-			hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_FS;
-		if (TransferSF(x, y, z))
-			hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SF;
-		if (TransferSW(x, y, z))
-			hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SW;
-	} );
+	);
 }
 
-template< typename CONFIG >
-	template< typename F >
+template <typename CONFIG>
+template <typename F>
 void LBM_BLOCK<CONFIG>::forLocalLatticeSites(F f)
 {
-	#pragma omp parallel for schedule(static) collapse(2)
+#pragma omp parallel for schedule(static) collapse(2)
 	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-		f(*this, x, y, z);
+		for (idx z = offset.z(); z < offset.z() + local.z(); z++)
+			for (idx y = offset.y(); y < offset.y() + local.y(); y++)
+				f(*this, x, y, z);
 }
 
-template< typename CONFIG >
-	template< typename F >
+template <typename CONFIG>
+template <typename F>
 void LBM_BLOCK<CONFIG>::forAllLatticeSites(F f)
 {
-	const int overlap_x = hmap.template getOverlap< 0 >();
-	const int overlap_y = hmap.template getOverlap< 1 >();
-	const int overlap_z = hmap.template getOverlap< 2 >();
+	const int overlap_x = hmap.template getOverlap<0>();
+	const int overlap_y = hmap.template getOverlap<1>();
+	const int overlap_z = hmap.template getOverlap<2>();
 
-	#pragma omp parallel for schedule(static) collapse(2)
+#pragma omp parallel for schedule(static) collapse(2)
 	for (idx x = offset.x() - overlap_x; x < offset.x() + local.x() + overlap_x; x++)
-	for (idx z = offset.z() - overlap_z; z < offset.z() + local.z() + overlap_z; z++)
-	for (idx y = offset.y() - overlap_y; y < offset.y() + local.y() + overlap_y; y++)
-		f(*this, x, y, z);
+		for (idx z = offset.z() - overlap_z; z < offset.z() + local.z() + overlap_z; z++)
+			for (idx y = offset.y() - overlap_y; y < offset.y() + local.y() + overlap_y; y++)
+				f(*this, x, y, z);
 }
 
-template< typename CONFIG >
-	template< typename Output >
+template <typename CONFIG>
+template <typename Output>
 void LBM_BLOCK<CONFIG>::writeVTK_3D(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle) const
 {
 	std::vector<int> tempIData;
 	std::vector<float> tempFData;
 	const point_t origin = lat.lbm2physPoint(0, 0, 0);
-	ADIOSWriter<TRAITS> adios(MPI_COMM_WORLD, filename,global,local,offset,origin,lat.physDl,cycle);
+	ADIOSWriter<TRAITS> adios(MPI_COMM_WORLD, filename, global, local, offset, origin, lat.physDl, cycle);
 
 	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		tempIData.push_back(hmap(x,y,z));
-	adios.write("wall",tempIData,1);
+		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
+			for (idx x = offset.x(); x < offset.x() + local.x(); x++)
+				tempIData.push_back(hmap(x, y, z));
+	adios.write("wall", tempIData, 1);
 	tempIData.clear();
 
 	char idd[500];
 	real value;
 	int dofs;
-	int index=0;
-	while (outputData(*this, index++, 0, idd, offset.x(), offset.y(), offset.z(), value, dofs)){
+	int index = 0;
+	while (outputData(*this, index++, 0, idd, offset.x(), offset.y(), offset.z(), value, dofs)) {
 		std::string IDD(idd);
-		for (int dof=0;dof<dofs;dof++){
+		for (int dof = 0; dof < dofs; dof++) {
 			for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-			for (idx x = offset.x(); x < offset.x() + local.x(); x++){
-				outputData(*this, index-1, dof, idd, x, y, z, value, dofs);
-				tempFData.push_back(value);
-			}
+				for (idx y = offset.y(); y < offset.y() + local.y(); y++)
+					for (idx x = offset.x(); x < offset.x() + local.x(); x++) {
+						outputData(*this, index - 1, dof, idd, x, y, z, value, dofs);
+						tempFData.push_back(value);
+					}
 			// FIXME: the VTX reader does not support vector fields on ImageData
 			// https://github.com/ornladios/ADIOS2/discussions/4117
-			switch(dof){
+			switch (dof) {
 				case 0:
-					if(dofs>1){
-						adios.write(IDD + "X",tempFData,dofs);}
-					else{
-						adios.write(IDD,tempFData,dofs);
+					if (dofs > 1) {
+						adios.write(IDD + "X", tempFData, dofs);
+					}
+					else {
+						adios.write(IDD, tempFData, dofs);
 					}
 					break;
 				case 1:
-					adios.write(IDD + "Y",tempFData,dofs);
+					adios.write(IDD + "Y", tempFData, dofs);
 					break;
 				case 2:
-					adios.write(IDD + "Z",tempFData,dofs);
+					adios.write(IDD + "Z", tempFData, dofs);
 					break;
 			}
 			tempFData.clear();
 		}
 	}
 
-	adios.write("TIME",time);
+	adios.write("TIME", time);
 }
 
-template< typename CONFIG >
-	template< typename Output >
-void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ox, idx oy, idx oz, idx gx, idx gy, idx gz, idx step) const
+template <typename CONFIG>
+template <typename Output>
+void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(
+	lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ox, idx oy, idx oz, idx gx, idx gy, idx gz, idx step
+) const
 {
-	bool overlapT = !(ox + gx <= offset.x() || offset.x() + local.x() <= ox ||
-        			  oy + gy <= offset.y() || offset.y() + local.y() <= oy ||
-        			  oz + gz <= offset.z() || offset.z() + local.z() <= oz);
+	bool overlapT =
+		! (ox + gx <= offset.x() || offset.x() + local.x() <= ox || oy + gy <= offset.y() || offset.y() + local.y() <= oy || oz + gz <= offset.z()
+		   || offset.z() + local.z() <= oz);
 	int color = overlapT ? 1 : MPI_UNDEFINED;
 	TNL::MPI::Comm communicator = TNL::MPI::Comm::split(MPI_COMM_WORLD, color, 0);
-	if (!overlapT) return;
+	if (! overlapT)
+		return;
 
 	// intersection of the local domain with the box
 	idx lx = TNL::min(ox + gx, offset.x() + local.x()) - TNL::max(ox, offset.x());
@@ -827,240 +847,233 @@ void LBM_BLOCK<CONFIG>::writeVTK_3Dcut(lat_t lat, Output&& outputData, const std
 	std::vector<int> tempIData;
 	std::vector<float> tempFData;
 	const point_t origin = lat.lbm2physPoint(ox, oy, oz);
-	ADIOSWriter<TRAITS> adios(communicator, filename,
-		{gX,gY,gZ},
-		{lX,lY,lZ},
-		{oX,oY,oZ},
-		origin,
-		lat.physDl*step, cycle);
+	ADIOSWriter<TRAITS> adios(communicator, filename, {gX, gY, gZ}, {lX, lY, lZ}, {oX, oY, oZ}, origin, lat.physDl * step, cycle);
 
 	ox = TNL::max(ox, offset.x());
 	oy = TNL::max(oy, offset.y());
 	oz = TNL::max(oz, offset.z());
 
 	for (idx z = oz; z < oz + lz; z += step)
-	for (idx y = oy; y < oy + ly; y += step)
-	for (idx x = ox; x < ox + lx; x += step)
-		tempIData.push_back(hmap(x,y,z));
-	adios.write("wall",tempIData,1);
+		for (idx y = oy; y < oy + ly; y += step)
+			for (idx x = ox; x < ox + lx; x += step)
+				tempIData.push_back(hmap(x, y, z));
+	adios.write("wall", tempIData, 1);
 	tempIData.clear();
 
 	char idd[500];
 	real value;
 	int dofs;
-	int index=0;
-	while (outputData(*this, index++, 0, idd, ox, oy, oz, value, dofs)){
+	int index = 0;
+	while (outputData(*this, index++, 0, idd, ox, oy, oz, value, dofs)) {
 		std::string IDD(idd);
-		for (int dof=0;dof<dofs;dof++){
+		for (int dof = 0; dof < dofs; dof++) {
 			for (idx z = oz; z < oz + lz; z += step)
-			for (idx y = oy; y < oy + ly; y += step)
-			for (idx x = ox; x < ox + lx; x += step){
-				outputData(*this, index-1, dof, idd, x, y, z, value, dofs);
-				tempFData.push_back(value);
-			}
+				for (idx y = oy; y < oy + ly; y += step)
+					for (idx x = ox; x < ox + lx; x += step) {
+						outputData(*this, index - 1, dof, idd, x, y, z, value, dofs);
+						tempFData.push_back(value);
+					}
 			// FIXME: the VTX reader does not support vector fields on ImageData
 			// https://github.com/ornladios/ADIOS2/discussions/4117
-			switch(dof){
+			switch (dof) {
 				case 0:
-					if(dofs>1){
-						adios.write(IDD + "X",tempFData,dofs);}
-					else{
-						adios.write(IDD,tempFData,dofs);
+					if (dofs > 1) {
+						adios.write(IDD + "X", tempFData, dofs);
+					}
+					else {
+						adios.write(IDD, tempFData, dofs);
 					}
 					break;
 				case 1:
-					adios.write(IDD + "Y",tempFData,dofs);
+					adios.write(IDD + "Y", tempFData, dofs);
 					break;
 				case 2:
-					adios.write(IDD + "Z",tempFData,dofs);
+					adios.write(IDD + "Z", tempFData, dofs);
 					break;
 			}
 			tempFData.clear();
 		}
 	}
 
-	adios.write("TIME",time);
+	adios.write("TIME", time);
 }
 
-template< typename CONFIG >
-	template< typename Output >
+template <typename CONFIG>
+template <typename Output>
 void LBM_BLOCK<CONFIG>::writeVTK_2DcutX(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx XPOS) const
 {
 	int color = isLocalX(XPOS) ? 1 : MPI_UNDEFINED;
 	TNL::MPI::Comm communicator = TNL::MPI::Comm::split(MPI_COMM_WORLD, color, 1);
-	if (!isLocalX(XPOS)) return;
+	if (! isLocalX(XPOS))
+		return;
 
 	std::vector<int> tempIData;
 	std::vector<float> tempFData;
 	const point_t origin = lat.lbm2physPoint(XPOS, 0, 0);
-	ADIOSWriter<TRAITS> adios(communicator, filename,
-		{1, global.y(), global.z()},
-		{1, local.y(), local.z()},
-		{0, offset.y(), offset.z()},
-		origin,
-		lat.physDl, cycle);
+	ADIOSWriter<TRAITS> adios(
+		communicator, filename, {1, global.y(), global.z()}, {1, local.y(), local.z()}, {0, offset.y(), offset.z()}, origin, lat.physDl, cycle
+	);
 
 	idx x = XPOS;
 	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-		tempIData.push_back(hmap(x,y,z));
-	adios.write("wall",tempIData,1);
+		for (idx y = offset.y(); y < offset.y() + local.y(); y++)
+			tempIData.push_back(hmap(x, y, z));
+	adios.write("wall", tempIData, 1);
 	tempIData.clear();
 
-	int index=0;
+	int index = 0;
 	char idd[500];
 	real value;
 	int dofs;
-	while (outputData(*this, index++, 0, idd, offset.x(),offset.y(),offset.z(), value, dofs)){
+	while (outputData(*this, index++, 0, idd, offset.x(), offset.y(), offset.z(), value, dofs)) {
 		std::string IDD(idd);
-		for (int dof=0;dof<dofs;dof++){
+		for (int dof = 0; dof < dofs; dof++) {
 			for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			for (idx y = offset.y(); y < offset.y() + local.y(); y++){
-				outputData(*this, index-1, dof, idd, x, y, z, value, dofs);
-				tempFData.push_back(value);
-			}
+				for (idx y = offset.y(); y < offset.y() + local.y(); y++) {
+					outputData(*this, index - 1, dof, idd, x, y, z, value, dofs);
+					tempFData.push_back(value);
+				}
 			// FIXME: the VTX reader does not support vector fields on ImageData
 			// https://github.com/ornladios/ADIOS2/discussions/4117
-			switch(dof){
+			switch (dof) {
 				case 0:
-					if(dofs>1){
-						adios.write(IDD + "X",tempFData,dofs);}
-					else{
-						adios.write(IDD,tempFData,dofs);
+					if (dofs > 1) {
+						adios.write(IDD + "X", tempFData, dofs);
+					}
+					else {
+						adios.write(IDD, tempFData, dofs);
 					}
 					break;
 				case 1:
-					adios.write(IDD + "Y",tempFData,dofs);
+					adios.write(IDD + "Y", tempFData, dofs);
 					break;
 				case 2:
-					adios.write(IDD + "Z",tempFData,dofs);
+					adios.write(IDD + "Z", tempFData, dofs);
 					break;
 			}
 			tempFData.clear();
 		}
 	}
 
-	adios.write("TIME",time);
+	adios.write("TIME", time);
 }
 
-template< typename CONFIG >
-	template< typename Output >
+template <typename CONFIG>
+template <typename Output>
 void LBM_BLOCK<CONFIG>::writeVTK_2DcutY(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx YPOS) const
 {
 	int color = isLocalY(YPOS) ? 1 : MPI_UNDEFINED;
 	TNL::MPI::Comm communicator = TNL::MPI::Comm::split(MPI_COMM_WORLD, color, 2);
-	if (!isLocalY(YPOS)) return;
+	if (! isLocalY(YPOS))
+		return;
 
 	std::vector<int> tempIData;
 	std::vector<float> tempFData;
 	const point_t origin = lat.lbm2physPoint(0, YPOS, 0);
-	ADIOSWriter<TRAITS> adios(communicator, filename,
-		{global.x(), 1, global.z()},
-		{local.x(), 1, local.z()},
-		{offset.x(), 0, offset.z()},
-		origin,
-		lat.physDl, cycle);
+	ADIOSWriter<TRAITS> adios(
+		communicator, filename, {global.x(), 1, global.z()}, {local.x(), 1, local.z()}, {offset.x(), 0, offset.z()}, origin, lat.physDl, cycle
+	);
 
-	idx y=YPOS;
+	idx y = YPOS;
 	for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		tempIData.push_back(hmap(x,y,z));
-	adios.write("wall",tempIData,1);
+		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
+			tempIData.push_back(hmap(x, y, z));
+	adios.write("wall", tempIData, 1);
 	tempIData.clear();
 
-	int index=0;
+	int index = 0;
 	char idd[500];
 	real value;
 	int dofs;
-	while (outputData(*this, index++, 0, idd, offset.x(),offset.y(),offset.z(), value, dofs)){
+	while (outputData(*this, index++, 0, idd, offset.x(), offset.y(), offset.z(), value, dofs)) {
 		std::string IDD(idd);
-		for (int dof=0;dof<dofs;dof++){
+		for (int dof = 0; dof < dofs; dof++) {
 			for (idx z = offset.z(); z < offset.z() + local.z(); z++)
-			for (idx x = offset.x(); x < offset.x() + local.x(); x++){
-				outputData(*this, index-1, dof, idd, x, y, z, value, dofs);
-				tempFData.push_back(value);
-			}
+				for (idx x = offset.x(); x < offset.x() + local.x(); x++) {
+					outputData(*this, index - 1, dof, idd, x, y, z, value, dofs);
+					tempFData.push_back(value);
+				}
 			// FIXME: the VTX reader does not support vector fields on ImageData
 			// https://github.com/ornladios/ADIOS2/discussions/4117
-			switch(dof){
+			switch (dof) {
 				case 0:
-					if(dofs>1){
-						adios.write(IDD + "X",tempFData,dofs);}
-					else{
-						adios.write(IDD,tempFData,dofs);
+					if (dofs > 1) {
+						adios.write(IDD + "X", tempFData, dofs);
+					}
+					else {
+						adios.write(IDD, tempFData, dofs);
 					}
 					break;
 				case 1:
-					adios.write(IDD + "Y",tempFData,dofs);
+					adios.write(IDD + "Y", tempFData, dofs);
 					break;
 				case 2:
-					adios.write(IDD + "Z",tempFData,dofs);
+					adios.write(IDD + "Z", tempFData, dofs);
 					break;
 			}
 			tempFData.clear();
 		}
 	}
 
-	adios.write("TIME",time);
+	adios.write("TIME", time);
 }
 
-template< typename CONFIG >
-	template< typename Output >
+template <typename CONFIG>
+template <typename Output>
 void LBM_BLOCK<CONFIG>::writeVTK_2DcutZ(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ZPOS) const
 {
 	int color = isLocalZ(ZPOS) ? 1 : MPI_UNDEFINED;
 	TNL::MPI::Comm communicator = TNL::MPI::Comm::split(MPI_COMM_WORLD, color, 3);
-	if (!isLocalZ(ZPOS)) return;
+	if (! isLocalZ(ZPOS))
+		return;
 
 	std::vector<int> tempIData;
 	std::vector<float> tempFData;
 	const point_t origin = lat.lbm2physPoint(0, 0, ZPOS);
-	ADIOSWriter<TRAITS> adios(communicator, filename,
-		{global.x(), global.y(), 1},
-		{local.x(), local.y(), 1},
-		{offset.x(), offset.y(), 0},
-		origin,
-		lat.physDl, cycle);
+	ADIOSWriter<TRAITS> adios(
+		communicator, filename, {global.x(), global.y(), 1}, {local.x(), local.y(), 1}, {offset.x(), offset.y(), 0}, origin, lat.physDl, cycle
+	);
 
-	idx z=ZPOS;
+	idx z = ZPOS;
 	for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-	for (idx x = offset.x(); x < offset.x() + local.x(); x++)
-		tempIData.push_back(hmap(x,y,z));
-	adios.write("wall",tempIData,1);
+		for (idx x = offset.x(); x < offset.x() + local.x(); x++)
+			tempIData.push_back(hmap(x, y, z));
+	adios.write("wall", tempIData, 1);
 	tempIData.clear();
 
-	int index=0;
+	int index = 0;
 	char idd[500];
 	real value;
 	int dofs;
-	while (outputData(*this, index++, 0, idd, offset.x(),offset.y(),offset.z(), value, dofs)){
+	while (outputData(*this, index++, 0, idd, offset.x(), offset.y(), offset.z(), value, dofs)) {
 		std::string IDD(idd);
-		for (int dof=0;dof<dofs;dof++){
+		for (int dof = 0; dof < dofs; dof++) {
 			for (idx y = offset.y(); y < offset.y() + local.y(); y++)
-			for (idx x = offset.x(); x < offset.x() + local.x(); x++){
-				outputData(*this, index-1, dof, idd, x, y, z, value, dofs);
-				tempFData.push_back(value);
-			}
+				for (idx x = offset.x(); x < offset.x() + local.x(); x++) {
+					outputData(*this, index - 1, dof, idd, x, y, z, value, dofs);
+					tempFData.push_back(value);
+				}
 			// FIXME: the VTX reader does not support vector fields on ImageData
 			// https://github.com/ornladios/ADIOS2/discussions/4117
-			switch(dof){
+			switch (dof) {
 				case 0:
-					if(dofs>1){
-						adios.write(IDD + "X",tempFData,dofs);}
-					else{
-						adios.write(IDD,tempFData,dofs);
+					if (dofs > 1) {
+						adios.write(IDD + "X", tempFData, dofs);
+					}
+					else {
+						adios.write(IDD, tempFData, dofs);
 					}
 					break;
 				case 1:
-					adios.write(IDD + "Y",tempFData,dofs);
+					adios.write(IDD + "Y", tempFData, dofs);
 					break;
 				case 2:
-					adios.write(IDD + "Z",tempFData,dofs);
+					adios.write(IDD + "Z", tempFData, dofs);
 					break;
 			}
 			tempFData.clear();
 		}
 	}
 
-	adios.write("TIME",time);
+	adios.write("TIME", time);
 }

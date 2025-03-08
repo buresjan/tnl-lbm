@@ -7,19 +7,31 @@
 
 #include "lbm_common/png_tool.h"
 
-template< typename NSE >
-bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
+template <typename NSE>
+bool State<NSE>::getPNGdimensions(const char* filename, int& w, int& h)
 {
-	if (!fileExists(filename)) { printf("file %s does not exist\n",filename); return false; }
-	FILE *fp = fopen(filename, "rb");
+	if (! fileExists(filename)) {
+		printf("file %s does not exist\n", filename);
+		return false;
+	}
+	FILE* fp = fopen(filename, "rb");
 
 	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if(!png) { printf("file %s png read error\n",filename); return false; }
+	if (! png) {
+		printf("file %s png read error\n", filename);
+		return false;
+	}
 
 	png_infop info = png_create_info_struct(png);
-	if(!png) { printf("file %s png read error\n",filename); return false; }
+	if (! png) {
+		printf("file %s png read error\n", filename);
+		return false;
+	}
 
-	if(setjmp(png_jmpbuf(png))) { printf("file %s png read error\n",filename); return false; }
+	if (setjmp(png_jmpbuf(png))) {
+		printf("file %s png read error\n", filename);
+		return false;
+	}
 
 	png_init_io(png, fp);
 
@@ -30,42 +42,44 @@ bool State<NSE>::getPNGdimensions(const char * filename, int &w, int &h)
 	//  color_type = png_get_color_type(png, info);
 	//  bit_depth  = png_get_bit_depth(png, info);
 	fclose(fp);
-	if (w>0 && h>0) return true;
+	if (w > 0 && h > 0)
+		return true;
 	return false;
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::flagCreate(const char* flagname)
 {
-	if (nse.rank != 0) return;
+	if (nse.rank != 0)
+		return;
 
 	const std::string fname = fmt::format("results_{}/flag.{}", id, flagname);
 	create_file(fname.c_str());
 }
 
-template< typename NSE >
-void State<NSE>::flagDelete(const char*flagname)
+template <typename NSE>
+void State<NSE>::flagDelete(const char* flagname)
 {
-	if (nse.rank != 0) return;
+	if (nse.rank != 0)
+		return;
 
 	const std::string fname = fmt::format("results_{}/flag.{}", id, flagname);
 	if (fileExists(fname.c_str()))
 		remove(fname.c_str());
 }
 
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::flagExists(const char* flagname)
 {
 	const std::string fname = fmt::format("results_{}/flag.{}", id, flagname);
 	return fileExists(fname.c_str());
 }
 
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::canCompute()
 {
 	bool result;
-	if (nse.rank == 0)
-	{
+	if (nse.rank == 0) {
 		if (lock_fd < 0) {
 			spdlog::warn("Failed to lock the results_{} directory. Is there another instance of the solver running?", id);
 			result = false;
@@ -89,7 +103,6 @@ bool State<NSE>::canCompute()
 	return result;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //
@@ -98,11 +111,10 @@ bool State<NSE>::canCompute()
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::writeVTK_Points(const char* name, real time, int cycle)
 {
-	if (!ibm.allocated)
+	if (! ibm.allocated)
 		ibm.convertLagrangianPoints();
 
 	// synchronize hLL_lat if points movement is computed on the GPU
@@ -114,7 +126,7 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle)
 	writeVTK_Points(name, time, cycle, ibm.hLL_lat);
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, const typename Lagrange3D::HLPVECTOR& hLL_lat)
 {
 	VTKWriter vtk;
@@ -127,9 +139,8 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, const t
 
 	fprintf(fp, "DATASET POLYDATA\n");
 
-	fprintf(fp, "POINTS %d float\n", (int)hLL_lat.getSize());
-	for (idx i = 0; i < hLL_lat.getSize(); i++)
-	{
+	fprintf(fp, "POINTS %d float\n", (int) hLL_lat.getSize());
+	for (idx i = 0; i < hLL_lat.getSize(); i++) {
 		const point_t phys = nse.lat.lbm2physPoint(hLL_lat[i]);
 		vtk.writeFloat(fp, phys.x());
 		vtk.writeFloat(fp, phys.y());
@@ -139,7 +150,6 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, const t
 	fclose(fp);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //
@@ -148,25 +158,24 @@ void State<NSE>::writeVTK_Points(const char* name, real time, int cycle, const t
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add1Dcut(point_t from, point_t to, const char* fmts, ARGS... args)
 {
-	probe1Dlinevec.push_back( T_PROBE1DLINECUT() );
-	int last = probe1Dlinevec.size()-1;
+	probe1Dlinevec.push_back(T_PROBE1DLINECUT());
+	int last = probe1Dlinevec.size() - 1;
 	probe1Dlinevec[last].name = fmt::format(fmts, args...);
 	probe1Dlinevec[last].from = from;
 	probe1Dlinevec[last].to = to;
 	probe1Dlinevec[last].cycle = 0;
 }
 
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add1Dcut_X(real y, real z, const char* fmts, ARGS... args)
 {
-	probe1Dvec.push_back( T_PROBE1DCUT() );
-	int last = probe1Dvec.size()-1;
+	probe1Dvec.push_back(T_PROBE1DCUT());
+	int last = probe1Dvec.size() - 1;
 	probe1Dvec[last].name = fmt::format(fmts, args...);
 	probe1Dvec[last].type = 0;
 	probe1Dvec[last].pos1 = nse.lat.phys2lbmY(y);
@@ -174,12 +183,12 @@ void State<NSE>::add1Dcut_X(real y, real z, const char* fmts, ARGS... args)
 	probe1Dvec[last].cycle = 0;
 }
 
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add1Dcut_Y(real x, real z, const char* fmts, ARGS... args)
 {
-	probe1Dvec.push_back( T_PROBE1DCUT() );
-	int last = probe1Dvec.size()-1;
+	probe1Dvec.push_back(T_PROBE1DCUT());
+	int last = probe1Dvec.size() - 1;
 	probe1Dvec[last].name = fmt::format(fmts, args...);
 	probe1Dvec[last].type = 1;
 	probe1Dvec[last].pos1 = nse.lat.phys2lbmX(x);
@@ -187,12 +196,12 @@ void State<NSE>::add1Dcut_Y(real x, real z, const char* fmts, ARGS... args)
 	probe1Dvec[last].cycle = 0;
 }
 
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add1Dcut_Z(real x, real y, const char* fmts, ARGS... args)
 {
-	probe1Dvec.push_back( T_PROBE1DCUT() );
-	int last = probe1Dvec.size()-1;
+	probe1Dvec.push_back(T_PROBE1DCUT());
+	int last = probe1Dvec.size() - 1;
 	probe1Dvec[last].name = fmt::format(fmts, args...);
 	probe1Dvec[last].type = 2;
 	probe1Dvec[last].pos1 = nse.lat.phys2lbmX(x);
@@ -200,25 +209,25 @@ void State<NSE>::add1Dcut_Z(real x, real y, const char* fmts, ARGS... args)
 	probe1Dvec[last].cycle = 0;
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::writeVTKs_1D()
 {
-	if (probe1Dvec.size()>0)
-	{
+	if (probe1Dvec.size() > 0) {
 		// browse all 1D probeline cuts
-		for (std::size_t i=0;i<probe1Dvec.size(); i++)
-		{
+		for (std::size_t i = 0; i < probe1Dvec.size(); i++) {
 			const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dvec[i].name, nse.rank, probe1Dvec[i].cycle);
 			create_parent_directories(fname.c_str());
 			spdlog::info("[1dcut {}]", fname);
-//			probeLine(probe1Dvec[i].from[0],probe1Dvec[i].from[1],probe1Dvec[i].from[2],probe1Dvec[i].to[0],probe1Dvec[i].to[1],probe1Dvec[i].to[2],fname);
-			switch (probe1Dvec[i].type)
-			{
-				case 0: write1Dcut_X(probe1Dvec[i].pos1, probe1Dvec[i].pos2, fname);
+			//			probeLine(probe1Dvec[i].from[0],probe1Dvec[i].from[1],probe1Dvec[i].from[2],probe1Dvec[i].to[0],probe1Dvec[i].to[1],probe1Dvec[i].to[2],fname);
+			switch (probe1Dvec[i].type) {
+				case 0:
+					write1Dcut_X(probe1Dvec[i].pos1, probe1Dvec[i].pos2, fname);
 					break;
-				case 1: write1Dcut_Y(probe1Dvec[i].pos1, probe1Dvec[i].pos2, fname);
+				case 1:
+					write1Dcut_Y(probe1Dvec[i].pos1, probe1Dvec[i].pos2, fname);
 					break;
-				case 2: write1Dcut_Z(probe1Dvec[i].pos1, probe1Dvec[i].pos2, fname);
+				case 2:
+					write1Dcut_Z(probe1Dvec[i].pos1, probe1Dvec[i].pos2, fname);
 					break;
 			}
 			probe1Dvec[i].cycle++;
@@ -226,9 +235,9 @@ void State<NSE>::writeVTKs_1D()
 	}
 
 	// browse all 1D probe cuts
-	for (std::size_t i=0;i<probe1Dlinevec.size(); i++)
-	{
-		const std::string fname = fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
+	for (std::size_t i = 0; i < probe1Dlinevec.size(); i++) {
+		const std::string fname =
+			fmt::format("results_{}/probes1D/{}_rank{:03d}_{:06d}", id, probe1Dlinevec[i].name, nse.rank, probe1Dlinevec[i].cycle);
 		create_parent_directories(fname.c_str());
 		spdlog::info("[1dcut {}]", fname);
 		write1Dcut(probe1Dlinevec[i].from, probe1Dlinevec[i].to, fname);
@@ -236,49 +245,47 @@ void State<NSE>::writeVTKs_1D()
 	}
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::write1Dcut(point_t from, point_t to, const std::string& fname)
 {
-	FILE* fout = fopen(fname.c_str(), "wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt");  // append information
 	point_t i = nse.lat.phys2lbmPoint(from);
 	point_t f = nse.lat.phys2lbmPoint(to);
-	real dist = NORM(i[0]-f[0],i[1]-f[1],i[2]-f[2]);
-	real ds = 1.0/(dist*2.0); // rozliseni najit
+	real dist = NORM(i[0] - f[0], i[1] - f[1], i[2] - f[2]);
+	real ds = 1.0 / (dist * 2.0);  // rozliseni najit
 	// special case: sampling along an axis
-	if( (i[0] == f[0] && i[1] == f[1]) ||
-		(i[1] == f[1] && i[2] == f[2]) ||
-		(i[0] == f[0] && i[2] == f[2]) )
-		ds = 1.0/dist;
+	if ((i[0] == f[0] && i[1] == f[1]) || (i[1] == f[1] && i[2] == f[2]) || (i[0] == f[0] && i[2] == f[2]))
+		ds = 1.0 / dist;
 
 	char idd[500];
 	real value;
 	int dofs;
-	fprintf(fout,"#time %f s\n", nse.physTime());
-	fprintf(fout,"#1:rel_pos");
+	fprintf(fout, "#time %f s\n", nse.physTime());
+	fprintf(fout, "#1:rel_pos");
 
-	int count=2, index=0;
-	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	int count = 2, index = 0;
+	while (outputData(
+		nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs
+	))
 	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		if (dofs == 1)
+			fprintf(fout, "\t%d:%s", count++, idd);
 		else
-		for (int i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,i);
+			for (int i = 0; i < dofs; i++)
+				fprintf(fout, "\t%d:%s[%d]", count++, idd, i);
 	}
-	fprintf(fout,"\n");
+	fprintf(fout, "\n");
 
-	for (real s=0;s<=1.0;s+=ds)
-	{
+	for (real s = 0; s <= 1.0; s += ds) {
 		point_t p = i + s * (f - i);
-		for (const auto& block : nse.blocks)
-		{
-			if (!block.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z()))
+		for (const auto& block : nse.blocks) {
+			if (! block.isLocalIndex((idx) p.x(), (idx) p.y(), (idx) p.z()))
 				continue;
-			fprintf(fout, "%e", (s*dist-0.5)*nse.lat.physDl);
-			index=0;
-			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
-			{
-				for (int dof=0;dof<dofs;dof++)
-				{
-					outputData(block, index-1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
+			fprintf(fout, "%e", (s * dist - 0.5) * nse.lat.physDl);
+			index = 0;
+			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs)) {
+				for (int dof = 0; dof < dofs; dof++) {
+					outputData(block, index - 1, dof, idd, (idx) p.x(), (idx) p.y(), (idx) p.z(), value, dofs);
 					fprintf(fout, "\t%e", value);
 				}
 			}
@@ -288,117 +295,119 @@ void State<NSE>::write1Dcut(point_t from, point_t to, const std::string& fname)
 	fclose(fout);
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::write1Dcut_X(idx y, idx z, const std::string& fname)
 {
-	FILE* fout = fopen(fname.c_str(), "wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt");  // append information
 	// probe vertical profile at x_m
 	char idd[500];
 	real value;
 	int dofs;
-	fprintf(fout,"#time %f s\n", nse.physTime());
-	fprintf(fout,"#1:x");
-	int count=2, index=0;
-	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	fprintf(fout, "#time %f s\n", nse.physTime());
+	fprintf(fout, "#1:x");
+	int count = 2, index = 0;
+	while (outputData(
+		nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs
+	))
 	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		if (dofs == 1)
+			fprintf(fout, "\t%d:%s", count++, idd);
 		else
-		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
+			for (idx i = 0; i < dofs; i++)
+				fprintf(fout, "\t%d:%s[%d]", count++, idd, (int) i);
 	}
-	fprintf(fout,"\n");
+	fprintf(fout, "\n");
 
 	for (const auto& block : nse.blocks)
-	for (idx i = block.offset.x(); i < block.offset.x() + block.local.x(); i++)
-	{
-		fprintf(fout, "%e", nse.lat.lbm2physX(i));
-		index=0;
-		if (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
-		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(block, index-1,dof,idd,i,y,z,value,dofs);
-				fprintf(fout, "\t%e", value);
+		for (idx i = block.offset.x(); i < block.offset.x() + block.local.x(); i++) {
+			fprintf(fout, "%e", nse.lat.lbm2physX(i));
+			index = 0;
+			if (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs)) {
+				for (int dof = 0; dof < dofs; dof++) {
+					outputData(block, index - 1, dof, idd, i, y, z, value, dofs);
+					fprintf(fout, "\t%e", value);
+				}
 			}
+			fprintf(fout, "\n");
 		}
-		fprintf(fout, "\n");
-	}
 	fclose(fout);
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::write1Dcut_Y(idx x, idx z, const std::string& fname)
 {
-	FILE* fout = fopen(fname.c_str(), "wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt");  // append information
 	// probe vertical profile at x_m
 	char idd[500];
 	real value;
 	int dofs;
-	fprintf(fout,"#time %f s\n", nse.physTime());
-	fprintf(fout,"#1:y");
-	int count=2, index=0;
-	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	fprintf(fout, "#time %f s\n", nse.physTime());
+	fprintf(fout, "#1:y");
+	int count = 2, index = 0;
+	while (outputData(
+		nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs
+	))
 	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		if (dofs == 1)
+			fprintf(fout, "\t%d:%s", count++, idd);
 		else
-		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
+			for (idx i = 0; i < dofs; i++)
+				fprintf(fout, "\t%d:%s[%d]", count++, idd, (int) i);
 	}
-	fprintf(fout,"\n");
+	fprintf(fout, "\n");
 
 	for (const auto& block : nse.blocks)
-	for (idx i = block.offset.y(); i < block.offset.y() + block.local.y(); i++)
-	{
-		fprintf(fout, "%e", nse.lat.lbm2physY(i));
-		int index=0;
-		while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
-		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(block, index-1,dof,idd,x,i,z,value,dofs);
-				fprintf(fout, "\t%e", value);
+		for (idx i = block.offset.y(); i < block.offset.y() + block.local.y(); i++) {
+			fprintf(fout, "%e", nse.lat.lbm2physY(i));
+			int index = 0;
+			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs)) {
+				for (int dof = 0; dof < dofs; dof++) {
+					outputData(block, index - 1, dof, idd, x, i, z, value, dofs);
+					fprintf(fout, "\t%e", value);
+				}
 			}
+			fprintf(fout, "\n");
 		}
-		fprintf(fout, "\n");
-	}
 	fclose(fout);
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::write1Dcut_Z(idx x, idx y, const std::string& fname)
 {
-	FILE* fout = fopen(fname.c_str(), "wt"); // append information
+	FILE* fout = fopen(fname.c_str(), "wt");  // append information
 	// probe vertical profile at x_m
 	char idd[500];
 	real value;
 	int dofs;
-	fprintf(fout,"#time %f s\n", nse.physTime());
-	fprintf(fout,"#1:z");
-	int count=2, index=0;
-	while (outputData(nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs))
+	fprintf(fout, "#time %f s\n", nse.physTime());
+	fprintf(fout, "#1:z");
+	int count = 2, index = 0;
+	while (outputData(
+		nse.blocks.front(), index++, 0, idd, nse.blocks.front().offset.x(), nse.blocks.front().offset.y(), nse.blocks.front().offset.z(), value, dofs
+	))
 	{
-		if (dofs==1) fprintf(fout,"\t%d:%s",count++,idd);
+		if (dofs == 1)
+			fprintf(fout, "\t%d:%s", count++, idd);
 		else
-		for (idx i=0;i<dofs;i++) fprintf(fout,"\t%d:%s[%d]",count++,idd,(int)i);
+			for (idx i = 0; i < dofs; i++)
+				fprintf(fout, "\t%d:%s[%d]", count++, idd, (int) i);
 	}
-	fprintf(fout,"\n");
+	fprintf(fout, "\n");
 
 	for (const auto& block : nse.blocks)
-	for (idx i = block.offset.z(); i < block.offset.z() + block.local.z(); i++)
-	{
-		fprintf(fout, "%e", nse.lat.lbm2physZ(i));
-		index=0;
-		while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs))
-		{
-			for (int dof=0;dof<dofs;dof++)
-			{
-				outputData(block, index-1,dof,idd,x,y,i,value,dofs);
-				fprintf(fout, "\t%e", value);
+		for (idx i = block.offset.z(); i < block.offset.z() + block.local.z(); i++) {
+			fprintf(fout, "%e", nse.lat.lbm2physZ(i));
+			index = 0;
+			while (outputData(block, index++, 0, idd, block.offset.x(), block.offset.y(), block.offset.z(), value, dofs)) {
+				for (int dof = 0; dof < dofs; dof++) {
+					outputData(block, index - 1, dof, idd, x, y, i, value, dofs);
+					fprintf(fout, "\t%e", value);
+				}
 			}
+			fprintf(fout, "\n");
 		}
-		fprintf(fout, "\n");
-	}
 	fclose(fout);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
@@ -408,16 +417,14 @@ void State<NSE>::write1Dcut_Z(idx x, idx y, const std::string& fname)
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::writeVTKs_3D()
 {
 	TNL::Timer timer;
-	for (const auto& block : nse.blocks)
-	{
+	for (const auto& block : nse.blocks) {
 		const std::string fname = fmt::format("results_{}/output_3D", id);
 		create_parent_directories(fname.c_str());
-		auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+		auto outputData = [this](const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 		{
 			return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 		};
@@ -438,13 +445,12 @@ void State<NSE>::writeVTKs_3D()
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step, const char* fmts, ARGS... args)
 {
-	probe3Dvec.push_back( T_PROBE3DCUT() );
-	int last = probe3Dvec.size()-1;
+	probe3Dvec.push_back(T_PROBE3DCUT());
+	int last = probe3Dvec.size() - 1;
 
 	probe3Dvec[last].name = fmt::format(fmts, args...);
 
@@ -458,18 +464,17 @@ void State<NSE>::add3Dcut(idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx st
 	probe3Dvec[last].cycle = 0;
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::writeVTKs_3Dcut()
 {
-	if (probe3Dvec.size()<=0) return;
+	if (probe3Dvec.size() <= 0)
+		return;
 	// browse all 3D vtk cuts
-	for (auto& probevec : probe3Dvec)
-	{
-		for (const auto& block : nse.blocks)
-		{
+	for (auto& probevec : probe3Dvec) {
+		for (const auto& block : nse.blocks) {
 			const std::string fname = fmt::format("results_{}/output_3Dcut_{}", id, probevec.name);
 			create_parent_directories(fname.c_str());
-			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+			auto outputData = [this](const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
@@ -493,7 +498,6 @@ void State<NSE>::writeVTKs_3Dcut()
 	}
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
 //                                                                                                                                                                                                                //
@@ -502,12 +506,12 @@ void State<NSE>::writeVTKs_3Dcut()
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add2Dcut_X(idx x, const char* fmts, ARGS... args)
 {
-	probe2Dvec.push_back( T_PROBE2DCUT() );
-	int last = probe2Dvec.size()-1;
+	probe2Dvec.push_back(T_PROBE2DCUT());
+	int last = probe2Dvec.size() - 1;
 
 	probe2Dvec[last].name = fmt::format(fmts, args...);
 
@@ -516,12 +520,12 @@ void State<NSE>::add2Dcut_X(idx x, const char* fmts, ARGS... args)
 	probe2Dvec[last].position = x;
 }
 
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add2Dcut_Y(idx y, const char* fmts, ARGS... args)
 {
-	probe2Dvec.push_back( T_PROBE2DCUT() );
-	int last = probe2Dvec.size()-1;
+	probe2Dvec.push_back(T_PROBE2DCUT());
+	int last = probe2Dvec.size() - 1;
 
 	probe2Dvec[last].name = fmt::format(fmts, args...);
 
@@ -530,12 +534,12 @@ void State<NSE>::add2Dcut_Y(idx y, const char* fmts, ARGS... args)
 	probe2Dvec[last].position = y;
 }
 
-template< typename NSE >
-template< typename... ARGS >
+template <typename NSE>
+template <typename... ARGS>
 void State<NSE>::add2Dcut_Z(idx z, const char* fmts, ARGS... args)
 {
-	probe2Dvec.push_back( T_PROBE2DCUT() );
-	int last = probe2Dvec.size()-1;
+	probe2Dvec.push_back(T_PROBE2DCUT());
+	int last = probe2Dvec.size() - 1;
 
 	probe2Dvec[last].name = fmt::format(fmts, args...);
 
@@ -544,29 +548,29 @@ void State<NSE>::add2Dcut_Z(idx z, const char* fmts, ARGS... args)
 	probe2Dvec[last].position = z;
 }
 
-
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::writeVTKs_2D()
 {
-	if (probe2Dvec.size()<=0) return;
+	if (probe2Dvec.size() <= 0)
+		return;
 	// browse all 2D vtk cuts
-	for (auto& probevec : probe2Dvec)
-	{
-		for (const auto& block : nse.blocks)
-		{
+	for (auto& probevec : probe2Dvec) {
+		for (const auto& block : nse.blocks) {
 			const std::string fname = fmt::format("results_{}/output_2D_{}", id, probevec.name);
 			create_parent_directories(fname.c_str());
-			auto outputData = [this] (const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
+			auto outputData = [this](const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) mutable
 			{
 				return this->outputData(block, index, dof, desc, x, y, z, value, dofs);
 			};
-			switch (probevec.type)
-			{
-				case 0: block.writeVTK_2DcutX(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
+			switch (probevec.type) {
+				case 0:
+					block.writeVTK_2DcutX(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 					break;
-				case 1: block.writeVTK_2DcutY(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
+				case 1:
+					block.writeVTK_2DcutY(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 					break;
-				case 2: block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
+				case 2:
+					block.writeVTK_2DcutZ(nse.lat, outputData, fname, nse.physTime(), probevec.cycle, probevec.position);
 					break;
 			}
 			spdlog::info("[vtk {} written, time {:f}, cycle {:d}] ", fname, nse.physTime(), probevec.cycle);
@@ -574,7 +578,6 @@ void State<NSE>::writeVTKs_2D()
 		probevec.cycle++;
 	}
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
@@ -584,39 +587,38 @@ void State<NSE>::writeVTKs_2D()
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::projectPNG_X(const std::string& filename, idx x0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!fileExists(filename.c_str())) {
+	if (! fileExists(filename.c_str())) {
 		fmt::print(stderr, "file {} does not exist\n", filename);
 		return false;
 	}
 	PNGTool P(filename.c_str());
 
-	for (auto& block : nse.blocks)
-	{
-		if (!block.isLocalX(x0)) continue;
+	for (auto& block : nse.blocks) {
+		if (! block.isLocalX(x0))
+			continue;
 
 		// plane y-z
 		idx x = x0;
-		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++)
-		{
-			real a = (real)z/(real)(nse.lat.global.z() - 1); // a in [0,1]
-			a = amin + a * (amax - amin); // a in [amin, amax]
-			if (mirror) a = 1.0 - a;
-			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++)
-			{
-				real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
-				b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
-				if (flip) b = 1.0 - b;
-				if (rotate)
-				{
-					if (P.intensity(b,a) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
+		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++) {
+			real a = (real) z / (real) (nse.lat.global.z() - 1);  // a in [0,1]
+			a = amin + a * (amax - amin);						  // a in [amin, amax]
+			if (mirror)
+				a = 1.0 - a;
+			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++) {
+				real b = (real) y / (real) (nse.lat.global.y() - 1);  // b in [0,1]
+				b = bmin + b * (bmax - bmin);						  // b in [bmin, bmax]
+				if (flip)
+					b = 1.0 - b;
+				if (rotate) {
+					if (P.intensity(b, a) > 0)
+						block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
-				else
-				{
-					if (P.intensity(a,b) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
+				else {
+					if (P.intensity(a, b) > 0)
+						block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 			}
 		}
@@ -624,38 +626,38 @@ bool State<NSE>::projectPNG_X(const std::string& filename, idx x0, bool rotate, 
 	return true;
 }
 
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::projectPNG_Y(const std::string& filename, idx y0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!fileExists(filename.c_str())) {
+	if (! fileExists(filename.c_str())) {
 		fmt::print(stderr, "file {} does not exist\n", filename);
 		return false;
 	}
 	PNGTool P(filename.c_str());
 
-	for (auto& block : nse.blocks)
-	{
-		if (!block.isLocalY(y0)) continue;
+	for (auto& block : nse.blocks) {
+		if (! block.isLocalY(y0))
+			continue;
 
 		// plane x-z
-		idx y=y0;
-		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++)
-		{
-			real a = (real)z/(real)(nse.lat.global.z() - 1); // a in [0,1]
-			a = amin + a * (amax - amin); // a in [amin, amax]
-			if (mirror) a = 1.0 - a;
-			for (idx x = block.offset.x(); x < block.offset.x() + block.local.x(); x++)
-			{
-				real b = (real)x/(real)(nse.lat.global.x() - 1); // b in [0,1]
-				b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
-				if (flip) b = 1.0 - b;
-				if (rotate)
-				{
-					if (P.intensity(b,a) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
+		idx y = y0;
+		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++) {
+			real a = (real) z / (real) (nse.lat.global.z() - 1);  // a in [0,1]
+			a = amin + a * (amax - amin);						  // a in [amin, amax]
+			if (mirror)
+				a = 1.0 - a;
+			for (idx x = block.offset.x(); x < block.offset.x() + block.local.x(); x++) {
+				real b = (real) x / (real) (nse.lat.global.x() - 1);  // b in [0,1]
+				b = bmin + b * (bmax - bmin);						  // b in [bmin, bmax]
+				if (flip)
+					b = 1.0 - b;
+				if (rotate) {
+					if (P.intensity(b, a) > 0)
+						block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
-				else
-				{
-					if (P.intensity(a,b) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
+				else {
+					if (P.intensity(a, b) > 0)
+						block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 			}
 		}
@@ -663,46 +665,44 @@ bool State<NSE>::projectPNG_Y(const std::string& filename, idx y0, bool rotate, 
 	return true;
 }
 
-
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::projectPNG_Z(const std::string& filename, idx z0, bool rotate, bool mirror, bool flip, real amin, real amax, real bmin, real bmax)
 {
-	if (!fileExists(filename.c_str())) {
+	if (! fileExists(filename.c_str())) {
 		fmt::print(stderr, "file {} does not exist\n", filename);
 		return false;
 	}
 	PNGTool P(filename.c_str());
 
-	for (auto& block : nse.blocks)
-	{
-		if (!block.isLocalZ(z0)) continue;
+	for (auto& block : nse.blocks) {
+		if (! block.isLocalZ(z0))
+			continue;
 
 		// plane x-y
-		idx z=z0;
-		for (idx x = block.offset.x(); x < block.offset.x() + block.local.x(); x++)
-		{
-			real a = (real)x/(real)(nse.lat.global.x() - 1); // a in [0,1]
-			a = amin + a * (amax - amin); // a in [amin, amax]
-			if (mirror) a = 1.0 - a;
-			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++)
-			{
-				real b = (real)y/(real)(nse.lat.global.y() - 1); // b in [0,1]
-				b = bmin + b * (bmax - bmin); // b in [bmin, bmax]
-				if (flip) b = 1.0 - b;
-				if (rotate)
-				{
-					if (P.intensity(b,a) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
+		idx z = z0;
+		for (idx x = block.offset.x(); x < block.offset.x() + block.local.x(); x++) {
+			real a = (real) x / (real) (nse.lat.global.x() - 1);  // a in [0,1]
+			a = amin + a * (amax - amin);						  // a in [amin, amax]
+			if (mirror)
+				a = 1.0 - a;
+			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++) {
+				real b = (real) y / (real) (nse.lat.global.y() - 1);  // b in [0,1]
+				b = bmin + b * (bmax - bmin);						  // b in [bmin, bmax]
+				if (flip)
+					b = 1.0 - b;
+				if (rotate) {
+					if (P.intensity(b, a) > 0)
+						block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
-				else
-				{
-					if (P.intensity(a,b) > 0) block.setMap(x, y, z, NSE::BC::GEO_WALL);
+				else {
+					if (P.intensity(a, b) > 0)
+						block.setMap(x, y, z, NSE::BC::GEO_WALL);
 				}
 			}
 		}
 	}
 	return true;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
@@ -712,8 +712,7 @@ bool State<NSE>::projectPNG_Z(const std::string& filename, idx z0, bool rotate, 
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::checkpointState(adios2::Mode mode)
 {
 	checkpoint.saveLoadAttribute("LBM_total_blocks", nse.total_blocks);
@@ -724,43 +723,36 @@ void State<NSE>::checkpointState(adios2::Mode mode)
 	// TODO: save/load nse.lat ?
 
 	// save/load all counter states
-	for (int c = 0; c < MAX_COUNTER; c++)
-	{
+	for (int c = 0; c < MAX_COUNTER; c++) {
 		const std::string name = fmt::format("State_counter_{}", c);
 		checkpoint.saveLoadAttribute(name + "_count", cnt[c].count);
 		checkpoint.saveLoadAttribute(name + "_period", cnt[c].period);
 	}
 
 	// save/load probes
-	for (std::size_t i = 0; i < probe3Dvec.size(); i++)
-	{
+	for (std::size_t i = 0; i < probe3Dvec.size(); i++) {
 		const std::string name = fmt::format("State_probe3D_{}_cycle", i);
 		checkpoint.saveLoadAttribute(name, probe3Dvec[i].cycle);
 	}
-	for (std::size_t i = 0; i < probe2Dvec.size(); i++)
-	{
+	for (std::size_t i = 0; i < probe2Dvec.size(); i++) {
 		const std::string name = fmt::format("State_probe2D_{}_cycle", i);
 		checkpoint.saveLoadAttribute(name, probe2Dvec[i].cycle);
 	}
-	for (std::size_t i = 0; i < probe1Dvec.size(); i++)
-	{
+	for (std::size_t i = 0; i < probe1Dvec.size(); i++) {
 		const std::string name = fmt::format("State_probe1D_{}_cycle", i);
 		checkpoint.saveLoadAttribute(name, probe1Dvec[i].cycle);
 	}
-	for (std::size_t i = 0; i < probe1Dlinevec.size(); i++)
-	{
+	for (std::size_t i = 0; i < probe1Dlinevec.size(); i++) {
 		const std::string name = fmt::format("State_probe1Dline_{}_cycle", i);
 		checkpoint.saveLoadAttribute(name, probe1Dlinevec[i].cycle);
 	}
 
-	for (auto& block : nse.blocks)
-	{
+	for (auto& block : nse.blocks) {
 		// save/load map
 		checkpoint.saveLoadVariable("LBM_map", block, block.hmap);
 
 		// save/load DFs
-		for (int dfty = 0; dfty < DFMAX; dfty++)
-		{
+		for (int dfty = 0; dfty < DFMAX; dfty++) {
 			const std::string name = fmt::format("LBM_df_{}", dfty);
 			checkpoint.saveLoadVariable(name, block, block.hfs[dfty]);
 		}
@@ -782,7 +774,7 @@ void State<NSE>::checkpointState(adios2::Mode mode)
 	}
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::saveState()
 {
 	// checkpoint to a staging file first to not break the previous checkpoint if we fail to create another one
@@ -815,7 +807,7 @@ void State<NSE>::saveState()
 	flagCreate("loadstate");
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::loadState()
 {
 	const std::string filename = fmt::format("results_{}/checkpoint.bp", id);
@@ -826,15 +818,13 @@ void State<NSE>::loadState()
 	checkpoint.finalize();
 }
 
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::wallTimeReached()
 {
 	bool local_result = false;
-	if (wallTime > 0)
-	{
+	if (wallTime > 0) {
 		long actualtimediff = timer_total.getRealTime();
-		if (actualtimediff >= wallTime)
-		{
+		if (actualtimediff >= wallTime) {
 			spdlog::info("wallTime reached: {} / {} [sec]", actualtimediff, wallTime);
 			local_result = true;
 		}
@@ -842,22 +832,19 @@ bool State<NSE>::wallTimeReached()
 	return TNL::MPI::reduce(local_result, MPI_LOR, nse.communicator);
 }
 
-template< typename NSE >
+template <typename NSE>
 double State<NSE>::getWallTime(bool collective)
 {
 	double result = 0;
-	if (!collective || nse.rank == 0)
-	{
+	if (! collective || nse.rank == 0) {
 		result = timer_total.getRealTime();
 	}
-	if (collective)
-	{
+	if (collective) {
 		// collective operation - make sure that all MPI processes return the same walltime (taken from rank 0)
 		TNL::MPI::Bcast(&result, 1, 0, nse.communicator);
 	}
 	return result;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                                                                                //
@@ -867,8 +854,7 @@ double State<NSE>::getWallTime(bool collective)
 //                                                                                                                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-template< typename NSE >
+template <typename NSE>
 bool State<NSE>::estimateMemoryDemands()
 {
 	long long memDFs = 0;
@@ -881,17 +867,17 @@ bool State<NSE>::estimateMemoryDemands()
 		memMap += XYZ * sizeof(map_t);
 	}
 
-	long long CPUavail = sysconf(_SC_PHYS_PAGES)*sysconf(_SC_PAGE_SIZE);
+	long long CPUavail = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 	long long GPUavail = 0;
 	long long GPUtotal = 0;
 	long long GPUtotal_hw = 0;
-	long long CPUtotal = memMacro + memMap + DFMAX*memDFs;
-	long long CPUDFs = DFMAX*memDFs;
-	#ifdef USE_CUDA
+	long long CPUtotal = memMacro + memMap + DFMAX * memDFs;
+	long long CPUDFs = DFMAX * memDFs;
+#ifdef USE_CUDA
 	GPUavail = 0;
-	GPUtotal_hw =0;
-	GPUtotal += DFMAX*memDFs + memMacro + memMap;
-//	CPUDFs = 0;
+	GPUtotal_hw = 0;
+	GPUtotal += DFMAX * memDFs + memMacro + memMap;
+	//	CPUDFs = 0;
 
 	const int gpu_id = TNL::Backend::getDevice();
 	const std::string gpu_name = TNL::Backend::getDeviceName(gpu_id);
@@ -901,28 +887,41 @@ bool State<NSE>::estimateMemoryDemands()
 	GPUavail += free;
 	GPUtotal_hw += total;
 
-	#else
-//	CPUtotal += CPUDFs;
-	#endif
+#else
+	//	CPUtotal += CPUDFs;
+#endif
 
 	spdlog::info("Local memory budget analysis / estimation for MPI rank {}", nse.rank);
-	spdlog::info("CPU RAM for DFs:   {:d} MiB", CPUDFs/1024/1024);
-//	spdlog::info("CPU RAM for lat:   {:d} MiB", memDFs/1024/1024);
-	spdlog::info("CPU RAM for map:   {:d} MiB", memMap/1024/1024);
-	spdlog::info("CPU RAM for macro: {:d} MiB", memMacro/1024/1024);
-	spdlog::info("TOTAL CPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%)", CPUtotal/1024/1024, CPUavail/1024/1024, 100.0*CPUtotal/CPUavail);
-	#ifdef USE_CUDA
-	spdlog::info("GPU RAM for DFs:   {:d} MiB", DFMAX*memDFs/1024/1024);
-	spdlog::info("GPU RAM for map:   {:d} MiB", memMap/1024/1024);
-	spdlog::info("GPU RAM for macro: {:d} MiB", memMacro/1024/1024);
-	spdlog::info("TOTAL GPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%), total GPU RAM: {:d} MiB", GPUtotal/1024/1024, GPUavail/1024/1024, 100.0*GPUtotal/GPUavail, GPUtotal_hw/1024/1024);
-	if (GPUavail <= GPUtotal) return false;
-	#endif
-	if (CPUavail <= CPUtotal) return false;
+	spdlog::info("CPU RAM for DFs:   {:d} MiB", CPUDFs / 1024 / 1024);
+	//	spdlog::info("CPU RAM for lat:   {:d} MiB", memDFs/1024/1024);
+	spdlog::info("CPU RAM for map:   {:d} MiB", memMap / 1024 / 1024);
+	spdlog::info("CPU RAM for macro: {:d} MiB", memMacro / 1024 / 1024);
+	spdlog::info(
+		"TOTAL CPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%)",
+		CPUtotal / 1024 / 1024,
+		CPUavail / 1024 / 1024,
+		100.0 * CPUtotal / CPUavail
+	);
+#ifdef USE_CUDA
+	spdlog::info("GPU RAM for DFs:   {:d} MiB", DFMAX * memDFs / 1024 / 1024);
+	spdlog::info("GPU RAM for map:   {:d} MiB", memMap / 1024 / 1024);
+	spdlog::info("GPU RAM for macro: {:d} MiB", memMacro / 1024 / 1024);
+	spdlog::info(
+		"TOTAL GPU RAM {:d} MiB estimated needed, {:d} MiB available ({:6.4f}%), total GPU RAM: {:d} MiB",
+		GPUtotal / 1024 / 1024,
+		GPUavail / 1024 / 1024,
+		100.0 * GPUtotal / GPUavail,
+		GPUtotal_hw / 1024 / 1024
+	);
+	if (GPUavail <= GPUtotal)
+		return false;
+#endif
+	if (CPUavail <= CPUtotal)
+		return false;
 	return true;
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::reset()
 {
 	// compute initial DFs on GPU
@@ -941,15 +940,15 @@ void State<NSE>::reset()
 	nse.copyMacroToHost();
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::resetDFs()
 {
 	// compute initial DFs on GPU and copy to CPU
-	nse.setEquilibrium(1, 0, 0, 0);	// rho, vx, vy, vz
+	nse.setEquilibrium(1, 0, 0, 0);	 // rho, vx, vy, vz
 	nse.copyDFsToHost();
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::SimInit()
 {
 	glups_prev_time = glups_prev_iterations = 0;
@@ -964,28 +963,45 @@ void State<NSE>::SimInit()
 
 	timer_SimInit.start();
 
-	spdlog::info("MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]", nse.rank, nse.nproc, nse.lat.global.x(), nse.lat.global.y(), nse.lat.global.z());
+	spdlog::info(
+		"MPI info: rank={:d}, nproc={:d}, lat.global=[{:d},{:d},{:d}]",
+		nse.rank,
+		nse.nproc,
+		nse.lat.global.x(),
+		nse.lat.global.y(),
+		nse.lat.global.z()
+	);
 	for (auto& block : nse.blocks)
-		spdlog::info("LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]", block.id, block.local.x(), block.local.y(), block.local.z(), block.offset.x(), block.offset.y(), block.offset.z());
+		spdlog::info(
+			"LBM block {:d}: local=[{:d},{:d},{:d}], offset=[{:d},{:d},{:d}]",
+			block.id,
+			block.local.x(),
+			block.local.y(),
+			block.local.z(),
+			block.offset.x(),
+			block.offset.y(),
+			block.offset.z()
+		);
 
-	spdlog::info("START: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt);
+	spdlog::info(
+		"START: simulation NSE:{} lbmVisc {:e} physDl {:e} physDt {:e}", NSE::COLL::id, nse.lat.lbmViscosity(), nse.lat.physDl, nse.lat.physDt
+	);
 
 	// reset counters
-	for (int c=0;c<MAX_COUNTER;c++) cnt[c].count = 0;
+	for (int c = 0; c < MAX_COUNTER; c++)
+		cnt[c].count = 0;
 	cnt[SAVESTATE].count = 1;  // skip initial save of state
 	nse.iterations = 0;
 
 	// check for loadState
-	if (flagExists("loadstate"))
-	{
+	if (flagExists("loadstate")) {
 		// load saved state into host memory
 		loadState();
 		// allocate device memory and copy the data
 		nse.allocateDeviceData();
 		copyAllToDevice();
 	}
-	else
-	{
+	else {
 		// allocate before reset - it might initialize on the GPU...
 		nse.allocateDeviceData();
 
@@ -993,8 +1009,7 @@ void State<NSE>::SimInit()
 		reset();
 
 #ifdef HAVE_MPI
-		if (nse.nproc > 1)
-		{
+		if (nse.nproc > 1) {
 			// synchronize overlaps with MPI (initial synchronization can be synchronous)
 			nse.synchronizeMapDevice();
 			nse.synchronizeDFsAndMacroDevice(df_cur);
@@ -1006,39 +1021,37 @@ void State<NSE>::SimInit()
 	timer_SimInit.stop();
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::SimUpdate()
 {
 	timer_SimUpdate.start();
 
 	// debug
 	for (auto& block : nse.blocks)
-	if (block.data.lbmViscosity == 0) {
-		spdlog::error("error: LBM viscosity is 0");
-		nse.terminate = true;
-		return;
-	}
+		if (block.data.lbmViscosity == 0) {
+			spdlog::error("error: LBM viscosity is 0");
+			nse.terminate = true;
+			return;
+		}
 
 	// NOTE: all Lagrangian points are assumed to be on the first GPU
 	// TODO
-//	if (nse.data.rank == 0 && ibm.LL.size() > 0)
-	if (ibm.LL.size() > 0)
-	{
-		for (auto& block : nse.blocks)
-		{
-		#ifdef USE_CUDA
+	//	if (nse.data.rank == 0 && ibm.LL.size() > 0)
+	if (ibm.LL.size() > 0) {
+		for (auto& block : nse.blocks) {
+#ifdef USE_CUDA
 			const auto direction = TNL::Containers::SyncDirection::None;
 			TNL::Backend::LaunchConfiguration launch_config;
 			launch_config.blockSize = block.computeData.at(direction).blockSize;
 			launch_config.gridSize = block.computeData.at(direction).gridSize;
 			TNL::Backend::launchKernelAsync(cudaLBMComputeVelocitiesStarAndZeroForce<NSE>, launch_config, block.data, nse.total_blocks);
-		#else
-			#pragma omp parallel for schedule(static) collapse(2)
+#else
+	#pragma omp parallel for schedule(static) collapse(2)
 			for (idx x = 0; x < block.local.x(); x++)
-			for (idx z = 0; z < block.local.z(); z++)
-			for (idx y = 0; y < block.local.y(); y++)
-			LBMComputeVelocitiesStarAndZeroForce< NSE >(block.data, nse.total_blocks, x, y, z);
-		#endif
+				for (idx z = 0; z < block.local.z(); z++)
+					for (idx y = 0; y < block.local.y(); y++)
+						LBMComputeVelocitiesStarAndZeroForce<NSE>(block.data, nse.total_blocks, x, y, z);
+#endif
 		}
 		// synchronize the null-stream after all grids
 		TNL::Backend::streamSynchronize(0);
@@ -1046,10 +1059,8 @@ void State<NSE>::SimUpdate()
 		ibm.computeForces(nse.physTime());
 	}
 
-
 	// call hook method (used e.g. for extra kernels in the non-Newtonian model)
 	computeBeforeLBMKernel();
-
 
 #ifdef AA_PATTERN
 	uint8_t output_df = df_cur;
@@ -1060,12 +1071,10 @@ void State<NSE>::SimUpdate()
 
 #ifdef USE_CUDA
 	#ifdef HAVE_MPI
-	if (nse.nproc == 1)
-	{
+	if (nse.nproc == 1) {
 	#endif
 		timer_compute.start();
-		for (auto& block : nse.blocks)
-		{
+		for (auto& block : nse.blocks) {
 			const auto direction = TNL::Containers::SyncDirection::None;
 			TNL::Backend::LaunchConfiguration launch_config;
 			launch_config.blockSize = block.computeData.at(direction).blockSize;
@@ -1078,8 +1087,7 @@ void State<NSE>::SimUpdate()
 		timer_compute.stop();
 	#ifdef HAVE_MPI
 	}
-	else
-	{
+	else {
 		timer_compute.start();
 		timer_compute_overlaps.start();
 
@@ -1147,15 +1155,13 @@ void State<NSE>::SimUpdate()
 	#endif
 #else
 	timer_compute.start();
-	for (auto& block : nse.blocks)
-	{
-		#pragma omp parallel for schedule(static) collapse(2)
-		for (idx x=0; x<block.local.x(); x++)
-		for (idx z=0; z<block.local.z(); z++)
-		for (idx y=0; y<block.local.y(); y++)
-		{
-			LBMKernel< NSE >(block.data, x, y, z, nse.total_blocks);
-		}
+	for (auto& block : nse.blocks) {
+	#pragma omp parallel for schedule(static) collapse(2)
+		for (idx x = 0; x < block.local.x(); x++)
+			for (idx z = 0; z < block.local.z(); z++)
+				for (idx y = 0; y < block.local.y(); y++) {
+					LBMKernel<NSE>(block.data, x, y, z, nse.total_blocks);
+				}
 	}
 	timer_compute.stop();
 	#ifdef HAVE_MPI
@@ -1168,10 +1174,12 @@ void State<NSE>::SimUpdate()
 
 	nse.iterations++;
 
-	bool doit=false;
-	for (int c=0;c<MAX_COUNTER;c++) if (c!=PRINT && c!=SAVESTATE) if (cnt[c].action(nse.physTime())) doit = true;
-	if (doit)
-	{
+	bool doit = false;
+	for (int c = 0; c < MAX_COUNTER; c++)
+		if (c != PRINT && c != SAVESTATE)
+			if (cnt[c].action(nse.physTime()))
+				doit = true;
+	if (doit) {
 		// common copy
 		nse.copyMacroToHost();
 	}
@@ -1179,7 +1187,7 @@ void State<NSE>::SimUpdate()
 	timer_SimUpdate.stop();
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::AfterSimUpdate()
 {
 	timer_AfterSimUpdate.start();
@@ -1189,15 +1197,9 @@ void State<NSE>::AfterSimUpdate()
 
 	bool write_info = false;
 
-	if (cnt[PRINT].action(nse.physTime()) ||
-	    cnt[VTK1D].action(nse.physTime()) ||
-	    cnt[VTK2D].action(nse.physTime()) ||
-	    cnt[VTK3D].action(nse.physTime()) ||
-	    cnt[VTK3DCUT].action(nse.physTime()) ||
-	    cnt[PROBE1].action(nse.physTime()) ||
-	    cnt[PROBE2].action(nse.physTime()) ||
-	    cnt[PROBE3].action(nse.physTime())
-	    )
+	if (cnt[PRINT].action(nse.physTime()) || cnt[VTK1D].action(nse.physTime()) || cnt[VTK2D].action(nse.physTime())
+		|| cnt[VTK3D].action(nse.physTime()) || cnt[VTK3DCUT].action(nse.physTime()) || cnt[PROBE1].action(nse.physTime())
+		|| cnt[PROBE2].action(nse.physTime()) || cnt[PROBE3].action(nse.physTime()))
 	{
 		write_info = true;
 		cnt[PRINT].count++;
@@ -1205,12 +1207,10 @@ void State<NSE>::AfterSimUpdate()
 
 	// check for NaN values, abusing the period of other actions
 	bool nan_detected = false;
-	if (nse.iterations > 1 && write_info && MACRO::e_rho < MACRO::N)
-	{
-		for( auto& block : nse.blocks )
-		{
+	if (nse.iterations > 1 && write_info && MACRO::e_rho < MACRO::N) {
+		for (auto& block : nse.blocks) {
 			auto data = block.data;
-			auto check_nan = [=] __cuda_callable__ (idx i) -> bool
+			auto check_nan = [=] __cuda_callable__(idx i) -> bool
 			{
 				auto value = data.dmacro[MACRO::e_rho * data.XYZ + i];
 				return value != value;
@@ -1222,64 +1222,50 @@ void State<NSE>::AfterSimUpdate()
 			}
 		}
 		nan_detected = TNL::MPI::reduce(nan_detected, MPI_LOR);
-		if (nan_detected)
-		{
+		if (nan_detected) {
 			spdlog::error("Detected NaN, terminating the simulation.");
-			nse.terminate=true;
+			nse.terminate = true;
 			// in order to save the proper data, we need to copy macros from device to host
 			nse.copyMacroToHost();
 		}
 	}
 
-	if (cnt[VTK1D].action(nse.physTime()) ||
-	    cnt[VTK2D].action(nse.physTime()) ||
-	    cnt[VTK3D].action(nse.physTime()) ||
-	    cnt[VTK3DCUT].action(nse.physTime()) ||
-	    cnt[PROBE1].action(nse.physTime()) ||
-	    cnt[PROBE2].action(nse.physTime()) ||
-	    cnt[PROBE3].action(nse.physTime()) ||
-	    nan_detected
-	    )
+	if (cnt[VTK1D].action(nse.physTime()) || cnt[VTK2D].action(nse.physTime()) || cnt[VTK3D].action(nse.physTime())
+		|| cnt[VTK3DCUT].action(nse.physTime()) || cnt[PROBE1].action(nse.physTime()) || cnt[PROBE2].action(nse.physTime())
+		|| cnt[PROBE3].action(nse.physTime()) || nan_detected)
 	{
 		// probe1
-		if (cnt[PROBE1].action(nse.physTime()))
-		{
+		if (cnt[PROBE1].action(nse.physTime())) {
 			probe1();
 			cnt[PROBE1].count++;
 		}
 		// probe2
-		if (cnt[PROBE2].action(nse.physTime()))
-		{
+		if (cnt[PROBE2].action(nse.physTime())) {
 			probe2();
 			cnt[PROBE2].count++;
 		}
 		// probe3
-		if (cnt[PROBE3].action(nse.physTime()))
-		{
+		if (cnt[PROBE3].action(nse.physTime())) {
 			probe3();
 			cnt[PROBE3].count++;
 		}
 		// 3D VTK
-		if (cnt[VTK3D].action(nse.physTime()) || nan_detected)
-		{
+		if (cnt[VTK3D].action(nse.physTime()) || nan_detected) {
 			writeVTKs_3D();
 			cnt[VTK3D].count++;
 		}
 		// 3D VTK CUT
-		if (cnt[VTK3DCUT].action(nse.physTime()))
-		{
+		if (cnt[VTK3DCUT].action(nse.physTime())) {
 			writeVTKs_3Dcut();
 			cnt[VTK3DCUT].count++;
 		}
 		// 2D VTK
-		if (cnt[VTK2D].action(nse.physTime()) || nan_detected)
-		{
+		if (cnt[VTK2D].action(nse.physTime()) || nan_detected) {
 			writeVTKs_2D();
 			cnt[VTK2D].count++;
 		}
 		// 1D VTK
-		if (cnt[VTK1D].action(nse.physTime()))
-		{
+		if (cnt[VTK1D].action(nse.physTime())) {
 			writeVTKs_1D();
 			cnt[VTK1D].count++;
 		}
@@ -1287,14 +1273,12 @@ void State<NSE>::AfterSimUpdate()
 
 	// statReset is called after all probes and VTK output
 	// copy macro from host to device after reset
-	if (cnt[STAT_RESET].action(nse.physTime()))
-	{
+	if (cnt[STAT_RESET].action(nse.physTime())) {
 		statReset();
 		nse.copyMacroToDevice();
 		cnt[STAT_RESET].count++;
 	}
-	if (cnt[STAT2_RESET].action(nse.physTime()))
-	{
+	if (cnt[STAT2_RESET].action(nse.physTime())) {
 		stat2Reset();
 		nse.copyMacroToDevice();
 		cnt[STAT2_RESET].count++;
@@ -1303,79 +1287,83 @@ void State<NSE>::AfterSimUpdate()
 	// only the first process writes GLUPS
 	// getting the rank from MPI_COMM_WORLD is intended here - other ranks may be redirected to a file when the ranks are reordered
 	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
-	if (nse.iterations > 1)
-	if (write_info)
-	{
-		// get time diff
-		const double now = timer_total.getRealTime();
-		const double timediff = TNL::max(1e-6, now - glups_prev_time);
+		if (nse.iterations > 1)
+			if (write_info) {
+				// get time diff
+				const double now = timer_total.getRealTime();
+				const double timediff = TNL::max(1e-6, now - glups_prev_time);
 
-		// to avoid numerical errors - split LUPS computation in two parts
-		double LUPS = (nse.iterations - glups_prev_iterations) / timediff;
-		LUPS *= nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z();
+				// to avoid numerical errors - split LUPS computation in two parts
+				double LUPS = (nse.iterations - glups_prev_iterations) / timediff;
+				LUPS *= nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z();
 
-		// save prev time and iterations
-		glups_prev_time = now;
-		glups_prev_iterations = nse.iterations;
+				// save prev time and iterations
+				glups_prev_time = now;
+				glups_prev_iterations = nse.iterations;
 
-		// simple estimate of time of accomplishment
-		double ETA = (getWallTime() - timer_SimInit.getRealTime()) * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
+				// simple estimate of time of accomplishment
+				double ETA =
+					(getWallTime() - timer_SimInit.getRealTime()) * (nse.physFinalTime - nse.physTime()) / (nse.physTime() - nse.physStartTime);
 
-		spdlog::info("GLUPS={:.3f} iter={:d} t={:1.3f}s dt={:1.2e} lbmVisc={:1.2e} WT={:.0f}s ETA={:.0f}s",
-			LUPS * 1e-9,
-			nse.iterations,
-			nse.physTime(),
-			nse.lat.physDt,
-			nse.lat.lbmViscosity(),
-			getWallTime(),
-			ETA
-		);
-	}
+				spdlog::info(
+					"GLUPS={:.3f} iter={:d} t={:1.3f}s dt={:1.2e} lbmVisc={:1.2e} WT={:.0f}s ETA={:.0f}s",
+					LUPS * 1e-9,
+					nse.iterations,
+					nse.physTime(),
+					nse.lat.physDt,
+					nse.lat.lbmViscosity(),
+					getWallTime(),
+					ETA
+				);
+			}
 
 	timer_AfterSimUpdate.stop();
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::AfterSimFinished()
 {
 	const int iterations = nse.iterations - nse.startIterations;
 
 	// only the first process writes the info
 	if (TNL::MPI::GetRank(MPI_COMM_WORLD) == 0)
-	if (iterations > 1)
-	{
-		spdlog::info("total walltime: {:.1f} s, SimInit time: {:.1f} s, SimUpdate time: {:.1f} s, AfterSimUpdate time: {:.1f} s",
-			getWallTime(),
-			timer_SimInit.getRealTime(),
-			timer_SimUpdate.getRealTime(),
-			timer_AfterSimUpdate.getRealTime()
-		);
-		spdlog::info("compute time: {:.1f} s, compute overlaps time: {:.1f} s, wait for communication time: {:.1f} s, wait for computation time: {:.1f} s",
-			timer_compute.getRealTime(),
-			timer_compute_overlaps.getRealTime(),
-			timer_wait_communication.getRealTime(),
-			timer_wait_computation.getRealTime()
-		);
-		const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
-		const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (iterations / timer_compute.getRealTime());
-		spdlog::info("final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): {:.3f}, based on compute time: {:.3f}",
-			avgLUPS * 1e-9,
-			computeLUPS * 1e-9
-		);
-	}
+		if (iterations > 1) {
+			spdlog::info(
+				"total walltime: {:.1f} s, SimInit time: {:.1f} s, SimUpdate time: {:.1f} s, AfterSimUpdate time: {:.1f} s",
+				getWallTime(),
+				timer_SimInit.getRealTime(),
+				timer_SimUpdate.getRealTime(),
+				timer_AfterSimUpdate.getRealTime()
+			);
+			spdlog::info(
+				"compute time: {:.1f} s, compute overlaps time: {:.1f} s, wait for communication time: {:.1f} s, wait for computation time: {:.1f} s",
+				timer_compute.getRealTime(),
+				timer_compute_overlaps.getRealTime(),
+				timer_wait_communication.getRealTime(),
+				timer_wait_computation.getRealTime()
+			);
+			const double avgLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z()
+								 * (iterations / (timer_SimUpdate.getRealTime() + timer_AfterSimUpdate.getRealTime()));
+			const double computeLUPS = nse.lat.global.x() * nse.lat.global.y() * nse.lat.global.z() * (iterations / timer_compute.getRealTime());
+			spdlog::info(
+				"final GLUPS: average (based on SimInit + SimUpdate + AfterSimUpdate time): {:.3f}, based on compute time: {:.3f}",
+				avgLUPS * 1e-9,
+				computeLUPS * 1e-9
+			);
+		}
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::updateKernelData()
 {
 	nse.updateKernelData();
 
 	// this is not in nse.updateKernelData so that it can be overridden for ADE
-	for( auto& block : nse.blocks )
+	for (auto& block : nse.blocks)
 		block.data.lbmViscosity = nse.lat.lbmViscosity();
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::copyAllToDevice()
 {
 	nse.copyMapToDevice();
@@ -1383,7 +1371,7 @@ void State<NSE>::copyAllToDevice()
 	nse.copyMacroToDevice();  // important when a state has been loaded
 }
 
-template< typename NSE >
+template <typename NSE>
 void State<NSE>::copyAllToHost()
 {
 	nse.copyMapToHost();

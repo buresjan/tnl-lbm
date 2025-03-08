@@ -4,16 +4,9 @@
 
 #include "adios_writer.h"
 
-template<typename TRAITS>
+template <typename TRAITS>
 ADIOSWriter<TRAITS>::ADIOSWriter(
-	TNL::MPI::Comm communicator,
-	const std::string& basename,
-	idx3d global,
-	idx3d local,
-	idx3d offset,
-	point_t physOrigin,
-	real physDl,
-	int cycle
+	TNL::MPI::Comm communicator, const std::string& basename, idx3d global, idx3d local, idx3d offset, point_t physOrigin, real physDl, int cycle
 )
 #ifdef HAVE_MPI
 : adios(communicator)
@@ -25,7 +18,7 @@ ADIOSWriter<TRAITS>::ADIOSWriter(
 	io.SetEngine("BP4");
 	filename = basename + ".bp";
 
-	if (cycle==0)
+	if (cycle == 0)
 		engine = io.Open(filename, adios2::Mode::Write);
 	else
 		engine = io.Open(filename, adios2::Mode::Append);
@@ -39,20 +32,20 @@ ADIOSWriter<TRAITS>::ADIOSWriter(
 	engine.BeginStep();
 }
 
-template<typename TRAITS>
-template<typename T>
+template <typename TRAITS>
+template <typename T>
 void ADIOSWriter<TRAITS>::write(std::string varName, T val)
 {
 	recordVariable(varName, 0);
 
 	adios2::Variable<T> value = io.DefineVariable<T>(varName);
 
-	engine.Put(value,val);
+	engine.Put(value, val);
 	engine.PerformPuts();
 }
 
-template<typename TRAITS>
-template<typename T>
+template <typename TRAITS>
+template <typename T>
 void ADIOSWriter<TRAITS>::write(std::string varName, std::vector<T>& val, int dim)
 {
 	recordVariable(varName, dim);
@@ -62,11 +55,11 @@ void ADIOSWriter<TRAITS>::write(std::string varName, std::vector<T>& val, int di
 	adios2::Dims count({size_t(local.z()), size_t(local.y()), size_t(local.x())});
 	adios2::Variable<T> values = io.DefineVariable<T>(varName, shape, start, count);
 
-	engine.Put(values,val.data());
+	engine.Put(values, val.data());
 	engine.PerformPuts();
 }
 
-template<typename TRAITS >
+template <typename TRAITS>
 void ADIOSWriter<TRAITS>::recordVariable(const std::string& name, int dim)
 {
 	if (variables.count(name) > 0)
@@ -77,7 +70,7 @@ void ADIOSWriter<TRAITS>::recordVariable(const std::string& name, int dim)
 	variables[name] = dim;
 }
 
-template<typename TRAITS >
+template <typename TRAITS>
 void ADIOSWriter<TRAITS>::addVTKAttributes()
 {
 	const std::string extentG = fmt::format("0 {} 0 {} 0 {}", global.z(), global.y(), global.x());
@@ -86,10 +79,8 @@ void ADIOSWriter<TRAITS>::addVTKAttributes()
 	const std::string spacing = fmt::format("{} {} {}", physDl, physDl, physDl);
 
 	std::string dataArrays;
-	for (const auto& [name, dim] : variables)
-	{
-		switch (dim)
-		{
+	for (const auto& [name, dim] : variables) {
+		switch (dim) {
 			case 0:
 				dataArrays += "<DataArray Name=\"" + name + "\"> " + name + " </DataArray>\n";
 				break;
@@ -106,10 +97,12 @@ void ADIOSWriter<TRAITS>::addVTKAttributes()
 	const std::string imageData = R"(
 		<?xml version="1.0"?>
 		<VTKFile type="ImageData" version="0.1" byte_order="LittleEndian">
-			<ImageData WholeExtent=")" + extentG + R"(" Origin=")" + origin + R"(" Spacing=")" + spacing + R"(">
-				<Piece Extent=")" + extentL + R"(">
+			<ImageData WholeExtent=")"
+								+ extentG + R"(" Origin=")" + origin + R"(" Spacing=")" + spacing + R"(">
+				<Piece Extent=")"
+								+ extentL + R"(">
 					<CellData Scalars="data">)"
-					+ dataArrays + R"(
+								+ dataArrays + R"(
 					</CellData>
 				</Piece>
 			</ImageData>
@@ -118,7 +111,7 @@ void ADIOSWriter<TRAITS>::addVTKAttributes()
 	io.DefineAttribute<std::string>("vtk.xml", imageData);
 }
 
-template<typename TRAITS >
+template <typename TRAITS>
 void ADIOSWriter<TRAITS>::addFidesAttributes()
 {
 	// add attributes for Fides
@@ -130,10 +123,9 @@ void ADIOSWriter<TRAITS>::addFidesAttributes()
 	bool dimension_variable_set = false;
 	std::vector<std::string> variable_list;
 	std::vector<std::string> variable_associations;
-	for (const auto& [name, dim] : variables)
-	{
+	for (const auto& [name, dim] : variables) {
 		if (dim > 0) {
-			if (!dimension_variable_set) {
+			if (! dimension_variable_set) {
 				// NOTE: Fides_Dimension_Variable must refer to a scalar variable
 				// https://gitlab.kitware.com/vtk/fides/-/issues/22
 				// FIXME: Fides requires this variable to be PointData for sizing,
@@ -151,10 +143,10 @@ void ADIOSWriter<TRAITS>::addFidesAttributes()
 	io.DefineAttribute<std::string>("Fides_Time_Variable", "TIME");
 }
 
-template<typename TRAITS >
+template <typename TRAITS>
 ADIOSWriter<TRAITS>::~ADIOSWriter()
 {
-	if (!variables.empty()) {
+	if (! variables.empty()) {
 		addVTKAttributes();
 		addFidesAttributes();
 	}

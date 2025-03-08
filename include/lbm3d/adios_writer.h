@@ -7,7 +7,7 @@
 
 #include <TNL/MPI/Comm.h>
 
-template< typename TRAITS >
+template <typename TRAITS>
 class ADIOSWriter
 {
 private:
@@ -42,14 +42,8 @@ public:
 	ADIOSWriter() = delete;
 
 	ADIOSWriter(
-		TNL::MPI::Comm communicator,
-		const std::string& basename,
-		idx3d global,
-		idx3d local,
-		idx3d offset,
-		point_t physOrigin,
-		real physDl,
-		int cycle);
+		TNL::MPI::Comm communicator, const std::string& basename, idx3d global, idx3d local, idx3d offset, point_t physOrigin, real physDl, int cycle
+	);
 
 	template <typename T>
 	void write(std::string varName, T val);

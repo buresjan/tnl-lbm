@@ -53,7 +53,7 @@ public:
 			io.DefineAttribute<CastToType>(name, static_cast<CastToType>(variable), "", "/", true);
 		else
 			variable = static_cast<T>(io.InquireAttribute<CastToType>(name).Data()[0]);
-	};
+	}
 
 	template <typename LBM_BLOCK, typename Array>
 	void saveLoadVariable(std::string name, LBM_BLOCK& block, Array& array)
@@ -78,18 +78,18 @@ public:
 		//	count = adios2::Dims({size_t(block.local.z()), size_t(block.local.y()), size_t(block.local.x())});
 		//}
 		start = {0};
-		#ifdef HAVE_MPI
+#ifdef HAVE_MPI
 		shape = count = {std::size_t(array.getLocalStorageSize())};
-		#else
+#else
 		shape = count = {std::size_t(array.getStorageSize())};
-		#endif
+#endif
 		name += fmt::format("_block_{}", block.id);
 
 		if (mode == adios2::Mode::Write) {
 			// ADIOS2 variables cannot be redefined and we are not re-declaring the IO
 			// object, so we must use InquireVariable.
 			adios2::Variable<T> var = io.InquireVariable<T>(name);
-			if (!var)
+			if (! var)
 				var = io.DefineVariable<T>(name, shape, start, count);
 			engine.Put(var, array.getData());
 		}
@@ -98,7 +98,7 @@ public:
 			var.SetSelection({start, count});
 			engine.Get(var, array.getData());
 		}
-	};
+	}
 
 	// This is for the case where each rank maintains its own, independent array
 	// (i.e., not DistributedNDArray).
@@ -117,7 +117,7 @@ public:
 			// ADIOS2 variables cannot be redefined and we are not re-declaring the IO
 			// object, so we must use InquireVariable.
 			adios2::Variable<T> var = io.InquireVariable<T>(name);
-			if (!var)
+			if (! var)
 				var = io.DefineVariable<T>(name, shape, start, count);
 			engine.Put(var, array.getData());
 		}
@@ -126,5 +126,5 @@ public:
 			var.SetSelection({start, count});
 			engine.Get(var, array.getData());
 		}
-	};
+	}
 };

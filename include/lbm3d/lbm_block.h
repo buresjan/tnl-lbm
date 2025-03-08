@@ -3,7 +3,7 @@
 #include "defs.h"
 #include "lattice.h"
 
-template< typename CONFIG >
+template <typename CONFIG>
 struct LBM_BLOCK
 {
 	using MACRO = typename CONFIG::MACRO;
@@ -73,15 +73,15 @@ struct LBM_BLOCK
 	int id;
 
 	// indices of the neighboring blocks
-	std::map< TNL::Containers::SyncDirection, int > neighborIDs;
+	std::map<TNL::Containers::SyncDirection, int> neighborIDs;
 
 	// owners of the neighboring blocks
-	std::map< TNL::Containers::SyncDirection, int > neighborRanks;
+	std::map<TNL::Containers::SyncDirection, int> neighborRanks;
 
 #ifdef HAVE_MPI
 	// synchronizers for dfs, macro and map
-	TNL::Containers::DistributedNDArraySynchronizer< typename sync_array_t::ViewType > dreal_sync[CONFIG::Q + MACRO::N];
-	TNL::Containers::DistributedNDArraySynchronizer< dmap_array_t > map_sync;
+	TNL::Containers::DistributedNDArraySynchronizer<typename sync_array_t::ViewType> dreal_sync[CONFIG::Q + MACRO::N];
+	TNL::Containers::DistributedNDArraySynchronizer<dmap_array_t> map_sync;
 #endif
 
 	// data for compute for the block itself and each neighbor
@@ -95,7 +95,7 @@ struct LBM_BLOCK
 		idx3d offset = 0;
 		idx3d size = 0;
 	};
-	std::map< TNL::Containers::SyncDirection, COMPUTE_DATA > computeData;
+	std::map<TNL::Containers::SyncDirection, COMPUTE_DATA> computeData;
 
 	// constructors
 	LBM_BLOCK() = delete;
@@ -104,34 +104,43 @@ struct LBM_BLOCK
 	LBM_BLOCK(const TNL::MPI::Comm& communicator, idx3d global, idx3d local, idx3d offset, int this_id = 0);
 
 	// initialization method for MPI synchronization - must be called before starting the simulation!
-	template< typename Pattern >
+	template <typename Pattern>
 	void setLatticeDecomposition(
-		const Pattern& pattern,  // communication pattern for MPI synchronization - must be consistent with the lattice decomposition
-		const std::map< TNL::Containers::SyncDirection, int >& neighborIDs,
-		const std::map< TNL::Containers::SyncDirection, int >& neighborRanks
+		const Pattern& pattern,	 // communication pattern for MPI synchronization - must be consistent with the lattice decomposition
+		const std::map<TNL::Containers::SyncDirection, int>& neighborIDs,
+		const std::map<TNL::Containers::SyncDirection, int>& neighborRanks
 	);
 
 	// auxiliary
 	dim3 getCudaBlockSize(const idx3d& local_size);
 	dim3 getCudaGridSize(const idx3d& local_size, const dim3& block_size, idx x = 0, idx y = 0, idx z = 0);
 
-	// maximum width of overlaps for the map and fs arrays
-	// (the real overlap may still be 0 if there is no neighbor in the particular direction)
-	#ifdef HAVE_MPI
+// maximum width of overlaps for the map and fs arrays
+// (the real overlap may still be 0 if there is no neighbor in the particular direction)
+#ifdef HAVE_MPI
 	static constexpr int overlap_width = 1;
-	#else
+#else
 	static constexpr int overlap_width = 0;
-	#endif
+#endif
 	// maximum width of overlaps for the macro arrays
 	static constexpr int macro_overlap_width = MACRO::overlap_width;
 
-	int df_overlap_X() { return data.indexer.template getOverlap< 0 >(); }
-	int df_overlap_Y() { return data.indexer.template getOverlap< 1 >(); }
-	int df_overlap_Z() { return data.indexer.template getOverlap< 2 >(); }
+	int df_overlap_X()
+	{
+		return data.indexer.template getOverlap<0>();
+	}
+	int df_overlap_Y()
+	{
+		return data.indexer.template getOverlap<1>();
+	}
+	int df_overlap_Z()
+	{
+		return data.indexer.template getOverlap<2>();
+	}
 
 #ifdef HAVE_MPI
 	// synchronization methods
-	template< typename Array >
+	template <typename Array>
 	void startDrealArraySynchronization(Array& array, int sync_offset);
 	void synchronizeDFsDevice_start(uint8_t dftype);
 	void synchronizeMacroDevice_start();
@@ -168,22 +177,24 @@ struct LBM_BLOCK
 	void allocateDiffusionCoefficientArrays();
 	void allocatePhiTransferDirectionArrays();
 
-	template< typename F >
+	template <typename F>
 	void forLocalLatticeSites(F f);
 
-	template< typename F >
+	template <typename F>
 	void forAllLatticeSites(F f);
 
 	// VTK output
-	template< typename Output >
+	template <typename Output>
 	void writeVTK_3D(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle) const;
-	template< typename Output >
-	void writeVTK_3Dcut(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step) const;
-	template< typename Output >
+	template <typename Output>
+	void writeVTK_3Dcut(
+		lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ox, idx oy, idx oz, idx lx, idx ly, idx lz, idx step
+	) const;
+	template <typename Output>
 	void writeVTK_2DcutX(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx XPOS) const;
-	template< typename Output >
+	template <typename Output>
 	void writeVTK_2DcutY(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx YPOS) const;
-	template< typename Output >
+	template <typename Output>
 	void writeVTK_2DcutZ(lat_t lat, Output&& outputData, const std::string& filename, real time, int cycle, idx ZPOS) const;
 
 	~LBM_BLOCK() = default;

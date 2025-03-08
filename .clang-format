@@ -1,0 +1,201 @@
+# Documentation: https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+---
+Language: Cpp
+Standard: c++17
+#BasedOnStyle: Mozilla
+
+# max line length
+ColumnLimit: 150  # TODO: decrease to 128
+LineEnding: LF
+InsertNewlineAtEOF: true
+
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
+ContinuationIndentWidth: 4
+IndentAccessModifiers: false
+AccessModifierOffset: -4
+IndentCaseLabels: true
+IndentCaseBlocks: true
+IndentGotoLabels: false
+IndentPPDirectives: BeforeHash
+IndentExternBlock: NoIndent
+IndentWrappedFunctionNames: false
+
+NamespaceIndentation: None
+FixNamespaceComments: true
+CompactNamespaces: false
+ShortNamespaceLines: 10
+
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+SeparateDefinitionBlocks: Leave  # 'Always' breaks formatting of __cuda_callable__ etc.
+
+SpacesInParens: Custom
+SpacesInParensOptions:
+  ExceptDoubleParentheses: false
+  InConditionalStatements: false
+  InCStyleCasts: false
+  InEmptyParentheses: false
+  Other: false
+SpacesInSquareBrackets: false
+SpacesInAngles: Never
+SpacesInContainerLiterals: false
+SpaceAfterCStyleCast: true
+SpaceAfterLogicalNot: true
+SpaceAfterTemplateKeyword: true
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+BitFieldColonSpacing: Both
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceInEmptyBlock: false
+SpacesInLineCommentPrefix:
+  Minimum: 0
+SpacesBeforeTrailingComments: 2
+Cpp11BracedListStyle: true
+
+PackConstructorInitializers: Never
+ConstructorInitializerIndentWidth: 0
+
+BreakAfterReturnType: Automatic
+AlwaysBreakBeforeMultilineStrings: false
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel:  true
+  AfterClass:      true
+  AfterControlStatement: MultiLine
+  AfterEnum:       true
+  AfterFunction:   true
+  AfterNamespace:  false
+  AfterStruct:     true
+  AfterUnion:      true
+  AfterExternBlock: true
+  BeforeLambdaBody: true
+  BeforeCatch:     true
+  BeforeElse:      true
+  BeforeWhile:     false
+  IndentBraces:    false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: true
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
+BreakInheritanceList: BeforeColon
+BreakConstructorInitializers: BeforeColon
+BreakTemplateDeclarations: Yes
+BreakBeforeConceptDeclarations: Always
+BreakAfterAttributes: Never
+
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: None
+AlignConsecutiveMacros: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: None
+AlignEscapedNewlines: Left
+AlignOperands:   AlignAfterOperator
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+
+# this is needed so that clang-format does not treat these macros as function calls and formats the arguments accordingly
+# (notably, it must not remove parentheses in ASSERT_TRUE((foo<x,y>(0,1))) etc. because then the comma would become
+# a separator of the macro arguments rather than template arguments)
+Macros:
+  - ASSERT_THAT(x)=abc<<x
+  - ASSERT_TRUE(x)=abc<<x
+  - ASSERT_FALSE(x)=abc<<x
+  - ASSERT_EQ(x,y)=abc<<(x==y)
+  - ASSERT_NE(x,y)=abc<<(x!=y)
+  - ASSERT_LT(x,y)=abc<<(x<y)
+  - ASSERT_LE(x,y)=abc<<(x<=y)
+  - ASSERT_GT(x,y)=abc<<(x>y)
+  - ASSERT_GE(x,y)=abc<<(x>=y)
+  - EXPECT_THAT(x)=abc<<x
+  - EXPECT_TRUE(x)=abc<<x
+  - EXPECT_FALSE(x)=abc<<x
+  - EXPECT_EQ(x,y)=abc<<(x==y)
+  - EXPECT_NE(x,y)=abc<<(x!=y)
+  - EXPECT_LT(x,y)=abc<<(x<y)
+  - EXPECT_LE(x,y)=abc<<(x<=y)
+  - EXPECT_GT(x,y)=abc<<(x>y)
+  - EXPECT_GE(x,y)=abc<<(x>=y)
+# statement macros are typically formatted on their own lines
+#StatementMacros:
+#  - __global__
+#  - __host__
+#  - __device__
+#  - __cuda_callable__
+# Note: forcing qualifier alignment does not work with __cuda_callable__ etc. (no way to force them to the left)
+#QualifierAlignment: Custom
+#QualifierOrder:
+#  - static
+#  - inline
+#  - constexpr
+#  - const
+#  - type
+
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortEnumsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+
+#CommentPragmas:  '^ IWYU pragma:'
+
+#IncludeBlocks:   Preserve
+#IncludeCategories:
+#  - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
+#    Priority:        2
+#    SortPriority:    0
+#    CaseSensitive:   false
+#  - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
+#    Priority:        3
+#    SortPriority:    0
+#    CaseSensitive:   false
+#  - Regex:           '.*'
+#    Priority:        1
+#    SortPriority:    0
+#    CaseSensitive:   false
+#IncludeIsMainRegex: '(Test)?$'
+#IncludeIsMainSourceRegex: ''
+#PenaltyBreakAssignment: 2
+#PenaltyBreakBeforeFirstCallParameter: 19
+#PenaltyBreakComment: 300
+#PenaltyBreakFirstLessLess: 120
+#PenaltyBreakString: 1000
+#PenaltyBreakTemplateDeclaration: 10
+PenaltyExcessCharacter: 500
+#PenaltyIndentedWhitespace: 0
+#PPIndentWidth:   -1
+#SortIncludes:    CaseSensitive
+#SortUsingDeclarations: true
+
+# FIXME: sorting includes causes a lot of breakage due to cyclic inclusion problems
+SortIncludes: Never
+
+# NOTE: disabling this option breaks indentation of comments, see https://github.com/llvm/llvm-project/issues/53425
+ReflowComments:  true
+
+InsertTrailingCommas: Wrapped
+RemoveParentheses: ReturnStatement
+RemoveSemicolon: true
+
+...
+# vim: ft=yaml

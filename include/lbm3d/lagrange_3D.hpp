@@ -20,7 +20,7 @@
 #include "ibm_kernels.h"
 #include "dirac.h"
 
-template< typename LBM >
+template <typename LBM>
 auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
 {
 	if (macro_idx >= MACRO::N)
@@ -44,7 +44,7 @@ auto Lagrange3D<LBM>::hmacroVector(int macro_idx) -> hVectorView
 	return {data, n};
 }
 
-template< typename LBM >
+template <typename LBM>
 auto Lagrange3D<LBM>::dmacroVector(int macro_idx) -> dVectorView
 {
 	if (macro_idx >= MACRO::N)
@@ -66,50 +66,48 @@ auto Lagrange3D<LBM>::dmacroVector(int macro_idx) -> dVectorView
 	return {data, n};
 }
 
-template< typename LBM >
+template <typename LBM>
 typename LBM::TRAITS::real Lagrange3D<LBM>::computeMinDist()
 {
-	minDist=1e10;
-	maxDist=-1e10;
-	for (std::size_t i=0;i<LL.size()-1;i++)
-	{
-		for (std::size_t j=i+1;j<LL.size();j++)
-		{
+	minDist = 1e10;
+	maxDist = -1e10;
+	for (std::size_t i = 0; i < LL.size() - 1; i++) {
+		for (std::size_t j = i + 1; j < LL.size(); j++) {
 			real d = TNL::l2Norm(LL[j] - LL[i]);
-			if (d>maxDist) maxDist=d;
-			if (d<minDist) minDist=d;
+			if (d > maxDist)
+				maxDist = d;
+			if (d < minDist)
+				minDist = d;
 		}
 	}
 	return minDist;
 }
 
-template< typename LBM >
+template <typename LBM>
 typename LBM::TRAITS::real Lagrange3D<LBM>::computeMaxDistFromMinDist(typename LBM::TRAITS::real mindist)
 {
-	maxDist=-1e10;
-	for (std::size_t i=0;i<LL.size()-1;i++)
-	{
-		real search_dist = 2.0*mindist;
-		for (std::size_t j=i+1;j<LL.size();j++)
-		{
+	maxDist = -1e10;
+	for (std::size_t i = 0; i < LL.size() - 1; i++) {
+		real search_dist = 2.0 * mindist;
+		for (std::size_t j = i + 1; j < LL.size(); j++) {
 			real d = TNL::l2Norm(LL[j] - LL[i]);
 			if (d < search_dist)
-				if (d>maxDist) maxDist=d;
+				if (d > maxDist)
+					maxDist = d;
 		}
 	}
 	return maxDist;
 }
 
-
-template< typename LBM >
+template <typename LBM>
 void Lagrange3D<LBM>::convertLagrangianPoints()
 {
 	hLL_lat.setSize(LL.size());
 
-	TNL::Algorithms::parallelFor< TNL::Devices::Host >(
+	TNL::Algorithms::parallelFor<TNL::Devices::Host>(
 		(idx) 0,
 		(idx) LL.size(),
-		[this] (idx i, typename LBM::lat_t lat) mutable
+		[this](idx i, typename LBM::lat_t lat) mutable
 		{
 			this->hLL_lat[i] = lat.phys2lbmPoint(this->LL[i]);
 		},
@@ -120,11 +118,11 @@ void Lagrange3D<LBM>::convertLagrangianPoints()
 	hLL_velocity_lat = 0;
 }
 
-template< typename LBM >
+template <typename LBM>
 void Lagrange3D<LBM>::allocateMatricesCPU()
 {
-	idx m = LL.size();	// number of lagrangian nodes
-	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
+	idx m = LL.size();													   // number of lagrangian nodes
+	idx n = lbm.lat.global.x() * lbm.lat.global.y() * lbm.lat.global.z();  // number of eulerian nodes
 
 	spdlog::info("number of Lagrangian points: {}", m);
 
@@ -133,40 +131,42 @@ void Lagrange3D<LBM>::allocateMatricesCPU()
 
 	// Allocate matrices
 	ws_tnl_hM.setDimensions(m, n);
-	ws_tnl_hA = std::make_shared< hEllpack >();
+	ws_tnl_hA = std::make_shared<hEllpack>();
 	ws_tnl_hA->setDimensions(m, m);
-	#ifdef USE_CUDA
+#ifdef USE_CUDA
 	ws_tnl_dM.setDimensions(m, n);
-	ws_tnl_dA = std::make_shared< dEllpack >();
+	ws_tnl_dA = std::make_shared<dEllpack>();
 	ws_tnl_dA->setDimensions(m, m);
-	#endif
+#endif
 
 	// Allocate row capacity vectors
 	hM_row_capacities.setSize(m);
 	hA_row_capacities.setSize(m);
 
 	// Create vectors for the solution of the linear system
-	for (int k=0;k<3;k++)
-	{
+	for (int k = 0; k < 3; k++) {
 		ws_tnl_hx[k].setSize(m);
 		ws_tnl_hb[k].setSize(m);
-		#ifdef USE_CUDA
+#ifdef USE_CUDA
 		ws_tnl_dx[k].setSize(m);
 		ws_tnl_db[k].setSize(m);
 		ws_tnl_hxz[k].setSize(m);
 		ws_tnl_hbz[k].setSize(m);
-		#endif
+#endif
 	}
 
 	// Zero-initialize x1, x2, x3
-	for (int k=0;k<3;k++) ws_tnl_hx[k].setValue(0);
-	#ifdef USE_CUDA
-	for (int k=0;k<3;k++) ws_tnl_dx[k].setValue(0);
-	for (int k=0;k<3;k++) ws_tnl_hxz[k].setValue(0);
-	#endif
+	for (int k = 0; k < 3; k++)
+		ws_tnl_hx[k].setValue(0);
+#ifdef USE_CUDA
+	for (int k = 0; k < 3; k++)
+		ws_tnl_dx[k].setValue(0);
+	for (int k = 0; k < 3; k++)
+		ws_tnl_hxz[k].setValue(0);
+#endif
 }
 
-template< typename LBM >
+template <typename LBM>
 void Lagrange3D<LBM>::constructMatricesCPU()
 {
 	auto ibm_logger = spdlog::get("ibm");
@@ -188,30 +188,25 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	timer.start();
 	loopTimer.start();
 	// Calculate row capacities of hM
-	const idx support = 5; // search in this support
-	#pragma omp parallel for schedule(static)
-	for (idx i = 0; i < m; i++)
-	{
+	const idx support = 5;	// search in this support
+#pragma omp parallel for schedule(static)
+	for (idx i = 0; i < m; i++) {
 		idx rowCapacity = 0;
 
-		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
-		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
-		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
+		idx fi_x = floor(hLL_lat[i].x() - (dreal) 0.5);
+		idx fi_y = floor(hLL_lat[i].y() - (dreal) 0.5);
+		idx fi_z = floor(hLL_lat[i].z() - (dreal) 0.5);
 
 		// FIXME: iterate over LBM blocks
 		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
-		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
-		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
-		{
-			if (
-				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
-				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
-				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
-			)
-			{
-				rowCapacity++;
-			}
-		}
+			for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
+				for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++) {
+					if (isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) && isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y())
+						&& isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z()))
+					{
+						rowCapacity++;
+					}
+				}
 
 		hM_row_capacities[i] = rowCapacity;
 	}
@@ -223,36 +218,29 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 
 	loopTimer.reset();
 	loopTimer.start();
-	// Construct the matrix hM
-	#pragma omp parallel for schedule(static)
-	for (idx i = 0; i < m; i++)
-	{
+// Construct the matrix hM
+#pragma omp parallel for schedule(static)
+	for (idx i = 0; i < m; i++) {
 		auto row = ws_tnl_hM.getRow(i);
 		idx element_idx = 0;
 
-		idx fi_x = floor(hLL_lat[i].x() - (dreal)0.5);
-		idx fi_y = floor(hLL_lat[i].y() - (dreal)0.5);
-		idx fi_z = floor(hLL_lat[i].z() - (dreal)0.5);
+		idx fi_x = floor(hLL_lat[i].x() - (dreal) 0.5);
+		idx fi_y = floor(hLL_lat[i].y() - (dreal) 0.5);
+		idx fi_z = floor(hLL_lat[i].z() - (dreal) 0.5);
 
 		// FIXME: iterate over LBM blocks
 		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
-		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
-		for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++)
-		{
-			if (
-				isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) &&
-				isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y()) &&
-				isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z())
-			)
-			{
-				dreal dd =
-					diracDelta(diracDeltaTypeEL, gx - hLL_lat[i].x()) *
-					diracDelta(diracDeltaTypeEL, gy - hLL_lat[i].y()) *
-					diracDelta(diracDeltaTypeEL, gz - hLL_lat[i].z());
-				idx index = lbm.blocks.front().hmap.getStorageIndex(gx,gy,gz);
-				row.setElement(element_idx++, index, dd);
-			}
-		}
+			for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
+				for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++) {
+					if (isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) && isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y())
+						&& isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z()))
+					{
+						dreal dd = diracDelta(diracDeltaTypeEL, gx - hLL_lat[i].x()) * diracDelta(diracDeltaTypeEL, gy - hLL_lat[i].y())
+								 * diracDelta(diracDeltaTypeEL, gz - hLL_lat[i].z());
+						idx index = lbm.blocks.front().hmap.getStorageIndex(gx, gy, gz);
+						row.setElement(element_idx++, index, dd);
+					}
+				}
 	}
 	loopTimer.stop();
 	time_M_construct = loopTimer.getRealTime();
@@ -260,7 +248,7 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	// Transpose matrix M
 	loopTimer.reset();
 	loopTimer.start();
-    ws_tnl_hMT.getTransposition(ws_tnl_hM);
+	ws_tnl_hMT.getTransposition(ws_tnl_hM);
 	loopTimer.stop();
 	time_M_transpose = loopTimer.getRealTime();
 
@@ -268,35 +256,27 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	// TODO: find the correct threshold for this condition
 	//if( m < 1000 )
 	//	threads = 1;
-	(void) threads; // shut up clang warning
+	(void) threads;	 // shut up clang warning
 
 	loopTimer.reset();
 	loopTimer.start();
-	// Calculate row capacities of matrix A
-	#pragma omp parallel for schedule(dynamic) num_threads(threads)
-	for (idx index_row = 0; index_row < m; index_row++)
-	{
+// Calculate row capacities of matrix A
+#pragma omp parallel for schedule(dynamic) num_threads(threads)
+	for (idx index_row = 0; index_row < m; index_row++) {
 		idx rowCapacity = 0;
-		for (idx index_col = 0; index_col < m; index_col++)
-		{
-			if (methodVariant == IbmMethod::modified)
-			{
-				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
-				{
+		for (idx index_col = 0; index_col < m; index_col++) {
+			if (methodVariant == IbmMethod::modified) {
+				if (is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat)) {
 					rowCapacity++;
 				}
 			}
-			else
-			{
-				real val=0;
+			else {
+				real val = 0;
 				auto row1 = ws_tnl_hM.getRow(index_row);
 				auto row2 = ws_tnl_hM.getRow(index_col);
-				for (idx in1=0; in1 < row1.getSize(); in1++)
-				{
-					for (idx in2=0; in2 < row2.getSize(); in2++)
-					{
-						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
-						{
+				for (idx in1 = 0; in1 < row1.getSize(); in1++) {
+					for (idx in2 = 0; in2 < row2.getSize(); in2++) {
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2)) {
 							val += row1.getValue(in1) * row2.getValue(in2);
 							break;
 						}
@@ -309,43 +289,34 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		hA_row_capacities[index_row] = rowCapacity;
 	}
 
-
 	loopTimer.stop();
 	time_A_capacities = loopTimer.getRealTime();
 	ws_tnl_hA->setRowCapacities(hA_row_capacities);
 
-
 	loopTimer.reset();
 	loopTimer.start();
-	// Construct the matrix A
-	#pragma omp parallel for schedule(dynamic) num_threads(threads)
-	for (idx index_row=0;index_row<m;index_row++)
-	{
+// Construct the matrix A
+#pragma omp parallel for schedule(dynamic) num_threads(threads)
+	for (idx index_row = 0; index_row < m; index_row++) {
 		auto row = ws_tnl_hA->getRow(index_row);
 		idx element_idx = 0;
 
-		for (idx index_col=0;index_col<m;index_col++)
-		{
-			if (methodVariant == IbmMethod::modified)
-			{
-				if(is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat))
-				{
+		for (idx index_col = 0; index_col < m; index_col++) {
+			if (methodVariant == IbmMethod::modified) {
+				if (is3DiracNonZero(diracDeltaTypeLL, index_col, index_row, hLL_lat)) {
 					dreal ddd = calculate3Dirac(diracDeltaTypeLL, index_col, index_row, hLL_lat);
 					row.setElement(element_idx++, index_col, ddd);
 					if (element_idx == row.getSize())
 						break;
 				}
-			} else
-			{
-				dreal val=0;
+			}
+			else {
+				dreal val = 0;
 				auto row1 = ws_tnl_hM.getRow(index_row);
 				auto row2 = ws_tnl_hM.getRow(index_col);
-				for (idx in1=0; in1 < row1.getSize(); in1++)
-				{
-					for (idx in2=0; in2 < row2.getSize(); in2++)
-					{
-						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2))
-						{
+				for (idx in1 = 0; in1 < row1.getSize(); in1++) {
+					for (idx in2 = 0; in2 < row2.getSize(); in2++) {
+						if (row1.getColumnIndex(in1) == row2.getColumnIndex(in2)) {
 							val += row1.getValue(in1) * row2.getValue(in2);
 							break;
 						}
@@ -362,12 +333,11 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	loopTimer.stop();
 	time_A_construct = loopTimer.getRealTime();
 
-
 	// Update the preconditioner
 	ws_tnl_hprecond->update(ws_tnl_hA);
 	ws_tnl_hsolver.setMatrix(ws_tnl_hA);
 
-	#ifdef USE_CUDA
+#ifdef USE_CUDA
 	// Copy matrices from host to the GPU
 	loopTimer.reset();
 	loopTimer.start();
@@ -380,17 +350,16 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	// Update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
-	#endif
+#endif
 
-	if (mtx_output)
-	{
+	if (mtx_output) {
 		loopTimer.reset();
 		loopTimer.start();
 		const char* method_id = (methodVariant == IbmMethod::modified) ? "modified" : "original";
-		const std::string output_M = fmt::format("ibm_CPU_matrix-M_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
-		const std::string output_A = fmt::format("ibm_CPU_matrix-A_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
-		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_M, ws_tnl_hM );
-		TNL::Matrices::MatrixWriter< hEllpack >::writeMtx( output_A, *ws_tnl_hA );
+		const std::string output_M = fmt::format("ibm_CPU_matrix-M_method-{}_dirac-{}.mtx", method_id, (int) diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_CPU_matrix-A_method-{}_dirac-{}.mtx", method_id, (int) diracDeltaTypeEL);
+		TNL::Matrices::MatrixWriter<hEllpack>::writeMtx(output_M, ws_tnl_hM);
+		TNL::Matrices::MatrixWriter<hEllpack>::writeMtx(output_A, *ws_tnl_hA);
 		loopTimer.stop();
 		time_matrixWrite = loopTimer.getRealTime();
 	}
@@ -409,11 +378,11 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
 
-template< typename LBM >
+template <typename LBM>
 void Lagrange3D<LBM>::allocateMatricesGPU()
 {
-	idx m = LL.size();	// number of lagrangian nodes
-	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();	// number of eulerian nodes
+	idx m = LL.size();													   // number of lagrangian nodes
+	idx n = lbm.lat.global.x() * lbm.lat.global.y() * lbm.lat.global.z();  // number of eulerian nodes
 
 	spdlog::info("number of Lagrangian points: {}", m);
 
@@ -425,7 +394,7 @@ void Lagrange3D<LBM>::allocateMatricesGPU()
 
 	// Allocate matrices
 	ws_tnl_dM.setDimensions(m, n);
-	ws_tnl_dA = std::make_shared< dEllpack >();
+	ws_tnl_dA = std::make_shared<dEllpack>();
 	ws_tnl_dA->setDimensions(m, m);
 
 	// Allocate row capacity vectors
@@ -433,21 +402,21 @@ void Lagrange3D<LBM>::allocateMatricesGPU()
 	dA_row_capacities.setSize(m);
 
 	// Create vectors for the solution of the linear system
-	for (int k=0;k<3;k++)
-	{
-		#ifdef USE_CUDA
+	for (int k = 0; k < 3; k++) {
+#ifdef USE_CUDA
 		ws_tnl_dx[k].setSize(m);
 		ws_tnl_db[k].setSize(m);
-		#endif
+#endif
 	}
 
-	// Zero-initialize x1, x2, x3
-	#ifdef USE_CUDA
-	for (int k=0;k<3;k++) ws_tnl_dx[k].setValue(0);
-	#endif
+// Zero-initialize x1, x2, x3
+#ifdef USE_CUDA
+	for (int k = 0; k < 3; k++)
+		ws_tnl_dx[k].setValue(0);
+#endif
 }
 
-template< typename LBM >
+template <typename LBM>
 void Lagrange3D<LBM>::constructMatricesGPU()
 {
 	auto ibm_logger = spdlog::get("ibm");
@@ -471,12 +440,10 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	// Calculate row capacities of matrix M
 	TNL::Backend::LaunchConfiguration dM_config;
 	dM_config.blockSize.x = 256;
-	dM_config.gridSize.x = TNL::roundUpDivision(m,dM_config.blockSize.x);
-	TNL::Backend::launchKernelSync( dM_row_capacities_kernel<LBM>, dM_config,
-		dLL_lat.getView(),
-		dM_row_capacities.getView(),
-		lbm.blocks.front().local,
-		diracDeltaTypeEL);
+	dM_config.gridSize.x = TNL::roundUpDivision(m, dM_config.blockSize.x);
+	TNL::Backend::launchKernelSync(
+		dM_row_capacities_kernel<LBM>, dM_config, dLL_lat.getView(), dM_row_capacities.getView(), lbm.blocks.front().local, diracDeltaTypeEL
+	);
 
 	loopTimer.stop();
 	time_M_capacities = loopTimer.getRealTime();
@@ -488,18 +455,21 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	// Construct the matrix M
 	TNL::Backend::LaunchConfiguration dM_config_build;
 	dM_config_build.blockSize.x = 256;
-	dM_config_build.gridSize.x = TNL::roundUpDivision(m,dM_config_build.blockSize.x);
+	dM_config_build.gridSize.x = TNL::roundUpDivision(m, dM_config_build.blockSize.x);
 
-	TNL::Backend::launchKernelSync( dM_construction_kernel<LBM>, dM_config_build,
+	TNL::Backend::launchKernelSync(
+		dM_construction_kernel<LBM>,
+		dM_config_build,
 		dLL_lat.getConstView(),
 		ws_tnl_dM.getView(),
 		lbm.blocks.front().local,
-		#ifdef HAVE_MPI
+#ifdef HAVE_MPI
 		lbm.blocks.front().dmap.getConstLocalView(),
-		#else
+#else
 		lbm.blocks.front().dmap.getConstView(),
-		#endif
-		diracDeltaTypeEL);
+#endif
+		diracDeltaTypeEL
+	);
 
 	loopTimer.stop();
 	time_M_construct = loopTimer.getRealTime();
@@ -507,7 +477,7 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	// Transpose matrix M
 	loopTimer.reset();
 	loopTimer.start();
-    ws_tnl_dMT.getTransposition(ws_tnl_dM);
+	ws_tnl_dMT.getTransposition(ws_tnl_dM);
 	loopTimer.stop();
 	time_M_transpose = loopTimer.getRealTime();
 
@@ -517,50 +487,51 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	TNL::Backend::LaunchConfiguration dA_config;
 	dA_config.blockSize.x = 256;
 	dA_config.gridSize.x = TNL::roundUpDivision(m, dA_config.blockSize.x);
-	TNL::Backend::launchKernelSync(dA_row_capacities_kernel<LBM>, dA_config,
+	TNL::Backend::launchKernelSync(
+		dA_row_capacities_kernel<LBM>,
+		dA_config,
 		dLL_lat.getConstView(),
 		dA_row_capacities.getView(),
 		ws_tnl_dM.getConstView(),
 		diracDeltaTypeLL,
 		methodVariant
-		);
+	);
 
 	loopTimer.stop();
 	time_A_capacities = loopTimer.getRealTime();
 	ws_tnl_dA->setRowCapacities(dA_row_capacities);
 
-
 	loopTimer.reset();
 	loopTimer.start();
 	// Construct the matrix A
 	TNL::Backend::LaunchConfiguration dA_construct_config;
-	dA_construct_config.blockSize.x =256;
-	dA_construct_config.gridSize.x = TNL::roundUpDivision(m,dA_construct_config.blockSize.x);
-	TNL::Backend::launchKernelSync(dA_construction_kernel<LBM>, dA_construct_config,
+	dA_construct_config.blockSize.x = 256;
+	dA_construct_config.gridSize.x = TNL::roundUpDivision(m, dA_construct_config.blockSize.x);
+	TNL::Backend::launchKernelSync(
+		dA_construction_kernel<LBM>,
+		dA_construct_config,
 		dLL_lat.getConstView(),
 		ws_tnl_dA->getView(),
 		ws_tnl_dM.getConstView(),
 		diracDeltaTypeLL,
 		methodVariant
-		);
+	);
 
 	loopTimer.stop();
 	time_A_construct = loopTimer.getRealTime();
-
 
 	// Update the preconditioner
 	ws_tnl_dprecond->update(ws_tnl_dA);
 	ws_tnl_dsolver.setMatrix(ws_tnl_dA);
 
-	if (mtx_output)
-	{
+	if (mtx_output) {
 		loopTimer.reset();
 		loopTimer.start();
 		const char* method_id = (methodVariant == IbmMethod::modified) ? "modified" : "original";
-		const std::string output_M = fmt::format("ibm_GPU_matrix-M_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
-		const std::string output_A = fmt::format("ibm_GPU_matrix-A_method-{}_dirac-{}.mtx", method_id, (int)diracDeltaTypeEL);
-		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_M, ws_tnl_dM );
-		TNL::Matrices::MatrixWriter< dEllpack >::writeMtx( output_A, *ws_tnl_dA );
+		const std::string output_M = fmt::format("ibm_GPU_matrix-M_method-{}_dirac-{}.mtx", method_id, (int) diracDeltaTypeEL);
+		const std::string output_A = fmt::format("ibm_GPU_matrix-A_method-{}_dirac-{}.mtx", method_id, (int) diracDeltaTypeEL);
+		TNL::Matrices::MatrixWriter<dEllpack>::writeMtx(output_M, ws_tnl_dM);
+		TNL::Matrices::MatrixWriter<dEllpack>::writeMtx(output_A, *ws_tnl_dA);
 		loopTimer.stop();
 		time_matrixWrite = loopTimer.getRealTime();
 	}
@@ -579,53 +550,57 @@ void Lagrange3D<LBM>::constructMatricesGPU()
 	ibm_logger->info("constructMatricesJSON: {}", j.dump());
 }
 
-template< typename Matrix, typename Vector >
-__cuda_callable__
-typename Matrix::RealType
-rowVectorProduct( const Matrix& matrix, typename Matrix::IndexType i, const Vector& vector )
+template <typename Matrix, typename Vector>
+__cuda_callable__ typename Matrix::RealType rowVectorProduct(const Matrix& matrix, typename Matrix::IndexType i, const Vector& vector)
 {
-    typename Matrix::RealType result = 0;
-    const auto row = matrix.getRow( i );
+	typename Matrix::RealType result = 0;
+	const auto row = matrix.getRow(i);
 
-    for( typename Matrix::IndexType c = 0; c < row.getSize(); c++ ) {
-        const typename Matrix::IndexType column = row.getColumnIndex( c );
-        if( column != TNL::Matrices::paddingIndex< typename Matrix::IndexType > )
-            result += row.getValue( c ) * vector[ column ];
-    }
+	for (typename Matrix::IndexType c = 0; c < row.getSize(); c++) {
+		const typename Matrix::IndexType column = row.getColumnIndex(c);
+		if (column != TNL::Matrices::paddingIndex<typename Matrix::IndexType>)
+			result += row.getValue(c) * vector[column];
+	}
 
-    return result;
+	return result;
 }
 
 //require: rho, vx, vy, vz
-template< typename LBM >
+template <typename LBM>
 void Lagrange3D<LBM>::computeForces(real time)
 {
 	const char* compute_desc = "undefined";
-	switch (computeVariant)
-	{
-		case IbmCompute::CPU:                compute_desc = "CPU"; break;
-		case IbmCompute::GPU:                compute_desc = "GPU"; break;
-		case IbmCompute::Hybrid:             compute_desc = "Hybrid"; break;
-		case IbmCompute::Hybrid_zerocopy:    compute_desc = "Hybrid_zerocopy"; break;
+	switch (computeVariant) {
+		case IbmCompute::CPU:
+			compute_desc = "CPU";
+			break;
+		case IbmCompute::GPU:
+			compute_desc = "GPU";
+			break;
+		case IbmCompute::Hybrid:
+			compute_desc = "Hybrid";
+			break;
+		case IbmCompute::Hybrid_zerocopy:
+			compute_desc = "Hybrid_zerocopy";
+			break;
 	}
 
-	switch (computeVariant)
-	{
+	switch (computeVariant) {
 		case IbmCompute::CPU:
 		case IbmCompute::Hybrid:
 		case IbmCompute::Hybrid_zerocopy:
-			if (!allocated)
+			if (! allocated)
 				allocateMatricesCPU();
 			allocated = true;
-			if (!constructed)
+			if (! constructed)
 				constructMatricesCPU();
 			constructed = true;
 			break;
 		case IbmCompute::GPU:
-			if (!allocated)
+			if (! allocated)
 				allocateMatricesGPU();
 			allocated = true;
-			if (!constructed)
+			if (! constructed)
 				constructMatricesGPU();
 			constructed = true;
 			break;
@@ -636,7 +611,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 	TNL::Timer timer;
 	timer.start();
 	idx m = LL.size();
-	idx n = lbm.lat.global.x()*lbm.lat.global.y()*lbm.lat.global.z();
+	idx n = lbm.lat.global.x() * lbm.lat.global.y() * lbm.lat.global.z();
 
 	const auto drho = dmacroVector(MACRO::e_rho);
 	const auto dvx = dmacroVector(MACRO::e_vx);
@@ -654,204 +629,233 @@ void Lagrange3D<LBM>::computeForces(real time)
 	auto hfy = hmacroVector(MACRO::e_fy);
 	auto hfz = hmacroVector(MACRO::e_fz);
 
-	switch (computeVariant)
-	{
-		#ifdef USE_CUDA
+	switch (computeVariant) {
+#ifdef USE_CUDA
 		case IbmCompute::GPU:
-		{
-			// no Device--Host copy is required
-			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
-			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
-			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
-			if (use_LL_velocity_in_solution) {
-				auto dbx = ws_tnl_db[0].getView();
-				auto dby = ws_tnl_db[1].getView();
-				auto dbz = ws_tnl_db[2].getView();
-				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
-				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
-				{
-					const point_t v = LL_velocity_lat[i];
-					dbx[i] += v.x();
-					dby[i] += v.y();
-					dbz[i] += v.z();
-				};
-				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
-			}
-			// solver
-			for (int k=0;k<3;k++) {
-				auto start = std::chrono::steady_clock::now();
-				ws_tnl_dsolver.solve(ws_tnl_db[k], ws_tnl_dx[k]);
-				auto end = std::chrono::steady_clock::now();
-				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-				real WT = int_ms * 1e-6;
-				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_dsolver.getIterations(), ws_tnl_dsolver.getResidue());
-			}
-			const auto x1 = ws_tnl_dx[0].getConstView();
-			const auto x2 = ws_tnl_dx[1].getConstView();
-			const auto x3 = ws_tnl_dx[2].getConstView();
-			//TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
-			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
-			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
-			auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
 			{
-				// skipping empty rows explicitly is much faster
-				if( MT->getRowCapacity(i) > 0 ) {
-					dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
-					dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
-					dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+				// no Device--Host copy is required
+				ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
+				ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
+				ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
+				if (use_LL_velocity_in_solution) {
+					auto dbx = ws_tnl_db[0].getView();
+					auto dby = ws_tnl_db[1].getView();
+					auto dbz = ws_tnl_db[2].getView();
+					const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+					auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+					{
+						const point_t v = LL_velocity_lat[i];
+						dbx[i] += v.x();
+						dby[i] += v.y();
+						dbz[i] += v.z();
+					};
+					TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, m, kernel);
 				}
-			};
-			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
-			break;
-		}
+				// solver
+				for (int k = 0; k < 3; k++) {
+					auto start = std::chrono::steady_clock::now();
+					ws_tnl_dsolver.solve(ws_tnl_db[k], ws_tnl_dx[k]);
+					auto end = std::chrono::steady_clock::now();
+					auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+					real WT = int_ms * 1e-6;
+					ibm_logger->info(
+						"t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}",
+						time,
+						k,
+						WT,
+						ws_tnl_dsolver.getIterations(),
+						ws_tnl_dsolver.getResidue()
+					);
+				}
+				const auto x1 = ws_tnl_dx[0].getConstView();
+				const auto x2 = ws_tnl_dx[1].getConstView();
+				const auto x3 = ws_tnl_dx[2].getConstView();
+				//TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
+				TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
+				const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
+				auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+				{
+					// skipping empty rows explicitly is much faster
+					if (MT->getRowCapacity(i) > 0) {
+						dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
+						dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
+						dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+					}
+				};
+				TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, n, kernel);
+				break;
+			}
 
 		case IbmCompute::Hybrid:
-		{
-			ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
-			ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
-			ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
-			if (use_LL_velocity_in_solution) {
-				auto dbx = ws_tnl_db[0].getView();
-				auto dby = ws_tnl_db[1].getView();
-				auto dbz = ws_tnl_db[2].getView();
-				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
-				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
-				{
-					const point_t v = LL_velocity_lat[i];
-					dbx[i] += v.x();
-					dby[i] += v.y();
-					dbz[i] += v.z();
-				};
-				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
-			}
-			// copy to Host
-			for (int k=0;k<3;k++) ws_tnl_hb[k] = ws_tnl_db[k];
-			// solve on CPU
-			for (int k=0;k<3;k++) {
-				auto start = std::chrono::steady_clock::now();
-				ws_tnl_hsolver.solve(ws_tnl_hb[k], ws_tnl_hx[k]);
-				auto end = std::chrono::steady_clock::now();
-				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-				real WT = int_ms * 1e-6;
-				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
-			}
-			// copy to GPU
-			for (int k=0;k<3;k++) ws_tnl_dx[k] = ws_tnl_hx[k];
-			// continue on GPU
-			const auto x1 = ws_tnl_dx[0].getConstView();
-			const auto x2 = ws_tnl_dx[1].getConstView();
-			const auto x3 = ws_tnl_dx[2].getConstView();
-//			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
-			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
-			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
-			auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
 			{
-				// skipping empty rows explicitly is much faster
-				if( MT->getRowCapacity(i) > 0 ) {
-					dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
-					dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
-					dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+				ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
+				ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
+				ws_tnl_dM.vectorProduct(dvz, ws_tnl_db[2], -1.0);
+				if (use_LL_velocity_in_solution) {
+					auto dbx = ws_tnl_db[0].getView();
+					auto dby = ws_tnl_db[1].getView();
+					auto dbz = ws_tnl_db[2].getView();
+					const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+					auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+					{
+						const point_t v = LL_velocity_lat[i];
+						dbx[i] += v.x();
+						dby[i] += v.y();
+						dbz[i] += v.z();
+					};
+					TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, m, kernel);
 				}
-			};
-			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
-			break;
-		}
+				// copy to Host
+				for (int k = 0; k < 3; k++)
+					ws_tnl_hb[k] = ws_tnl_db[k];
+				// solve on CPU
+				for (int k = 0; k < 3; k++) {
+					auto start = std::chrono::steady_clock::now();
+					ws_tnl_hsolver.solve(ws_tnl_hb[k], ws_tnl_hx[k]);
+					auto end = std::chrono::steady_clock::now();
+					auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+					real WT = int_ms * 1e-6;
+					ibm_logger->info(
+						"t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}",
+						time,
+						k,
+						WT,
+						ws_tnl_hsolver.getIterations(),
+						ws_tnl_hsolver.getResidue()
+					);
+				}
+				// copy to GPU
+				for (int k = 0; k < 3; k++)
+					ws_tnl_dx[k] = ws_tnl_hx[k];
+				// continue on GPU
+				const auto x1 = ws_tnl_dx[0].getConstView();
+				const auto x2 = ws_tnl_dx[1].getConstView();
+				const auto x3 = ws_tnl_dx[2].getConstView();
+				//			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
+				TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
+				const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
+				auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+				{
+					// skipping empty rows explicitly is much faster
+					if (MT->getRowCapacity(i) > 0) {
+						dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
+						dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
+						dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+					}
+				};
+				TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, n, kernel);
+				break;
+			}
 
 		case IbmCompute::Hybrid_zerocopy:
-		{
-			ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
-			ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);
-			ws_tnl_dM.vectorProduct(dvz, ws_tnl_hbz[2], -1.0);
-			if (use_LL_velocity_in_solution) {
-				auto dbx = ws_tnl_db[0].getView();
-				auto dby = ws_tnl_db[1].getView();
-				auto dbz = ws_tnl_db[2].getView();
-				const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
-				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
-				{
-					const point_t v = LL_velocity_lat[i];
-					dbx[i] += v.x();
-					dby[i] += v.y();
-					dbz[i] += v.z();
-				};
-				TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, m, kernel);
-			}
-			// solve on CPU
-			for (int k=0;k<3;k++) {
-				auto start = std::chrono::steady_clock::now();
-				ws_tnl_hsolver.solve(ws_tnl_hbz[k].getView(), ws_tnl_hxz[k]);
-				auto end = std::chrono::steady_clock::now();
-				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-				real WT = int_ms * 1e-6;
-				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
-			}
-			// continue on GPU
-			const auto x1 = ws_tnl_hxz[0].getConstView();
-			const auto x2 = ws_tnl_hxz[1].getConstView();
-			const auto x3 = ws_tnl_hxz[2].getConstView();
-//			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
-			TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
-			const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
-			auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
 			{
-				// skipping empty rows explicitly is much faster
-				if( MT->getRowCapacity(i) > 0 ) {
-					dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
-					dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
-					dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+				ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
+				ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);
+				ws_tnl_dM.vectorProduct(dvz, ws_tnl_hbz[2], -1.0);
+				if (use_LL_velocity_in_solution) {
+					auto dbx = ws_tnl_db[0].getView();
+					auto dby = ws_tnl_db[1].getView();
+					auto dbz = ws_tnl_db[2].getView();
+					const auto LL_velocity_lat = dLL_velocity_lat.getConstView();
+					auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+					{
+						const point_t v = LL_velocity_lat[i];
+						dbx[i] += v.x();
+						dby[i] += v.y();
+						dbz[i] += v.z();
+					};
+					TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, m, kernel);
 				}
-			};
-			TNL::Algorithms::parallelFor< TNL::Devices::Cuda >((idx) 0, n, kernel);
-			break;
-		}
-		#endif // USE_CUDA
+				// solve on CPU
+				for (int k = 0; k < 3; k++) {
+					auto start = std::chrono::steady_clock::now();
+					ws_tnl_hsolver.solve(ws_tnl_hbz[k].getView(), ws_tnl_hxz[k]);
+					auto end = std::chrono::steady_clock::now();
+					auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+					real WT = int_ms * 1e-6;
+					ibm_logger->info(
+						"t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}",
+						time,
+						k,
+						WT,
+						ws_tnl_hsolver.getIterations(),
+						ws_tnl_hsolver.getResidue()
+					);
+				}
+				// continue on GPU
+				const auto x1 = ws_tnl_hxz[0].getConstView();
+				const auto x2 = ws_tnl_hxz[1].getConstView();
+				const auto x3 = ws_tnl_hxz[2].getConstView();
+				//			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
+				TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
+				const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
+				auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+				{
+					// skipping empty rows explicitly is much faster
+					if (MT->getRowCapacity(i) > 0) {
+						dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
+						dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
+						dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+					}
+				};
+				TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, n, kernel);
+				break;
+			}
+#endif	// USE_CUDA
 
 		case IbmCompute::CPU:
-		{
-			// vx, vy, vz, rho must be copied from the device
-			lbm.copyMacroToHost();
-			ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
-			ws_tnl_hM.vectorProduct(hvy, ws_tnl_hb[1], -1.0);
-			ws_tnl_hM.vectorProduct(hvz, ws_tnl_hb[2], -1.0);
-			if (use_LL_velocity_in_solution) {
-				auto hbx = ws_tnl_hb[0].getView();
-				auto hby = ws_tnl_hb[1].getView();
-				auto hbz = ws_tnl_hb[2].getView();
-				const auto LL_velocity_lat = hLL_velocity_lat.getConstView();
-				auto kernel = [=] CUDA_HOSTDEV (idx i) mutable
-				{
-					const point_t v = LL_velocity_lat[i];
-					hbx[i] += v.x();
-					hby[i] += v.y();
-					hbz[i] += v.z();
-				};
-				TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, m, kernel);
-			}
-			// solver
-			for (int k=0;k<3;k++) {
-				auto start = std::chrono::steady_clock::now();
-				ws_tnl_hsolver.solve(ws_tnl_hb[k], ws_tnl_hx[k]);
-				auto end = std::chrono::steady_clock::now();
-				auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-				real WT = int_ms * 1e-6;
-				ibm_logger->info("t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}", time, k, WT, ws_tnl_hsolver.getIterations(), ws_tnl_hsolver.getResidue());
-			}
-			auto kernel = [&] (idx i) mutable
 			{
-				// skipping empty rows explicitly is much faster
-				if( ws_tnl_hMT.getRowCapacity(i) > 0 ) {
-					hfx[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[0]);
-					hfy[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[1]);
-					hfz[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
+				// vx, vy, vz, rho must be copied from the device
+				lbm.copyMacroToHost();
+				ws_tnl_hM.vectorProduct(hvx, ws_tnl_hb[0], -1.0);
+				ws_tnl_hM.vectorProduct(hvy, ws_tnl_hb[1], -1.0);
+				ws_tnl_hM.vectorProduct(hvz, ws_tnl_hb[2], -1.0);
+				if (use_LL_velocity_in_solution) {
+					auto hbx = ws_tnl_hb[0].getView();
+					auto hby = ws_tnl_hb[1].getView();
+					auto hbz = ws_tnl_hb[2].getView();
+					const auto LL_velocity_lat = hLL_velocity_lat.getConstView();
+					auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
+					{
+						const point_t v = LL_velocity_lat[i];
+						hbx[i] += v.x();
+						hby[i] += v.y();
+						hbz[i] += v.z();
+					};
+					TNL::Algorithms::parallelFor<TNL::Devices::Host>((idx) 0, m, kernel);
 				}
-			};
-			TNL::Algorithms::parallelFor< TNL::Devices::Host >((idx) 0, n, kernel);
-			// copy forces to the device
-			dfx = hfx;
-			dfy = hfy;
-			dfz = hfz;
-			break;
-		}
+				// solver
+				for (int k = 0; k < 3; k++) {
+					auto start = std::chrono::steady_clock::now();
+					ws_tnl_hsolver.solve(ws_tnl_hb[k], ws_tnl_hx[k]);
+					auto end = std::chrono::steady_clock::now();
+					auto int_ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+					real WT = int_ms * 1e-6;
+					ibm_logger->info(
+						"t={:e}s k={:d} TNL CG solver: WT={:e} iterations={:d} residual={:e}",
+						time,
+						k,
+						WT,
+						ws_tnl_hsolver.getIterations(),
+						ws_tnl_hsolver.getResidue()
+					);
+				}
+				auto kernel = [&](idx i) mutable
+				{
+					// skipping empty rows explicitly is much faster
+					if (ws_tnl_hMT.getRowCapacity(i) > 0) {
+						hfx[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[0]);
+						hfy[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[1]);
+						hfz[i] += 2 * hrho[i] * rowVectorProduct(ws_tnl_hMT, i, ws_tnl_hx[2]);
+					}
+				};
+				TNL::Algorithms::parallelFor<TNL::Devices::Host>((idx) 0, n, kernel);
+				// copy forces to the device
+				dfx = hfx;
+				dfy = hfy;
+				dfz = hfz;
+				break;
+			}
 	}
 	timer.stop();
 
@@ -861,20 +865,21 @@ void Lagrange3D<LBM>::computeForces(real time)
 	ibm_logger->info("computeForcesJSON: {}", j.dump());
 }
 
-template< typename LBM >
-Lagrange3D<LBM>::Lagrange3D(LBM &inputLBM, const std::string& state_id) : lbm(inputLBM)
+template <typename LBM>
+Lagrange3D<LBM>::Lagrange3D(LBM& inputLBM, const std::string& state_id)
+: lbm(inputLBM)
 {
-	if (!spdlog::get("ibm"))
+	if (! spdlog::get("ibm"))
 		init_file_logger("ibm", state_id, inputLBM.communicator);
 
 	ws_tnl_hsolver.setMaxIterations(10000);
 	ws_tnl_hsolver.setConvergenceResidue(3e-4);
-	ws_tnl_hprecond = std::make_shared< hPreconditioner >();
-//	ws_tnl_hsolver.setPreconditioner(ws_tnl_hprecond);
-	#ifdef USE_CUDA
+	ws_tnl_hprecond = std::make_shared<hPreconditioner>();
+	//ws_tnl_hsolver.setPreconditioner(ws_tnl_hprecond);
+#ifdef USE_CUDA
 	ws_tnl_dsolver.setMaxIterations(10000);
 	ws_tnl_dsolver.setConvergenceResidue(3e-4);
-	ws_tnl_dprecond = std::make_shared< dPreconditioner >();
-//	ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
-	#endif
+	ws_tnl_dprecond = std::make_shared<dPreconditioner>();
+	//ws_tnl_dsolver.setPreconditioner(ws_tnl_dprecond);
+#endif
 }

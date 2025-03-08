@@ -1,33 +1,34 @@
 #pragma once
 
-#include <unistd.h>   // access
+#include <unistd.h>	 // access
 
 static bool fileExists(const char* fname)
 {
-//	FILE *fp = fopen(fname, "r");
-//	if (!fp) return false;
-//	fclose(fp);
-//	return true;
+	//FILE *fp = fopen(fname, "r");
+	//if (!fp) return false;
+	//fclose(fp);
+	//return true;
+
 	// POSIX way is faster
 	return access(fname, F_OK) == 0;
 }
 
 #include <string.h>
-#include <linux/limits.h>   // PATH_MAX
-#include <sys/stat.h>   // mkdir(2)
+#include <linux/limits.h>  // PATH_MAX
+#include <sys/stat.h>	   // mkdir(2)
 #include <errno.h>
 
 // adapted from http://stackoverflow.com/a/2336245/119527
-static int mkdir_p(const char *path, mode_t mode)
+static int mkdir_p(const char* path, mode_t mode)
 {
 	const size_t len = strlen(path);
 	char _path[PATH_MAX];
-	char *p;
+	char* p;
 
 	errno = 0;
 
 	// copy string so it is mutable
-	if (len > sizeof(_path)-1) {
+	if (len > sizeof(_path) - 1) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}
@@ -56,7 +57,7 @@ static int mkdir_p(const char *path, mode_t mode)
 	return 0;
 }
 
-#include <libgen.h>   // dirname, basename
+#include <libgen.h>	 // dirname, basename
 
 // create parent directories of a file path
 static int create_parent_directories(const char* fname)
@@ -81,8 +82,7 @@ static int create_file(const char* fname)
 
 	// create the file
 	FILE* fp = fopen(fname, "wb");
-	if (fp == NULL)
-	{
+	if (fp == NULL) {
 		fprintf(stderr, "error: failed to create file %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
@@ -91,10 +91,10 @@ static int create_file(const char* fname)
 	return 0;
 }
 
-#include <stdio.h>	// renameat2
-#include <fcntl.h>	// open
-#include <unistd.h>	// close
-#include <error.h>	// errno
+#include <stdio.h>	 // renameat2
+#include <fcntl.h>	 // open
+#include <unistd.h>	 // close
+#include <error.h>	 // errno
 
 // swap two filenames on the same filesystem https://lwn.net/Articles/569134/
 static int rename_exchange(const char* oldpath, const char* newpath)
@@ -110,7 +110,7 @@ static int rename_exchange(const char* oldpath, const char* newpath)
 	return result;
 #else
 	// if the target does not exist, just move it
-	if (!fileExists(newpath))
+	if (! fileExists(newpath))
 		return renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
 	// make a temporary path
 	char buffer[PATH_MAX];
@@ -134,9 +134,9 @@ static int rename_exchange(const char* oldpath, const char* newpath)
 #endif
 }
 
-#include <sys/file.h>	// flock
-#include <fcntl.h>		// open
-#include <unistd.h>		// close
+#include <sys/file.h>  // flock
+#include <fcntl.h>	   // open
+#include <unistd.h>	   // close
 
 // Try to get a lock. Returns its file descriptor or -1 if failed.
 static int tryLockFile(const char* lockpath)

@@ -1,7 +1,7 @@
 #pragma once
 
 // only a base type - common for all D3Q* models, cannot be used directly
-template < typename TRAITS >
+template <typename TRAITS>
 struct LBM_Data
 {
 	using idx = typename TRAITS::idx;
@@ -14,11 +14,11 @@ struct LBM_Data
 
 	// indexing
 	indexer_t indexer;
-	idx XYZ;	// precomputed indexer.getStorageSize(), i.e. product of (X+overlaps_x)*(Y+overlaps_y)*(Z+overlaps_z)
+	idx XYZ;  // precomputed indexer.getStorageSize(), i.e. product of (X+overlaps_x)*(Y+overlaps_y)*(Z+overlaps_z)
 
 	// scalars
 	dreal lbmViscosity;
-	int stat_counter = 0;	// counter for computing mean quantities in D3Q27_MACRO_Mean - must be set in StateLocal::updateKernelVelocities
+	int stat_counter = 0;  // counter for computing mean quantities in D3Q27_MACRO_Mean - must be set in StateLocal::updateKernelVelocities
 
 	// array pointers
 	dreal* dfs[DFMAX];
@@ -26,9 +26,18 @@ struct LBM_Data
 	map_t* dmap;
 
 	// sizes NOT including overlaps
-	CUDA_HOSTDEV idx X() { return indexer.template getSize<0>(); }
-	CUDA_HOSTDEV idx Y() { return indexer.template getSize<1>(); }
-	CUDA_HOSTDEV idx Z() { return indexer.template getSize<2>(); }
+	CUDA_HOSTDEV idx X()
+	{
+		return indexer.template getSize<0>();
+	}
+	CUDA_HOSTDEV idx Y()
+	{
+		return indexer.template getSize<1>();
+	}
+	CUDA_HOSTDEV idx Z()
+	{
+		return indexer.template getSize<2>();
+	}
 
 	CUDA_HOSTDEV map_t map(idx x, idx y, idx z)
 	{
@@ -42,7 +51,7 @@ struct LBM_Data
 
 	CUDA_HOSTDEV dreal& df(uint8_t type, int q, idx x, idx y, idx z)
 	{
-		return dfs[type][Fxyz(q,x,y,z)];
+		return dfs[type][Fxyz(q, x, y, z)];
 	}
 
 	CUDA_HOSTDEV dreal& macro(int id, idx x, idx y, idx z)
@@ -51,9 +60,8 @@ struct LBM_Data
 	}
 };
 
-
 // base type for all NSE_Data_* types
-template < typename TRAITS >
+template <typename TRAITS>
 struct NSE_Data : LBM_Data<TRAITS>
 {
 	using dreal = typename LBM_Data<TRAITS>::dreal;
@@ -64,7 +72,7 @@ struct NSE_Data : LBM_Data<TRAITS>
 	dreal fz = 0;
 };
 
-template < typename TRAITS >
+template <typename TRAITS>
 struct NSE_Data_ConstInflow : NSE_Data<TRAITS>
 {
 	using idx = typename TRAITS::idx;
@@ -74,8 +82,8 @@ struct NSE_Data_ConstInflow : NSE_Data<TRAITS>
 	dreal inflow_vy = 0;
 	dreal inflow_vz = 0;
 
-	template < typename LBM_KS >
-	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
+	template <typename LBM_KS>
+	CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
 	{
 		KS.vx = inflow_vx;
 		KS.vy = inflow_vy;
@@ -83,25 +91,24 @@ struct NSE_Data_ConstInflow : NSE_Data<TRAITS>
 	}
 };
 
-template < typename TRAITS >
+template <typename TRAITS>
 struct NSE_Data_NoInflow : NSE_Data<TRAITS>
 {
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 
-	template < typename LBM_KS >
-	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
+	template <typename LBM_KS>
+	CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
 	{
 		KS.rho = 1;
-		KS.vx  = 0;
-		KS.vy  = 0;
-		KS.vz  = 0;
+		KS.vx = 0;
+		KS.vy = 0;
+		KS.vz = 0;
 	}
 };
 
-
 // base type for all ADE_Data_* types
-template < typename TRAITS >
+template <typename TRAITS>
 struct ADE_Data : LBM_Data<TRAITS>
 {
 	using idx = typename LBM_Data<TRAITS>::idx;
@@ -134,7 +141,7 @@ struct ADE_Data : LBM_Data<TRAITS>
 	}
 };
 
-template < typename TRAITS >
+template <typename TRAITS>
 struct ADE_Data_ConstInflow : ADE_Data<TRAITS>
 {
 	using idx = typename TRAITS::idx;
@@ -142,8 +149,8 @@ struct ADE_Data_ConstInflow : ADE_Data<TRAITS>
 
 	dreal inflow_phi = 1;
 
-	template < typename LBM_KS >
-	CUDA_HOSTDEV void inflow(LBM_KS &KS, idx x, idx y, idx z)
+	template <typename LBM_KS>
+	CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
 	{
 		KS.phi = inflow_phi;
 	}

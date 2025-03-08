@@ -1,7 +1,7 @@
 #pragma once
 
 #include <spdlog/common.h>
-#include <sys/stat.h>   // mkdir(2)
+#include <sys/stat.h>  // mkdir(2)
 #include <memory>
 
 #include <spdlog/spdlog.h>
@@ -10,8 +10,7 @@
 
 #include <TNL/MPI/Comm.h>
 
-static spdlog::sink_ptr
-init_file_sink(const std::string& name, const std::string& id, const TNL::MPI::Comm& communicator)
+static spdlog::sink_ptr init_file_sink(const std::string& name, const std::string& id, const TNL::MPI::Comm& communicator)
 {
 	const int rank = TNL::MPI::GetRank(communicator);
 
@@ -68,7 +67,7 @@ static void deinit_logging()
 {
 	// create new default logger (same as spdlog itself) before destroying the current one
 	auto color_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    const char *default_logger_name = "";
+	const char* default_logger_name = "";
 	auto logger = std::make_shared<spdlog::logger>(default_logger_name, std::move(color_sink));
 	spdlog::set_default_logger(std::move(logger));
 
