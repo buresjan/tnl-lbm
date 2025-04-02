@@ -22,6 +22,7 @@ CompileFlags:
     - "--extended-lambda"
     - "--expt-relaxed-constexpr"
     - "--default-stream"
+    - "--generate-line-info"
     - "-arch=*"
     - "-forward-unknown-to-host-compiler"
     - "-fdiagnostics-color"  # passed to gcc, different from clangs -fcolor-diagnostics
