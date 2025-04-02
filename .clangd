@@ -37,6 +37,7 @@ Diagnostics:
       - performance-*
       - readability-*
     Remove:
+      - readability-braces-around-statements
       - readability-else-after-return
       - readability-named-parameter
       - readability-magic-numbers
@@ -48,7 +49,6 @@ Diagnostics:
       - modernize-use-trailing-return-type
       - modernize-raw-string-literal
     CheckOptions:
-      readability-braces-around-statements.ShortStatementLines: 99
       readability-function-size.LineThreshold: 64
       readability-function-size.ParameterThreshold: 15
       readability-magic-numbers.IgnoreAllFloatingPointValues: true
