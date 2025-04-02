@@ -1,0 +1,172 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default",
+      "description": "Configure TNL-LBM with default options",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "FETCHCONTENT_TRY_FIND_PACKAGE_MODE": "OPT_IN"
+      }
+    },
+    {
+      "name": "toolchain-gcc",
+      "inherits": "default",
+      "displayName": "Toolchain: GCC host only",
+      "description": "Switch toolchain: latest GCC (host only)",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CXX_FLAGS": null,
+        "CMAKE_EXE_LINKER_FLAGS": null,
+        "CMAKE_SHARED_LINKER_FLAGS": null,
+        "TNL_USE_CUDA": "OFF",
+        "TNL_USE_HIP": "OFF"
+      }
+    },
+    {
+      "name": "toolchain-clang",
+      "inherits": "default",
+      "displayName": "Toolchain: Clang host only",
+      "description": "Switch toolchain: latest Clang (host only)",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++",
+        "CMAKE_EXE_LINKER_FLAGS": "-fuse-ld=lld -lc++ -lc++abi",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fuse-ld=lld -lc++ -lc++abi",
+        "TNL_USE_CUDA": "OFF",
+        "TNL_USE_HIP": "OFF"
+      }
+    },
+    {
+      "name": "toolchain-gcc-nvcc",
+      "inherits": "default",
+      "displayName": "Toolchain: GCC + nvcc",
+      "description": "Switch toolchain: latest GCC and CUDA",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "environment": {
+        "CUDA_PATH": "$penv{CUDA_PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CUDA_COMPILER": "nvcc",
+        "CMAKE_CXX_FLAGS": null,
+        "CMAKE_CUDA_FLAGS": null,
+        "CMAKE_EXE_LINKER_FLAGS": null,
+        "CMAKE_SHARED_LINKER_FLAGS": null,
+        "Thrust_DIR": null,
+        "CUB_DIR": null,
+        "TNL_USE_CUDA": "ON",
+        "TNL_USE_HIP": "OFF"
+      }
+    },
+    {
+      "name": "toolchain-clang-cuda",
+      "inherits": "default",
+      "displayName": "Toolchain: Clang with CUDA",
+      "description": "Switch toolchain: Clang for host and CUDA",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "environment": {
+        "CUDA_PATH": "$penv{CUDA_PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CUDA_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-stdlib=libstdc++ -fopenmp",
+        "CMAKE_CUDA_FLAGS": "-stdlib=libstdc++ -fopenmp",
+        "CMAKE_EXE_LINKER_FLAGS": "-fuse-ld=lld -lc++ -lc++abi",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fuse-ld=lld -lc++ -lc++abi",
+        "Thrust_DIR": "$env{CUDA_PATH}/lib64/cmake/thrust/",
+        "CUB_DIR": "$env{CUDA_PATH}/lib64/cmake/cub/",
+        "TNL_USE_CUDA": "ON",
+        "TNL_USE_HIP": "OFF"
+      }
+    },
+    {
+      "name": "toolchain-hip",
+      "inherits": "default",
+      "displayName": "Toolchain: ROCm/HIP",
+      "description": "Switch toolchain: ROCm/HIP",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": null,
+        "CMAKE_CXX_COMPILER": null,
+        "CMAKE_CUDA_COMPILER": null,
+        "CMAKE_CXX_FLAGS": null,
+        "CMAKE_CUDA_FLAGS": null,
+        "CMAKE_EXE_LINKER_FLAGS": null,
+        "CMAKE_SHARED_LINKER_FLAGS": null,
+        "Thrust_DIR": null,
+        "CUB_DIR": null,
+        "TNL_USE_CUDA": "OFF",
+        "TNL_USE_HIP": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "output": {
+        "verbosity": "default",
+        "shortProgress": true,
+        "outputOnFailure": true,
+        "maxFailedTestOutputSize": 4096
+      },
+      "execution": {
+        "jobs": 4,
+        "noTestsAction": "error",
+        "repeat": {
+          "mode": "until-pass",
+          "count": 2
+        },
+        "timeout": 120,
+        "stopOnFailure": false
+      },
+      "environment": {
+        "OMP_NUM_THREADS": "4"
+      }
+    },
+    {
+      "name": "all-tests",
+      "displayName": "All tests",
+      "inherits": "default",
+      "configurePreset": "default"
+    }
+  ]
+}

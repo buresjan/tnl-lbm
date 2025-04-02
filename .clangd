@@ -1,0 +1,58 @@
+# vim: ft=yaml
+
+# Reference: https://clangd.llvm.org/config
+
+CompileFlags:
+  Compiler: clang++
+  CompilationDatabase: build
+  Add:
+    - "-DHAVE_OPENMP"
+    - "-DHAVE_MPI"
+    - "-DADIOS2_USE_MPI"
+    - "-DUSE_CUDA"
+    - "-xcu"
+  Remove:
+    # remove all nvcc-specific flags that may appear in the compile_commands.json file
+    - "-Xcompiler"
+    - "-Xcompiler=*"
+    - "-Xcudafe"
+    - "-Xcudafe=*"
+    - "--diag_suppress=*"
+    - "--display-error-number"
+    - "--extended-lambda"
+    - "--expt-relaxed-constexpr"
+    - "--default-stream"
+    - "-arch=*"
+    - "-forward-unknown-to-host-compiler"
+    - "-fdiagnostics-color"  # passed to gcc, different from clangs -fcolor-diagnostics
+
+Diagnostics:
+  ClangTidy:
+    Add:
+      - bugprone-suspicious-semicolon
+      - clang-analyzer-*
+      - modernize-*
+      - mpi-*
+      - openmp-*
+      - performance-*
+      - readability-*
+    Remove:
+      - readability-else-after-return
+      - readability-named-parameter
+      - readability-magic-numbers
+      - readability-math-missing-parentheses
+      - readability-function-cognitive-complexity
+      - readability-function-size
+      - readability-identifier-length
+      - modernize-avoid-c-arrays
+      - modernize-use-trailing-return-type
+      - modernize-raw-string-literal
+    CheckOptions:
+      readability-braces-around-statements.ShortStatementLines: 99
+      readability-function-size.LineThreshold: 64
+      readability-function-size.ParameterThreshold: 15
+      readability-magic-numbers.IgnoreAllFloatingPointValues: true
+      readability-magic-numbers.IgnorePowersOf2IntegerValues: true
+      modernize-use-default-member-init.UseAssignment: true
+      modernize-use-auto.MinTypeNameLength: 10
+      cppcoreguidelines-pro-type-member-init.UseAssignment: true
