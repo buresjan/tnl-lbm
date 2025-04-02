@@ -4,11 +4,6 @@
 #include <vector>
 #include <string>
 
-#include <math.h>
-
-#include "defs.h"
-#include "lbm.h"
-
 #include <fmt/core.h>
 
 #include <TNL/Matrices/SparseMatrix.h>
@@ -27,7 +22,7 @@ template <typename Real, typename Device, typename Index>
 using SlicedEllpack = TNL::Matrices::SparseMatrix<Real, Device, Index, TNL::Matrices::GeneralMatrix, SlicedEllpackSegments>;
 
 // Enum for deciding which compute approach is used
-enum class IbmCompute
+enum class IbmCompute : std::uint8_t
 {
 	GPU = 0,
 	CPU = 1,
@@ -36,7 +31,7 @@ enum class IbmCompute
 };
 
 // Enum for deciding which IBM method is used
-enum class IbmMethod
+enum class IbmMethod : std::uint8_t
 {
 	modified = 0,
 	original = 1,

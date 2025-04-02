@@ -10,10 +10,8 @@
 #include <fmt/core.h>
 #include <adios2.h>
 
-#include "lbm_common/logging.h"
-#include "lbm_common/fileutils.h"
-#include "defs.h"
-#include "kernels.h"
+#include "../lbm_common/logging.h"
+#include "../lbm_common/fileutils.h"
 #include "lbm.h"
 #include "vtk_writer.h"
 #include "checkpoint.h"
@@ -69,7 +67,7 @@ struct counter
 	REAL period = -1.0;
 	bool action(REAL time)
 	{
-		return (period > 0 && time >= count * period) ? true : false;
+		return period > 0 && time >= count * period;
 	}
 };
 
@@ -325,7 +323,7 @@ struct State
 		timer_total.start();
 	}
 
-	~State()
+	virtual ~State()
 	{
 		deinit_logging();
 		releaseLock(lock_fd);

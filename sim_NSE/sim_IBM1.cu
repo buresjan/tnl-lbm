@@ -1,4 +1,5 @@
 #include <argparse/argparse.hpp>
+#include <utility>
 
 #include "lbm3d/core.h"
 #include "lbm3d/lagrange_3D.h"
@@ -316,7 +317,7 @@ struct StateLocal : State<NSE>
 	}
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
-	: State<NSE>(id, communicator, lat)
+	: State<NSE>(id, communicator, std::move(lat))
 	{}
 };
 
@@ -463,7 +464,7 @@ int main(int argc, char** argv)
 		program.parse_args(argc, argv);
 	}
 	catch (const std::exception& err) {
-		std::cerr << err.what() << std::endl;
+		std::cerr << err.what() << '\n';
 		std::cerr << program;
 		return 1;
 	}

@@ -10,10 +10,7 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <cmath>
 
-#include <string>
-#include <iostream>
 #include <utility>
 
 #include <TNL/Containers/StaticVector.h>
@@ -288,9 +285,9 @@ enum
 	mpp = 26,
 };
 
-// static array of sync directions for the MPI synchronizer
+// array of sync directions for the MPI synchronizer
 // (indexing must correspond to the enum above)
-static TNL::Containers::SyncDirection df_sync_directions[27] = {
+inline constexpr TNL::Containers::SyncDirection df_sync_directions[27] = {
 	// Q7
 	TNL::Containers::SyncDirection::None,
 	TNL::Containers::SyncDirection::Right,

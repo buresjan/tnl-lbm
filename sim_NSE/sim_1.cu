@@ -1,4 +1,5 @@
 #include <argparse/argparse.hpp>
+#include <utility>
 
 #include "lbm3d/core.h"
 
@@ -21,7 +22,7 @@ struct StateLocal : State<NSE>
 
 	real lbm_inflow_vx = 0;
 
-	virtual void setupBoundaries()
+	void setupBoundaries() override
 	{
 		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT);						  // left
 		nse.setBoundaryX(nse.lat.global.x() - 1, BC::GEO_OUTFLOW_RIGHT);  // right
@@ -50,7 +51,7 @@ struct StateLocal : State<NSE>
 					}
 	}
 
-	virtual bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs)
+	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
 		int k = 0;
 		if (index == k++)
@@ -68,7 +69,7 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void updateKernelVelocities()
+	void updateKernelVelocities() override
 	{
 		for (auto& block : nse.blocks) {
 			block.data.inflow_vx = lbm_inflow_vx;
@@ -78,7 +79,7 @@ struct StateLocal : State<NSE>
 	}
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
-	: State<NSE>(id, communicator, lat)
+	: State<NSE>(id, communicator, std::move(lat))
 	{}
 };
 
@@ -182,7 +183,7 @@ int main(int argc, char** argv)
 		program.parse_args(argc, argv);
 	}
 	catch (const std::exception& err) {
-		std::cerr << err.what() << std::endl;
+		std::cerr << err.what() << '\n';
 		std::cerr << program;
 		return 1;
 	}

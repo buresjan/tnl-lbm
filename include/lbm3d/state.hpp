@@ -4,8 +4,9 @@
 #include <TNL/Timer.h>
 
 #include "state.h"
+#include "kernels.h"
 
-#include "lbm_common/png_tool.h"
+#include "../lbm_common/png_tool.h"
 
 template <typename NSE>
 bool State<NSE>::getPNGdimensions(const char* filename, int& w, int& h)
@@ -17,13 +18,13 @@ bool State<NSE>::getPNGdimensions(const char* filename, int& w, int& h)
 	FILE* fp = fopen(filename, "rb");
 
 	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (! png) {
+	if (png == nullptr) {
 		printf("file %s png read error\n", filename);
 		return false;
 	}
 
 	png_infop info = png_create_info_struct(png);
-	if (! png) {
+	if (png == nullptr) {
 		printf("file %s png read error\n", filename);
 		return false;
 	}
@@ -42,9 +43,7 @@ bool State<NSE>::getPNGdimensions(const char* filename, int& w, int& h)
 	//  color_type = png_get_color_type(png, info);
 	//  bit_depth  = png_get_bit_depth(png, info);
 	fclose(fp);
-	if (w > 0 && h > 0)
-		return true;
-	return false;
+	return w > 0 && h > 0;
 }
 
 template <typename NSE>
@@ -868,16 +867,12 @@ bool State<NSE>::estimateMemoryDemands()
 	}
 
 	long long CPUavail = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
-	long long GPUavail = 0;
-	long long GPUtotal = 0;
-	long long GPUtotal_hw = 0;
 	long long CPUtotal = memMacro + memMap + DFMAX * memDFs;
 	long long CPUDFs = DFMAX * memDFs;
 #ifdef USE_CUDA
-	GPUavail = 0;
-	GPUtotal_hw = 0;
-	GPUtotal += DFMAX * memDFs + memMacro + memMap;
-	//	CPUDFs = 0;
+	long long GPUavail = 0;
+	long long GPUtotal_hw = 0;
+	long long GPUtotal = DFMAX * memDFs + memMacro + memMap;
 
 	const int gpu_id = TNL::Backend::getDevice();
 	const std::string gpu_name = TNL::Backend::getDeviceName(gpu_id);
@@ -886,9 +881,6 @@ bool State<NSE>::estimateMemoryDemands()
 	const std::size_t total = TNL::Backend::getGlobalMemorySize(gpu_id);
 	GPUavail += free;
 	GPUtotal_hw += total;
-
-#else
-	//	CPUtotal += CPUDFs;
 #endif
 
 	spdlog::info("Local memory budget analysis / estimation for MPI rank {}", nse.rank);
@@ -1062,11 +1054,13 @@ void State<NSE>::SimUpdate()
 	// call hook method (used e.g. for extra kernels in the non-Newtonian model)
 	computeBeforeLBMKernel();
 
+#ifdef HAVE_MPI
 #ifdef AA_PATTERN
 	uint8_t output_df = df_cur;
 #endif
 #ifdef AB_PATTERN
 	uint8_t output_df = df_out;
+#endif
 #endif
 
 #ifdef USE_CUDA

@@ -15,7 +15,7 @@
 #include <fmt/core.h>
 #include <nlohmann/json.hpp>
 
-#include "lbm_common/logging.h"
+#include "../lbm_common/logging.h"
 #include "lagrange_3D.h"
 #include "ibm_kernels.h"
 #include "dirac.h"

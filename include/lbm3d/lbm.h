@@ -1,6 +1,5 @@
 #pragma once
 
-#include "defs.h"
 #include "lattice.h"
 #include "lbm_block.h"
 #include <type_traits>

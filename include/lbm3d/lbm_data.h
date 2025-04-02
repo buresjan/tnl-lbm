@@ -1,5 +1,7 @@
 #pragma once
 
+#include "defs.h"
+
 // only a base type - common for all D3Q* models, cannot be used directly
 template <typename TRAITS>
 struct LBM_Data

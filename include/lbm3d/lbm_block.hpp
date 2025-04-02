@@ -104,7 +104,8 @@ void LBM_BLOCK<CONFIG>::setLatticeDecomposition(
 	// create CUDA streams
 #ifdef USE_CUDA
 	// get the range of stream priorities for current GPU
-	int priority_high, priority_low;
+	int priority_high;
+	int priority_low;
 	cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high);
 	// low-priority stream for the interior
 	computeData.at(TNL::Containers::SyncDirection::None).stream = TNL::Backend::Stream::create(TNL::Backend::StreamNonBlocking, priority_low);
@@ -534,19 +535,19 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	dmap.allocate();
 	#endif
 
-	for (uint8_t dfty = 0; dfty < DFMAX; dfty++) {
-		dfs[dfty].setSizes(0, global.x(), global.y(), global.z());
+	for (auto & df : dfs) {
+		df.setSizes(0, global.x(), global.y(), global.z());
 	#ifdef HAVE_MPI
 		if (local.x() != global.x())
-			dfs[dfty].getOverlaps().template setSize<1>(overlap_width);
+			df.getOverlaps().template setSize<1>(overlap_width);
 		if (local.y() != global.y())
-			dfs[dfty].getOverlaps().template setSize<2>(overlap_width);
+			df.getOverlaps().template setSize<2>(overlap_width);
 		if (local.z() != global.z())
-			dfs[dfty].getOverlaps().template setSize<3>(overlap_width);
-		dfs[dfty].template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
-		dfs[dfty].template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
-		dfs[dfty].template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
-		dfs[dfty].allocate();
+			df.getOverlaps().template setSize<3>(overlap_width);
+		df.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+		df.template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+		df.template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
+		df.allocate();
 	#endif
 	}
 

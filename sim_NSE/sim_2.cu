@@ -1,11 +1,12 @@
 #include <argparse/argparse.hpp>
+#include <utility>
 
 #include "lbm3d/core.h"
 
 // 3D test problem: forcing/input velocity
 // analytical solution for rectangular duct: forcing accelerated
 
-enum Scaling
+enum Scaling : std::uint8_t
 {
 	STRONG_SCALING,
 	WEAK_SCALING_1D,
@@ -104,13 +105,13 @@ struct StateLocal : State<NSE>
 		an_cache.allocate();
 #endif
 
-#pragma omp parallel for schedule(static) collapse(2)
+#pragma omp parallel for schedule(static) collapse(2) default(none) shared(block)
 		for (idx z = block.offset.z(); z < block.offset.z() + block.local.z(); z++)
 			for (idx y = block.offset.y(); y < block.offset.y() + block.local.y(); y++)
 				an_cache(0, y, z) = raw_analytical_ux(an_n, y, z);
 	}
 
-	virtual void setupBoundaries()
+	void setupBoundaries() override
 	{
 		//if (nse.blocks.front().data.inflow_vx != 0)
 		if (nse.blocks.front().data.vx_profile) {
@@ -136,7 +137,7 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryY(nse.lat.global.y() - 1, BC::GEO_NOTHING);	// front
 	}
 
-	virtual bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs)
+	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
 		int k = 0;
 		if (index == k++)
@@ -188,7 +189,7 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void probe1()
+	void probe1() override
 	{
 		// compute exact error
 		// uy,uz should be zero
@@ -255,7 +256,7 @@ struct StateLocal : State<NSE>
 	}
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat, bool periodic_lattice)
-	: State<NSE>(id, communicator, lat, periodic_lattice)
+	: State<NSE>(id, communicator, std::move(lat), periodic_lattice)
 	{
 		errors_count = 10;
 		l1errors = new real[errors_count];
@@ -481,7 +482,7 @@ int main(int argc, char** argv)
 		program.parse_args(argc, argv);
 	}
 	catch (const std::exception& err) {
-		std::cerr << err.what() << std::endl;
+		std::cerr << err.what() << '\n';
 		std::cerr << program;
 		return 1;
 	}
