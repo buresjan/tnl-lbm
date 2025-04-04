@@ -352,12 +352,18 @@ int main(int argc, char** argv)
 	const auto dirac = program.get<int>("--dirac");
 	const auto method = program.get<std::string>("--method");
 
-	if (resolution < 1)
-		throw std::invalid_argument("CLI error: resolution must be at least 1");
-	if (Re < 1)
-		throw std::invalid_argument("CLI error: Re must be at least 1");
-	if (discretization_ratio <= 0)
-		throw std::invalid_argument("CLI error: discretization-ratio must be positive");
+	if (resolution < 1) {
+		fmt::println(stderr, "CLI error: resolution must be at least 1");
+		return 1;
+	}
+	if (Re < 1) {
+		fmt::println(stderr, "CLI error: Re must be at least 1");
+		return 1;
+	}
+	if (discretization_ratio <= 0) {
+		fmt::println(stderr, "CLI error: discretization-ratio must be positive");
+		return 1;
+	}
 
 	run(resolution, Re, discretization_ratio, compute, dirac, method);
 

@@ -189,8 +189,10 @@ int main(int argc, char** argv)
 	}
 
 	const auto resolution = program.get<int>("resolution");
-	if (resolution < 1)
-		throw std::invalid_argument("CLI error: resolution must be at least 1");
+	if (resolution < 1) {
+		fmt::println(stderr, "CLI error: resolution must be at least 1");
+		return 1;
+	}
 
 	run(resolution);
 

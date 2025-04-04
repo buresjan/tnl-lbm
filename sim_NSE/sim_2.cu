@@ -489,10 +489,14 @@ int main(int argc, char** argv)
 
 	const auto min_resolution = program.get<int>("--min-resolution");
 	const auto max_resolution = program.get<int>("--max-resolution");
-	if (min_resolution < 1)
-		throw std::invalid_argument("CLI error: min-resolution must be at least 1");
-	if (max_resolution < min_resolution)
-		throw std::invalid_argument(fmt::format("CLI error: max-resolution must be at least min-resolution ({})", min_resolution));
+	if (min_resolution < 1) {
+		fmt::println(stderr, "CLI error: min-resolution must be at least 1");
+		return 1;
+	}
+	if (max_resolution < min_resolution) {
+		fmt::println(stderr, "CLI error: max-resolution={} must be at least min-resolution={}", min_resolution);
+		return 1;
+	}
 
 	const bool use_forcing = program.get<bool>("--use-forcing");
 	Scaling scaling = STRONG_SCALING;
