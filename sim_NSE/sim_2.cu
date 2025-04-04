@@ -271,7 +271,7 @@ struct StateLocal : State<NSE>
 };
 
 template <typename NSE>
-int sim(int RES = 1, bool use_forcing = true, Scaling scaling = STRONG_SCALING)
+int sim(int RES, bool use_forcing, Scaling scaling)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -434,7 +434,7 @@ int sim(int RES = 1, bool use_forcing = true, Scaling scaling = STRONG_SCALING)
 }
 
 template <typename TRAITS = TraitsSP>
-void run()
+void run(int RES, bool use_forcing, Scaling scaling)
 {
 	using COLL = D3Q27_CUM<TRAITS, D3Q27_EQ_INV_CUM<TRAITS>>;
 	//using COLL = D3Q27_FCLBM<TRAITS>;
@@ -460,15 +460,7 @@ void run()
 		D3Q27_BC_All,
 		D3Q27_MACRO_Default<TRAITS>>;
 
-	bool use_forcing = false;
-	Scaling scaling = STRONG_SCALING;
-	//Scaling scaling = WEAK_SCALING;
-	//Scaling scaling = WEAK_SCALING_3D;
-	for (int i = 2; i <= 4; i++) {
-		//int res=4;
-		int res = pow(2, i);
-		sim<NSE_CONFIG>(res, use_forcing, scaling);
-	}
+	sim<NSE_CONFIG>(RES, use_forcing, scaling);
 }
 
 int main(int argc, char** argv)
@@ -477,6 +469,14 @@ int main(int argc, char** argv)
 
 	argparse::ArgumentParser program("sim_2");
 	program.add_description("Square duct flow with verification against analytical solution.");
+	program.add_argument("--min-resolution").help("minimum resolution of the lattice").scan<'i', int>().default_value(2).nargs(1);
+	program.add_argument("--max-resolution").help("maximum resolution of the lattice").scan<'i', int>().default_value(4).nargs(1);
+	program.add_argument("--use-forcing").help("use forcing term with periodic boundary conditions instead of inflow boundary condition").flag();
+	program.add_argument("--scaling")
+		.help("parallel scaling mode (affects the global lattice size and its distribution into subdomains)")
+		.choices("strong", "weak-1d", "weak-3d")
+		.default_value("strong")
+		.nargs(1);
 
 	try {
 		program.parse_args(argc, argv);
@@ -487,7 +487,24 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	run();
+	const auto min_resolution = program.get<int>("--min-resolution");
+	const auto max_resolution = program.get<int>("--max-resolution");
+	if (min_resolution < 1)
+		throw std::invalid_argument("CLI error: min-resolution must be at least 1");
+	if (max_resolution < min_resolution)
+		throw std::invalid_argument(fmt::format("CLI error: max-resolution must be at least min-resolution ({})", min_resolution));
+
+	const bool use_forcing = program.get<bool>("--use-forcing");
+	Scaling scaling = STRONG_SCALING;
+	if (program.get<std::string>("--scaling") == "weak-1d")
+		scaling = WEAK_SCALING_1D;
+	else if (program.get<std::string>("--scaling") == "weak-3d")
+		scaling = WEAK_SCALING_3D;
+
+	for (int i = min_resolution; i <= max_resolution; i++) {
+		int res = pow(2, i);
+		run(res, use_forcing, scaling);
+	}
 
 	return 0;
 }
