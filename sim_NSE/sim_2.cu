@@ -271,7 +271,7 @@ struct StateLocal : State<NSE>
 };
 
 template <typename NSE>
-int sim(int RES, bool use_forcing, Scaling scaling)
+int sim(int RES, bool use_forcing, Scaling scaling, double final_time)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -396,7 +396,7 @@ int sim(int RES, bool use_forcing, Scaling scaling)
 	state.cnt[PRINT].period = 10.0;
 	state.cnt[PROBE1].period = 1.0;
 	//state.nse.physFinalTime = PHYS_DT * 1e7;
-	state.nse.physFinalTime = 100;	//5000;
+	state.nse.physFinalTime = final_time;
 	//state.cnt[VTK2D].period = 1.0;
 
 	if (scaling == WEAK_SCALING_3D) {
@@ -434,7 +434,7 @@ int sim(int RES, bool use_forcing, Scaling scaling)
 }
 
 template <typename TRAITS = TraitsSP>
-void run(int RES, bool use_forcing, Scaling scaling)
+void run(int RES, bool use_forcing, Scaling scaling, double final_time)
 {
 	using COLL = D3Q27_CUM<TRAITS, D3Q27_EQ_INV_CUM<TRAITS>>;
 	//using COLL = D3Q27_FCLBM<TRAITS>;
@@ -460,7 +460,7 @@ void run(int RES, bool use_forcing, Scaling scaling)
 		D3Q27_BC_All,
 		D3Q27_MACRO_Default<TRAITS>>;
 
-	sim<NSE_CONFIG>(RES, use_forcing, scaling);
+	sim<NSE_CONFIG>(RES, use_forcing, scaling, final_time);
 }
 
 int main(int argc, char** argv)
@@ -471,6 +471,7 @@ int main(int argc, char** argv)
 	program.add_description("Square duct flow with verification against analytical solution.");
 	program.add_argument("--min-resolution").help("minimum resolution of the lattice").scan<'i', int>().default_value(2).nargs(1);
 	program.add_argument("--max-resolution").help("maximum resolution of the lattice").scan<'i', int>().default_value(4).nargs(1);
+	program.add_argument("--final-time").help("final time of the simulation").scan<'g', double>().default_value(100).nargs(1);
 	program.add_argument("--use-forcing").help("use forcing term with periodic boundary conditions instead of inflow boundary condition").flag();
 	program.add_argument("--scaling")
 		.help("parallel scaling mode (affects the global lattice size and its distribution into subdomains)")
@@ -503,6 +504,12 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	const auto final_time = program.get<double>("--final-time");
+	if (final_time <= 0) {
+		fmt::println(stderr, "CLI error: final-time must be positive");
+		return 1;
+	}
+
 	const bool use_forcing = program.get<bool>("--use-forcing");
 	Scaling scaling = STRONG_SCALING;
 	if (program.get<std::string>("--scaling") == "weak-1d")
@@ -513,9 +520,9 @@ int main(int argc, char** argv)
 	for (int i = min_resolution; i <= max_resolution; i++) {
 		int res = pow(2, i);
 		if (program.get<std::string>("--precision") == "double")
-			run<TraitsDP>(res, use_forcing, scaling);
+			run<TraitsDP>(res, use_forcing, scaling, final_time);
 		else
-			run<TraitsSP>(res, use_forcing, scaling);
+			run<TraitsSP>(res, use_forcing, scaling, final_time);
 	}
 
 	return 0;
