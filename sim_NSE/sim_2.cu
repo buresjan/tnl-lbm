@@ -311,9 +311,14 @@ int sim(int RES, bool use_forcing, Scaling scaling, double final_time)
 	lat.physViscosity = PHYS_VISCOSITY;
 
 	const char* prec = (std::is_same_v<dreal, float>) ? "float" : "double";
-	const std::string state_id = fmt::format(
-		"sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing) ? "forcing" : "velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD)
-	);
+	const char* bc_variant = (use_forcing) ? "forcing" : "velocity";
+	const char* scaling_variant = "strong";
+	if (scaling == WEAK_SCALING_1D)
+		scaling_variant = "weak-1d";
+	else if (scaling == WEAK_SCALING_3D)
+		scaling_variant = "weak-3d";
+	const std::string state_id =
+		fmt::format("sim_2_{}_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, bc_variant, scaling_variant, RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, use_forcing);
 
 	if (! state.canCompute())
