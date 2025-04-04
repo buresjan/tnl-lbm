@@ -477,6 +477,11 @@ int main(int argc, char** argv)
 		.choices("strong", "weak-1d", "weak-3d")
 		.default_value("strong")
 		.nargs(1);
+	program.add_argument("--precision")
+		.help("precision for numerical operations: single=32-bit (float), double=64-bit")
+		.choices("single", "double")
+		.default_value("single")
+		.nargs(1);
 
 	try {
 		program.parse_args(argc, argv);
@@ -507,7 +512,10 @@ int main(int argc, char** argv)
 
 	for (int i = min_resolution; i <= max_resolution; i++) {
 		int res = pow(2, i);
-		run(res, use_forcing, scaling);
+		if (program.get<std::string>("--precision") == "double")
+			run<TraitsDP>(res, use_forcing, scaling);
+		else
+			run<TraitsSP>(res, use_forcing, scaling);
 	}
 
 	return 0;
