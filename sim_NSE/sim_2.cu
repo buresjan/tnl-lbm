@@ -264,7 +264,7 @@ struct StateLocal : State<NSE>
 			l1errors[i] = 1;
 	}
 
-	~StateLocal()
+	~StateLocal() override
 	{
 		delete[] l1errors;
 	}
@@ -310,7 +310,7 @@ int sim(int RES = 1, bool use_forcing = true, Scaling scaling = STRONG_SCALING)
 	lat.physDt = PHYS_DT;
 	lat.physViscosity = PHYS_VISCOSITY;
 
-	const char* prec = (std::is_same<dreal, float>::value) ? "float" : "double";
+	const char* prec = (std::is_same_v<dreal, float>) ? "float" : "double";
 	const std::string state_id = fmt::format(
 		"sim_2_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, (use_forcing) ? "forcing" : "velocity", RES, TNL::MPI::GetSize(MPI_COMM_WORLD)
 	);

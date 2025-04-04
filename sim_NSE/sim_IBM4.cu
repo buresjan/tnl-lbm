@@ -79,7 +79,7 @@ struct StateLocal : State<NSE>
 	dreal ball_amplitude = 0;
 	dreal ball_period = 1;
 
-	virtual bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs)
+	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
 		int k = 0;
 		if (index == k++) {
@@ -130,7 +130,7 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void probe1()
+	void probe1() override
 	{
 		static idx cycle = 0;
 		const std::string basename = fmt::format("ball_{:04d}", cycle);
@@ -144,7 +144,7 @@ struct StateLocal : State<NSE>
 		cycle++;
 	}
 
-	virtual void computeBeforeLBMKernel()
+	void computeBeforeLBMKernel() override
 	{
 		// update ball position
 		const dreal velocity_amplitude = 2 * ball_amplitude / ball_period;
@@ -164,7 +164,7 @@ struct StateLocal : State<NSE>
 		ball_c += point_t{0, 0, vz * nse.lat.physDl};
 	}
 
-	virtual void updateKernelVelocities()
+	void updateKernelVelocities() override
 	{
 		for (auto& block : nse.blocks) {
 			block.data.inflow_vx = lbm_inflow_vx;
@@ -173,7 +173,7 @@ struct StateLocal : State<NSE>
 		}
 	}
 
-	virtual void setupBoundaries()
+	void setupBoundaries() override
 	{
 		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT);						  // left
 		nse.setBoundaryX(nse.lat.global.x() - 1, BC::GEO_OUTFLOW_RIGHT);  // right

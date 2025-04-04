@@ -79,7 +79,7 @@ struct StateLocal : State<NSE>
 	real ball_diameter = 0.01;
 	point_t ball_c;
 
-	virtual bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs)
+	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
 		int k = 0;
 		if (index == k++) {
@@ -130,7 +130,7 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void updateKernelVelocities()
+	void updateKernelVelocities() override
 	{
 		for (auto& block : nse.blocks) {
 			block.data.inflow_vx = lbm_inflow_vx;
@@ -139,7 +139,7 @@ struct StateLocal : State<NSE>
 		}
 	}
 
-	virtual void setupBoundaries()
+	void setupBoundaries() override
 	{
 		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT);					   // left
 		nse.setBoundaryX(nse.lat.global.x() - 1, BC::GEO_OUTFLOW_EQ);  // right

@@ -109,7 +109,7 @@ struct StateLocal : State<NSE>
 	real cylinder_diameter = 0.01;
 	point_t cylinder_c;
 
-	virtual bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs)
+	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
 		int k = 0;
 		if (index == k++) {
@@ -160,10 +160,13 @@ struct StateLocal : State<NSE>
 		return false;
 	}
 
-	virtual void probe1()
+	void probe1() override
 	{
 		// compute drag
-		real Fx = 0, Fy = 0, Fz = 0, dV = nse.lat.physDl * nse.lat.physDl * nse.lat.physDl;
+		real Fx = 0;
+		real Fy = 0;
+		real Fz = 0;
+		real dV = nse.lat.physDl * nse.lat.physDl * nse.lat.physDl;
 		real rho = 1.0;	 //nse.physFluidDensity;
 		//real target_velocity = nse.lat.lbm2physVelocity(lbm_input_velocity);
 		real lbm_input_velocity = nse.lat.phys2lbmVelocity(phys_input_U_bar);
@@ -295,7 +298,7 @@ struct StateLocal : State<NSE>
 		//fclose(f);
 	}
 
-	virtual void updateKernelVelocities()
+	void updateKernelVelocities() override
 	{
 		for (auto& block : nse.blocks) {
 			block.data.inflow_vx = nse.lat.phys2lbmVelocity(phys_input_U_max);
@@ -306,7 +309,7 @@ struct StateLocal : State<NSE>
 		}
 	}
 
-	virtual void setupBoundaries()
+	void setupBoundaries() override
 	{
 		nse.setBoundaryX(0, BC::GEO_INFLOW_LEFT);					   // left
 		nse.setBoundaryX(nse.lat.global.x() - 1, BC::GEO_OUTFLOW_EQ);  // right
