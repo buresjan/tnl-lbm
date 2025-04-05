@@ -1,7 +1,5 @@
-# vim: ft=yaml
-
 # Reference: https://clangd.llvm.org/config
-
+---
 CompileFlags:
   Compiler: clang++
   CompilationDatabase: build
@@ -57,3 +55,6 @@ Diagnostics:
       modernize-use-default-member-init.UseAssignment: true
       modernize-use-auto.MinTypeNameLength: 10
       cppcoreguidelines-pro-type-member-init.UseAssignment: true
+
+...
+# vim: ft=yaml
