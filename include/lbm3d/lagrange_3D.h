@@ -8,7 +8,6 @@
 
 #include <TNL/Matrices/SparseMatrix.h>
 #include <TNL/Algorithms/Segments/SlicedEllpack.h>
-#include <TNL/Pointers/DevicePointer.h>
 #include <TNL/Algorithms/parallelFor.h>
 #include <TNL/Solvers/Linear/CG.h>
 #include <TNL/Solvers/Linear/Preconditioners/Diagonal.h>

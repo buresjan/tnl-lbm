@@ -670,16 +670,14 @@ void Lagrange3D<LBM>::computeForces(real time)
 				const auto x1 = ws_tnl_dx[0].getConstView();
 				const auto x2 = ws_tnl_dx[1].getConstView();
 				const auto x3 = ws_tnl_dx[2].getConstView();
-				//TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
-				TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
-				const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
+				const auto MT = ws_tnl_dMT.getConstView();
 				auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
 				{
 					// skipping empty rows explicitly is much faster
-					if (MT->getRowCapacity(i) > 0) {
-						dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
-						dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
-						dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+					if (MT.getRowCapacity(i) > 0) {
+						dfx[i] += 2 * drho[i] * rowVectorProduct(MT, i, x1);
+						dfy[i] += 2 * drho[i] * rowVectorProduct(MT, i, x2);
+						dfz[i] += 2 * drho[i] * rowVectorProduct(MT, i, x3);
 					}
 				};
 				TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, n, kernel);
@@ -731,16 +729,14 @@ void Lagrange3D<LBM>::computeForces(real time)
 				const auto x1 = ws_tnl_dx[0].getConstView();
 				const auto x2 = ws_tnl_dx[1].getConstView();
 				const auto x3 = ws_tnl_dx[2].getConstView();
-				//			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
-				TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
-				const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
+				const auto MT = ws_tnl_dMT.getConstView();
 				auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
 				{
 					// skipping empty rows explicitly is much faster
-					if (MT->getRowCapacity(i) > 0) {
-						dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
-						dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
-						dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+					if (MT.getRowCapacity(i) > 0) {
+						dfx[i] += 2 * drho[i] * rowVectorProduct(MT, i, x1);
+						dfy[i] += 2 * drho[i] * rowVectorProduct(MT, i, x2);
+						dfz[i] += 2 * drho[i] * rowVectorProduct(MT, i, x3);
 					}
 				};
 				TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, n, kernel);
@@ -786,16 +782,14 @@ void Lagrange3D<LBM>::computeForces(real time)
 				const auto x1 = ws_tnl_hxz[0].getConstView();
 				const auto x2 = ws_tnl_hxz[1].getConstView();
 				const auto x3 = ws_tnl_hxz[2].getConstView();
-				//			TNL::Pointers::DevicePointer<dEllpack> MT(ws_tnl_dMT);
-				TNL::Pointers::DevicePointer<dEllpack> MT_dptr(ws_tnl_dMT);
-				const dEllpack* MT = &MT_dptr.template getData<TNL::Devices::Cuda>();
+				const auto MT = ws_tnl_dMT.getConstView();
 				auto kernel = [=] CUDA_HOSTDEV(idx i) mutable
 				{
 					// skipping empty rows explicitly is much faster
-					if (MT->getRowCapacity(i) > 0) {
-						dfx[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x1);
-						dfy[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x2);
-						dfz[i] += 2 * drho[i] * rowVectorProduct(*MT, i, x3);
+					if (MT.getRowCapacity(i) > 0) {
+						dfx[i] += 2 * drho[i] * rowVectorProduct(MT, i, x1);
+						dfy[i] += 2 * drho[i] * rowVectorProduct(MT, i, x2);
+						dfz[i] += 2 * drho[i] * rowVectorProduct(MT, i, x3);
 					}
 				};
 				TNL::Algorithms::parallelFor<TNL::Devices::Cuda>((idx) 0, n, kernel);
