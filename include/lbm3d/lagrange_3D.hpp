@@ -860,6 +860,36 @@ void Lagrange3D<LBM>::computeForces(real time)
 }
 
 template <typename LBM>
+typename Lagrange3D<LBM>::point_t Lagrange3D<LBM>::integrateForce()
+{
+	if (computeVariant == IbmCompute::CPU) {
+		const auto hfx = hmacroVector(MACRO::e_fx);
+		const auto hfy = hmacroVector(MACRO::e_fy);
+		const auto hfz = hmacroVector(MACRO::e_fz);
+
+		// FIXME: MPI !!!
+		point_t result;
+		result.x() = TNL::sum(hfx);
+		result.y() = TNL::sum(hfy);
+		result.z() = TNL::sum(hfz);
+		return result;
+	}
+	else {
+		const auto dfx = dmacroVector(MACRO::e_fx);
+		const auto dfy = dmacroVector(MACRO::e_fy);
+		const auto dfz = dmacroVector(MACRO::e_fz);
+
+		// TODO: compute with TNL::reduce to avoid 3 GPU kernels
+		// FIXME: MPI !!!
+		point_t result;
+		result.x() = TNL::sum(dfx);
+		result.y() = TNL::sum(dfy);
+		result.z() = TNL::sum(dfz);
+		return result;
+	}
+}
+
+template <typename LBM>
 Lagrange3D<LBM>::Lagrange3D(LBM& inputLBM, const std::string& state_id)
 : lbm(inputLBM)
 {
