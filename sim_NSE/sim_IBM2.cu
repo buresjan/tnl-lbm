@@ -130,13 +130,6 @@ struct StateLocal : State<NSE>
 
 	void probe1() override
 	{
-		// compute drag
-		real Fx = 0;
-		real Fy = 0;
-		real Fz = 0;
-		real dV = nse.lat.physDl * nse.lat.physDl * nse.lat.physDl;
-		real rho = 1.0;	 //nse.physFluidDensity;
-		real target_velocity = nse.lat.lbm2physVelocity(lbm_inflow_vx);
 		spdlog::info(
 			"Reynolds = {:f} lbmvel {:f} physvel {:f}",
 			lbm_inflow_vx * ball_diameter / nse.lat.physDl / nse.lat.lbmViscosity(),
@@ -144,83 +137,31 @@ struct StateLocal : State<NSE>
 			nse.lat.lbm2physVelocity(lbm_inflow_vx)
 		);
 
-		// FIXME: MPI !!!
-		// todo: compute C_D: integrate over the whole domain
-		for (int x = 0; x < nse.lat.global.x(); x++)
-			for (int y = 0; y < nse.lat.global.y(); y++)
-				for (int z = 0; z < nse.lat.global.z(); z++) {
-					// test if outside the ball
-					//if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) > 2.0*ball_diameter/2.0)
-					//if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) > ball_diameter/2.0)
-					{
-						Fx += nse.blocks.front().hmacro(MACRO::e_fx, x, y, z);
-						Fy += nse.blocks.front().hmacro(MACRO::e_fy, x, y, z);
-						Fz += nse.blocks.front().hmacro(MACRO::e_fz, x, y, z);
-					}
-				}
-
-		real lbm_cd_full = -Fx * 8.0 / lbm_inflow_vx / lbm_inflow_vx / PI / ball_diameter / ball_diameter * nse.lat.physDl * nse.lat.physDl;
-		real phys_cd_full = -nse.lat.lbm2physForce(Fx) * dV * 8.0 / rho / target_velocity / target_velocity / PI / ball_diameter / ball_diameter;
-		spdlog::info("FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_inflow_vx, Fx, Fy, Fz, phys_cd_full, lbm_cd_full);
-
-		// not used for evaluation of the results
-		// FIXME: MPI !!!
-		//for (int x=0; x<nse.lat.global.x(); x++)
-		//for (int y=0; y<nse.lat.global.y(); y++)
-		//for (int z=0; z<nse.lat.global.z(); z++)
-		//{
-		//	// test if outside the ball
-		//	//if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) < 2.0*ball_diameter/2.0)
-		//	if (NORM(x*nse.lat.physDl - ball_c[0], y*nse.lat.physDl - ball_c[1], z*nse.lat.physDl - ball_c[2]) > ball_diameter/2.0)
-		//	{
-		//		Fx += nse.blocks.front().hmacro(MACRO::e_fx,x,y,z);
-		//		Fy += nse.blocks.front().hmacro(MACRO::e_fy,x,y,z);
-		//		Fz += nse.blocks.front().hmacro(MACRO::e_fz,x,y,z);
-		//	}
-		//}
-		//real lbm_cd=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
-		//real phys_cd=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-		//spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-		////spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}", 0.07*ball_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
-
-		// not used for evaluation of the results
-		////real fil_fx=0,fil_fy=0,fil_fz=0;
-		//Fx=Fy=Fz=0;
-		////		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
-		////if (FIL_INDEX>=0) ibm.integrateForce(Fx,Fy,Fz, 1.0);//PI*ball_diameter*ball_diameter/(real)ibm.LL.size());
-		//real lbm_cd_lagr=-Fx*8.0/lbm_input_velocity/lbm_input_velocity/PI/ball_diameter/ball_diameter*nse.lat.physDl*nse.lat.physDl;
-		//real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*8.0/rho/target_velocity/target_velocity/PI/ball_diameter/ball_diameter;
-		//spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr,
-		//lbm_cd_lagr);
+		// compute drag and lift coefficients (both are dimensionless numbers,
+		// so we can do it just in LBM units and avoid converting force to physical units)
+		const point_t F = ibm.integrateForce();
+		const real reference_area = PI * ball_diameter * ball_diameter / nse.lat.physDl / nse.lat.physDl;
+		const real C_D = -F.x() * 2.0 / lbm_inflow_vx / lbm_inflow_vx / reference_area;
+		const real C_L = -F.z() * 2.0 / lbm_inflow_vx / lbm_inflow_vx / reference_area;
+		spdlog::info("F=[{:e}, {:e}, {:e}] C_D={:e} C_L={:e}", F.x(), F.y(), F.z(), C_D, C_L);
 
 		// empty files
 		const char* iotype = (firstrun) ? "wt" : "at";
 		firstrun = false;
 		// output
 		FILE* f;
-		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
 		const std::string dir = fmt::format("results_{}/probes", id);
 		mkdir_p(dir.c_str(), 0755);
 
-		std::string str = fmt::format("{}/probe_cd_full", dir);
+		std::string str = fmt::format("{}/probe_cd", dir);
 		f = fopen(str.c_str(), iotype);
-		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_full);
+		fprintf(f, "%e\t%e\n", nse.physTime(), C_D);
 		fclose(f);
 
-		//str = fmt::format("{}/probe_cd", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd);
-		//fclose(f);
-
-		//str = fmt::format("{}/probe_cd_lagr", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_lagr);
-		//fclose(f);
-
-		//str = fmt::format("{}/probe_cd_all", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\t%e\t%e\n", nse.physTime(), lbm_cd_full, lbm_cd, lbm_cd_lagr);
-		//fclose(f);
+		str = fmt::format("{}/probe_cl", dir);
+		f = fopen(str.c_str(), iotype);
+		fprintf(f, "%e\t%e\n", nse.physTime(), C_L);
+		fclose(f);
 	}
 
 	void updateKernelVelocities() override
@@ -344,6 +285,7 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 	ibmDrawSphere(state.ibm, state.ball_c, state.ball_diameter / 2.0, sigma);
 
 	// 2nd ball
+	// FIXME: computation of drag and lift coefficients assumes only one sphere
 	state.ball_c[0] = 5.5 * state.ball_diameter;
 	ibmDrawSphere(state.ibm, state.ball_c, state.ball_diameter / 2.0, sigma);
 

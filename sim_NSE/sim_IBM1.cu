@@ -99,13 +99,11 @@ struct StateLocal : State<NSE>
 	using point_t = typename TRAITS::point_t;
 	using lat_t = Lattice<3, real, idx>;
 
-	//dreal lbm_input_velocity=0.07;
-	//dreal start_velocity;
-	dreal phys_input_U_max;
-	dreal phys_input_U_bar;
-	//real init_time;
+	// maximum velocity for the parabolic profile
+	dreal lbm_inflow_vx_max = 0;
+	// characteristic velocity (given by the Reynolds number)
+	dreal lbm_char_velocity = 0;
 	bool firstrun = true;
-	//bool firstplot=true;
 	real cylinder_diameter = 0.01;
 	point_t cylinder_c;
 
@@ -162,146 +160,44 @@ struct StateLocal : State<NSE>
 
 	void probe1() override
 	{
-		// compute drag
-		real Fx = 0;
-		real Fy = 0;
-		real Fz = 0;
-		real dV = nse.lat.physDl * nse.lat.physDl * nse.lat.physDl;
-		real rho = 1.0;	 //nse.physFluidDensity;
-		//real target_velocity = nse.lat.lbm2physVelocity(lbm_input_velocity);
-		real lbm_input_velocity = nse.lat.phys2lbmVelocity(phys_input_U_bar);
 		spdlog::info(
-			"Reynolds = {:f} lbmvel {:f} physvel {:f} (phys_input_U_bar {:f})",
-			lbm_input_velocity * cylinder_diameter / nse.lat.physDl / nse.lat.lbmViscosity(),
-			lbm_input_velocity,
-			nse.lat.lbm2physVelocity(lbm_input_velocity),
-			phys_input_U_bar
+			"Reynolds = {:f} lbmvel {:f} physvel {:f}",
+			lbm_char_velocity * cylinder_diameter / nse.lat.physDl / nse.lat.lbmViscosity(),
+			lbm_char_velocity,
+			nse.lat.lbm2physVelocity(lbm_char_velocity)
 		);
 
-		// FIXME: MPI !!!
-		// todo: compute C_D: integrate over the whole domain
-		for (int x = 0; x < nse.lat.global.x(); x++)
-			for (int y = 0; y < nse.lat.global.y(); y++)
-				for (int z = 0; z < nse.lat.global.z(); z++) {
-					// test if outside the ball
-					//if (NORM(x*nse.lat.physDl - cylinder_c[0], y*nse.lat.physDl - cylinder_c[1], z*nse.lat.physDl - cylinder_c[2]) > 2.0*cylinder_diameter/2.0)
-					//if (NORM(x*nse.lat.physDl - cylinder_c[0], y*nse.lat.physDl - cylinder_c[1], z*nse.lat.physDl -
-					//cylinder_c[2]) > cylinder_diameter/2.0)
-					{
-						Fx += nse.blocks.front().hmacro(MACRO::e_fx, x, y, z);
-						Fy += nse.blocks.front().hmacro(MACRO::e_fy, x, y, z);
-						Fz += nse.blocks.front().hmacro(MACRO::e_fz, x, y, z);
-					}
-				}
-
-		real lbm_cd_full =
-			-Fx * 2.0 / lbm_input_velocity / lbm_input_velocity / cylinder_diameter / nse.blocks.front().data.H * nse.lat.physDl * nse.lat.physDl;
-		real phys_cd_full =
-			-nse.lat.lbm2physForce(Fx) * dV * 2.0 / rho / phys_input_U_bar / phys_input_U_bar / cylinder_diameter / nse.blocks.front().data.H;
-		real lbm_cl_full =
-			-Fz * 2.0 / lbm_input_velocity / lbm_input_velocity / cylinder_diameter / nse.blocks.front().data.H * nse.lat.physDl * nse.lat.physDl;
-		real phys_cl_full =
-			-nse.lat.lbm2physForce(Fz) * dV * 2.0 / rho / phys_input_U_bar / phys_input_U_bar / cylinder_diameter / nse.blocks.front().data.H;
-		spdlog::info(
-			"FULL: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f} C_L{{phys}} {:e} C_L{{LB}} {:f}",
-			lbm_input_velocity,
-			Fx,
-			Fy,
-			Fz,
-			phys_cd_full,
-			lbm_cd_full,
-			phys_cl_full,
-			lbm_cl_full
-		);
-
-		// not used for evaluation of the results
-		// FIXME: MPI !!!
-		//for (int x=0; x<nse.lat.global.x(); x++)
-		//for (int y=0; y<nse.lat.global.y(); y++)
-		//for (int z=0; z<nse.lat.global.z(); z++)
-		//{
-		//	// test if outside the ball
-		//	//if (NORM(x*nse.lat.physDl - cylinder_c[0], y*nse.lat.physDl - cylinder_c[1], z*nse.lat.physDl - cylinder_c[2])
-		//< 2.0*cylinder_diameter/2.0) 	if (NORM(x*nse.lat.physDl - cylinder_c[0], 0, z*nse.lat.physDl - cylinder_c[2]) > cylinder_diameter/2.0)
-		//	{
-		//		Fx += nse.hmacro(MACRO::e_fx,x,y,z);
-		//		Fy += nse.hmacro(MACRO::e_fy,x,y,z);
-		//		Fz += nse.hmacro(MACRO::e_fz,x,y,z);
-		//	}
-		//}
-		//real lbm_cd=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-		//real phys_cd=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-		//real lbm_cl=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-		//real phys_cl=-nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-		//spdlog::info("INNN: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd, lbm_cd);
-		////spdlog::info("Reynolds = {:f} lbmvel 0.07 physvel {:f}",0.07*cylinder_diameter/nse.lat.physDl/nse.lbmViscosity(), lbm_input_velocity);
-
-		// not used for evaluation of the results
-		////real fil_fx=0,fil_fy=0,fil_fz=0;
-		//Fx=Fy=Fz=0;
-		//		// FIXME - integrateForce is not implemented - see _stare_verze_/iblbm3d_verze1/filament_3D.h*
-		////if (FIL_INDEX>=0) ibm.integrateForce(Fx,Fy,Fz, 1.0);//PI*cylinder_diameter*cylinder_diameter/(real)ibm.LL.size());
-		//real lbm_cd_lagr=-Fx*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-		//real phys_cd_lagr=-nse.lat.lbm2physForce(Fx)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-		//real lbm_cl_lagr=-Fz*2.0/lbm_input_velocity/lbm_input_velocity/cylinder_diameter/nse.blocks.front().data.H*nse.lat.physDl*nse.lat.physDl;
-		//real phys_cl_lagr=-nse.lat.lbm2physForce(Fz)*dV*2.0/rho/phys_input_U_bar/phys_input_U_bar/cylinder_diameter/nse.blocks.front().data.H;
-		//spdlog::info("LAGR: u0 {:e} Fx {:e} Fy {:e} Fz {:e} C_D{{phys}} {:e} C_D{{LB}} {:f}", lbm_input_velocity, Fx, Fy, Fz, phys_cd_lagr,
-		//lbm_cd_lagr);
+		// compute drag and lift coefficients (both are dimensionless numbers,
+		// so we can do it just in LBM units and avoid converting force to physical units)
+		const point_t F = ibm.integrateForce();
+		const real reference_area = cylinder_diameter * nse.blocks.front().data.H / nse.lat.physDl / nse.lat.physDl;
+		const real C_D = -F.x() * 2.0 / lbm_char_velocity / lbm_char_velocity / reference_area;
+		const real C_L = -F.z() * 2.0 / lbm_char_velocity / lbm_char_velocity / reference_area;
+		spdlog::info("F=[{:e}, {:e}, {:e}] C_D={:e} C_L={:e}", F.x(), F.y(), F.z(), C_D, C_L);
 
 		// empty files
 		const char* iotype = (firstrun) ? "wt" : "at";
 		firstrun = false;
 		// output
 		FILE* f;
-		//real total = (real)(nse.lat.global.x()*nse.lat.global.y()*nse.lat.global.z()), ratio, area;
 		const std::string dir = fmt::format("results_{}/probes", id);
 		mkdir_p(dir.c_str(), 0755);
 
-		std::string str = fmt::format("{}/probe_cd_full", dir);
+		std::string str = fmt::format("{}/probe_cd", dir);
 		f = fopen(str.c_str(), iotype);
-		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_full);
+		fprintf(f, "%e\t%e\n", nse.physTime(), C_D);
 		fclose(f);
 
-		//str = fmt::format("{}/probe_cd", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd);
-		//fclose(f);
-
-		//str = fmt::format("{}/probe_cd_lagr", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cd_lagr);
-		//fclose(f);
-
-		//str = fmt::format("{}/probe_cd_all", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\t%e\t%e\n", nse.physTime(), lbm_cd_full, lbm_cd, lbm_cd_lagr);
-		//fclose(f);
-
-		str = fmt::format("{}/probe_cl_full", dir);
+		str = fmt::format("{}/probe_cl", dir);
 		f = fopen(str.c_str(), iotype);
-		fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cl_full);
+		fprintf(f, "%e\t%e\n", nse.physTime(), C_L);
 		fclose(f);
-
-		//str = fmt::format("{}/probe_cl", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cl);
-		//fclose(f);
-
-		//str = fmt::format("{}/probe_cl_lagr", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\n", nse.physTime(), lbm_cl_lagr);
-		//fclose(f);
-
-		//str = fmt::format("{}/probe_cl_all", dir);
-		//f = fopen(str.c_str(), iotype);
-		//fprintf(f, "%e\t%e\t%e\t%e\n", nse.physTime(), lbm_cl_full, lbm_cl, lbm_cl_lagr);
-		//fclose(f);
 	}
 
 	void updateKernelVelocities() override
 	{
 		for (auto& block : nse.blocks) {
-			block.data.inflow_vx = nse.lat.phys2lbmVelocity(phys_input_U_max);
+			block.data.inflow_vx = lbm_inflow_vx_max;
 			block.data.inflow_vy = 0;
 			block.data.inflow_vz = 0;
 			block.data.physDl = nse.lat.physDl;
@@ -369,11 +265,15 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 	if (! state.canCompute())
 		return 0;
 
-	state.phys_input_U_max = Umax;
-	state.phys_input_U_bar = Ubar;
+	state.lbm_char_velocity = state.nse.lat.phys2lbmVelocity(Ubar);
+	state.lbm_inflow_vx_max = state.nse.lat.phys2lbmVelocity(Umax);
 	state.nse.physCharLength = cylinder_diameter;  // [m]
 	state.cylinder_diameter = cylinder_diameter;   // [m]
 	//state.nse.physFluidDensity = 1000.0; // [kg/m^3]
+
+	spdlog::info(
+		"Reynolds = {:f} Umax_lbm {:f} Umax_phys {:f} Ubar_lbm {:f} Ubar_phys {:f}", Re, state.lbm_inflow_vx_max, Umax, state.lbm_char_velocity, Ubar
+	);
 
 	state.cnt[PRINT].period = 0.1;
 	state.cnt[PROBE1].period = 0.1;
