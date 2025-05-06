@@ -577,18 +577,18 @@ void Lagrange3D<LBM>::computeForces(real time)
 		case IbmCompute::GPU:
 			compute_desc = "GPU";
 			break;
-		case IbmCompute::Hybrid:
+		case IbmCompute::hybrid:
 			compute_desc = "Hybrid";
 			break;
-		case IbmCompute::Hybrid_zerocopy:
+		case IbmCompute::hybrid_zerocopy:
 			compute_desc = "Hybrid_zerocopy";
 			break;
 	}
 
 	switch (computeVariant) {
 		case IbmCompute::CPU:
-		case IbmCompute::Hybrid:
-		case IbmCompute::Hybrid_zerocopy:
+		case IbmCompute::hybrid:
+		case IbmCompute::hybrid_zerocopy:
 			if (! allocated)
 				allocateMatricesCPU();
 			allocated = true;
@@ -684,7 +684,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				break;
 			}
 
-		case IbmCompute::Hybrid:
+		case IbmCompute::hybrid:
 			{
 				ws_tnl_dM.vectorProduct(dvx, ws_tnl_db[0], -1.0);
 				ws_tnl_dM.vectorProduct(dvy, ws_tnl_db[1], -1.0);
@@ -743,7 +743,7 @@ void Lagrange3D<LBM>::computeForces(real time)
 				break;
 			}
 
-		case IbmCompute::Hybrid_zerocopy:
+		case IbmCompute::hybrid_zerocopy:
 			{
 				ws_tnl_dM.vectorProduct(dvx, ws_tnl_hbz[0], -1.0);
 				ws_tnl_dM.vectorProduct(dvy, ws_tnl_hbz[1], -1.0);

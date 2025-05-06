@@ -25,8 +25,8 @@ enum class IbmCompute : std::uint8_t
 {
 	GPU = 0,
 	CPU = 1,
-	Hybrid = 2,
-	Hybrid_zerocopy = 3,
+	hybrid = 2,
+	hybrid_zerocopy = 3,
 };
 
 // Enum for deciding which IBM method is used

@@ -1,4 +1,5 @@
 #include <argparse/argparse.hpp>
+#include <magic_enum/magic_enum.hpp>
 #include <utility>
 
 #include "lbm3d/core.h"
@@ -155,7 +156,7 @@ struct StateLocal : State<NSE>
 };
 
 template <typename NSE>
-int sim(int RES, double Re, double discretization_ratio, const std::string& compute, int dirac, const std::string& method)
+int sim(int RES, double Re, double discretization_ratio, IbmCompute computeVariant, int dirac, IbmMethod methodVariant)
 {
 	using idx = typename NSE::TRAITS::idx;
 	using real = typename NSE::TRAITS::real;
@@ -202,8 +203,10 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 	lat.physDt = PHYS_DT;
 	lat.physViscosity = PHYS_VISCOSITY;
 
+	const auto compute_name = magic_enum::enum_name(computeVariant);
+	const auto method_name = magic_enum::enum_name(methodVariant);
 	const std::string state_id = fmt::format(
-		"sim_IBM3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, method, dirac, RES, Re, discretization_ratio, compute
+		"sim_IBM3_{}_{}_dirac_{}_res_{}_Re_{}_nas_{:05.4f}_compute_{}", NSE::COLL::id, method_name, dirac, RES, Re, discretization_ratio, compute_name
 	);
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
@@ -222,21 +225,6 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 	state.cnt[VTK2D].period = 1.0;
 	state.cnt[VTK1D].period = 1.0;
 
-	// select compute method
-	IbmCompute computeVariant;
-	if (compute == "GPU")
-		computeVariant = IbmCompute::GPU;
-	else if (compute == "CPU")
-		computeVariant = IbmCompute::CPU;
-	else if (compute == "hybrid")
-		computeVariant = IbmCompute::Hybrid;
-	else if (compute == "hybrid-zero-copy")
-		computeVariant = IbmCompute::Hybrid_zerocopy;
-	else {
-		spdlog::warn("Unknown parameter compute={}, selecting GPU as the default.", compute);
-		computeVariant = IbmCompute::GPU;
-	}
-
 	// add cuts
 	state.add2Dcut_X(LBM_X / 2, "cut_X");
 	//state.add2Dcut_X(2*BALL_DIAMETER/PHYS_DL,"cut_Xball");
@@ -254,14 +242,7 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 	// configure IBM
 	state.ibm.computeVariant = computeVariant;
 	state.ibm.diracDeltaTypeEL = dirac;
-	if (method == "modified")
-		state.ibm.methodVariant = IbmMethod::modified;
-	else if (method == "original")
-		state.ibm.methodVariant = IbmMethod::original;
-	else {
-		spdlog::warn("Unknown parameter method={}, selecting modified as the default.", method);
-		state.ibm.methodVariant = IbmMethod::modified;
-	}
+	state.ibm.methodVariant = methodVariant;
 	state.ibm.mtx_output = true;
 
 	execute(state);
@@ -270,7 +251,7 @@ int sim(int RES, double Re, double discretization_ratio, const std::string& comp
 }
 
 template <typename TRAITS = TraitsSP>
-void run(int res, double Re, double discretization_ratio, const std::string& compute, int dirac, const std::string& method)
+void run(int res, double Re, double discretization_ratio, IbmCompute compute, int dirac, IbmMethod method)
 {
 	using COLL = D3Q27_CUM<TRAITS>;
 	using NSE_CONFIG = LBM_CONFIG<
@@ -299,7 +280,7 @@ int main(int argc, char** argv)
 		.scan<'g', double>()
 		.default_value(0.25)
 		.nargs(1);
-	program.add_argument("--compute").help("IBM compute method").default_value("GPU").choices("GPU", "CPU", "hybrid", "hybrid-zero-copy").nargs(1);
+	program.add_argument("--compute").help("IBM compute method").default_value("GPU").choices("GPU", "CPU", "hybrid", "hybrid_zerocopy").nargs(1);
 	program.add_argument("--dirac").help("Dirac delta function to use in IBM").scan<'i', int>().default_value(1).choices(1, 2, 3, 4).nargs(1);
 	program.add_argument("--method").help("IBM method").default_value("modified").choices("modified", "original").nargs(1);
 
@@ -332,7 +313,10 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	run(resolution, Re, discretization_ratio, compute, dirac, method);
+	const IbmCompute computeEnum = magic_enum::enum_cast<IbmCompute>(compute).value_or(IbmCompute::GPU);
+	const IbmMethod methodEnum = magic_enum::enum_cast<IbmMethod>(method).value_or(IbmMethod::modified);
+
+	run(resolution, Re, discretization_ratio, computeEnum, dirac, methodEnum);
 
 	return 0;
 }
