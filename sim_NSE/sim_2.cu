@@ -476,7 +476,7 @@ int main(int argc, char** argv)
 	program.add_description("Square duct flow with verification against analytical solution.");
 	program.add_argument("--min-resolution").help("minimum resolution of the lattice").scan<'i', int>().default_value(2).nargs(1);
 	program.add_argument("--max-resolution").help("maximum resolution of the lattice").scan<'i', int>().default_value(4).nargs(1);
-	program.add_argument("--final-time").help("final time of the simulation").scan<'g', double>().default_value(100).nargs(1);
+	program.add_argument("--final-time").help("final time of the simulation").scan<'g', double>().default_value(100.0).nargs(1);
 	program.add_argument("--use-forcing").help("use forcing term with periodic boundary conditions instead of inflow boundary condition").flag();
 	program.add_argument("--scaling")
 		.help("parallel scaling mode (affects the global lattice size and its distribution into subdomains)")
