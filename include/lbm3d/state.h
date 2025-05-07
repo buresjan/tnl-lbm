@@ -171,7 +171,7 @@ struct State
 	void add1Dcut_Z(real x, real y, const char* fmt, ARGS... args);
 	void write1Dcut(point_t from, point_t to, const std::string& fname);
 	void write1Dcut_X(idx y, idx z, const std::string& fname);
-	void write1Dcut_Y(idx y, idx z, const std::string& fname);
+	void write1Dcut_Y(idx x, idx z, const std::string& fname);
 	void write1Dcut_Z(idx x, idx y, const std::string& fname);
 
 	virtual bool outputData(const BLOCK_NSE& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs)
