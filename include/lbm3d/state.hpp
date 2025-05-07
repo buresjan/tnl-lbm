@@ -9,44 +9,6 @@
 #include "../lbm_common/png_tool.h"
 
 template <typename NSE>
-bool State<NSE>::getPNGdimensions(const char* filename, int& w, int& h)
-{
-	if (! fileExists(filename)) {
-		printf("file %s does not exist\n", filename);
-		return false;
-	}
-	FILE* fp = fopen(filename, "rb");
-
-	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (png == nullptr) {
-		printf("file %s png read error\n", filename);
-		return false;
-	}
-
-	png_infop info = png_create_info_struct(png);
-	if (png == nullptr) {
-		printf("file %s png read error\n", filename);
-		return false;
-	}
-
-	if (setjmp(png_jmpbuf(png))) {
-		printf("file %s png read error\n", filename);
-		return false;
-	}
-
-	png_init_io(png, fp);
-
-	png_read_info(png, info);
-
-	w = png_get_image_width(png, info);
-	h = png_get_image_height(png, info);
-	//  color_type = png_get_color_type(png, info);
-	//  bit_depth  = png_get_bit_depth(png, info);
-	fclose(fp);
-	return w > 0 && h > 0;
-}
-
-template <typename NSE>
 void State<NSE>::flagCreate(const char* flagname)
 {
 	if (nse.rank != 0)

@@ -179,8 +179,6 @@ struct State
 		return false;
 	}
 
-	bool getPNGdimensions(const char* filename, int& w, int& h);
-
 	bool projectPNG_X(
 		const std::string& filename,
 		idx x0,
