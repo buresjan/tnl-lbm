@@ -1,5 +1,7 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+
 template <typename CONFIG>
 struct D3Q27_BC_All
 {
