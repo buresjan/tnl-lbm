@@ -1,4 +1,5 @@
 #include <argparse/argparse.hpp>
+#include <magic_enum/magic_enum.hpp>
 #include <utility>
 
 #include "lbm3d/core.h"
@@ -6,11 +7,11 @@
 // 3D test problem: forcing/input velocity
 // analytical solution for rectangular duct: forcing accelerated
 
-enum Scaling : std::uint8_t
+enum class Scaling : std::uint8_t
 {
-	STRONG_SCALING,
-	WEAK_SCALING_1D,
-	WEAK_SCALING_3D,
+	strong,
+	weak_1d,
+	weak_3d,
 };
 
 template <typename TRAITS>
@@ -285,9 +286,9 @@ int sim(int RES, bool use_forcing, Scaling scaling, double final_time)
 		LBM_X *= RES;
 	int LBM_Y = RES * block_size;
 	int LBM_Z = RES * block_size;
-	if (scaling == WEAK_SCALING_1D)
+	if (scaling == Scaling::weak_1d)
 		LBM_X *= TNL::MPI::GetSize(MPI_COMM_WORLD);
-	else if (scaling == WEAK_SCALING_3D) {
+	else if (scaling == Scaling::weak_3d) {
 		// NOTE: scale volume by nproc, preserve the proportions of the domain
 		const real factor = std::cbrt(TNL::MPI::GetSize(MPI_COMM_WORLD));
 		LBM_X = std::round(LBM_X * factor);
@@ -312,11 +313,7 @@ int sim(int RES, bool use_forcing, Scaling scaling, double final_time)
 
 	const char* prec = (std::is_same_v<dreal, float>) ? "float" : "double";
 	const char* bc_variant = (use_forcing) ? "forcing" : "velocity";
-	const char* scaling_variant = "strong";
-	if (scaling == WEAK_SCALING_1D)
-		scaling_variant = "weak-1d";
-	else if (scaling == WEAK_SCALING_3D)
-		scaling_variant = "weak-3d";
+	const auto scaling_variant = magic_enum::enum_name(scaling);
 	const std::string state_id =
 		fmt::format("sim_2_{}_{}_{}_{}_res_{}_np_{}", NSE::COLL::id, prec, bc_variant, scaling_variant, RES, TNL::MPI::GetSize(MPI_COMM_WORLD));
 	StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat, use_forcing);
@@ -404,7 +401,7 @@ int sim(int RES, bool use_forcing, Scaling scaling, double final_time)
 	state.nse.physFinalTime = final_time;
 	//state.cnt[VTK2D].period = 1.0;
 
-	if (scaling == WEAK_SCALING_3D) {
+	if (scaling == Scaling::weak_3d) {
 		// TRICK to keep the benchmark fast: decrease the periods and physFinalTime
 		// to keep the compute time (more or less) constant
 		const real factor = (LBM_Y - 2) / real(block_size * RES - 2) * RES / 2;
@@ -476,11 +473,11 @@ int main(int argc, char** argv)
 	program.add_description("Square duct flow with verification against analytical solution.");
 	program.add_argument("--min-resolution").help("minimum resolution of the lattice").scan<'i', int>().default_value(2).nargs(1);
 	program.add_argument("--max-resolution").help("maximum resolution of the lattice").scan<'i', int>().default_value(4).nargs(1);
-	program.add_argument("--final-time").help("final time of the simulation").scan<'g', double>().default_value(100).nargs(1);
+	program.add_argument("--final-time").help("final time of the simulation").scan<'g', double>().default_value(100.0).nargs(1);
 	program.add_argument("--use-forcing").help("use forcing term with periodic boundary conditions instead of inflow boundary condition").flag();
 	program.add_argument("--scaling")
 		.help("parallel scaling mode (affects the global lattice size and its distribution into subdomains)")
-		.choices("strong", "weak-1d", "weak-3d")
+		.choices("strong", "weak_1d", "weak_3d")
 		.default_value("strong")
 		.nargs(1);
 	program.add_argument("--precision")
@@ -516,11 +513,8 @@ int main(int argc, char** argv)
 	}
 
 	const bool use_forcing = program.get<bool>("--use-forcing");
-	Scaling scaling = STRONG_SCALING;
-	if (program.get<std::string>("--scaling") == "weak-1d")
-		scaling = WEAK_SCALING_1D;
-	else if (program.get<std::string>("--scaling") == "weak-3d")
-		scaling = WEAK_SCALING_3D;
+	const auto scaling_name = program.get<std::string>("--scaling");
+	const Scaling scaling = magic_enum::enum_cast<Scaling>(scaling_name).value_or(Scaling::strong);
 
 	for (int i = min_resolution; i <= max_resolution; i++) {
 		int res = pow(2, i);

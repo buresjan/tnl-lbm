@@ -157,6 +157,15 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(ARGPARSE_INSTALL ON)  # needed for adding to the interface target
 FetchContent_MakeAvailable(argparse)
 
+FetchContent_Declare(magic_enum
+    GIT_REPOSITORY https://github.com/Neargye/magic_enum
+    GIT_TAG master
+    SYSTEM
+    FIND_PACKAGE_ARGS
+)
+set(MAGIC_ENUM_OPT_INSTALL ON)  # needed for adding to the interface target
+FetchContent_MakeAvailable(magic_enum)
+
 FetchContent_Declare(TNL
     GIT_REPOSITORY https://gitlab.com/tnl-project/tnl.git
     GIT_TAG main
@@ -171,7 +180,15 @@ find_package(MPI COMPONENTS CXX)
 find_package(ADIOS2 REQUIRED)
 
 # Add dependencies to the interface target
-target_link_libraries(TNL_LBM INTERFACE TNL::TNL PNG::PNG fmt::fmt spdlog::spdlog nlohmann_json::nlohmann_json argparse::argparse)
+target_link_libraries(TNL_LBM INTERFACE
+    TNL::TNL
+    PNG::PNG
+    fmt::fmt
+    spdlog::spdlog
+    nlohmann_json::nlohmann_json
+    argparse::argparse
+    magic_enum::magic_enum
+)
 if(OPENMP_FOUND)
     target_compile_definitions(TNL_LBM INTERFACE "-DHAVE_OPENMP")
     target_link_libraries(TNL_LBM INTERFACE OpenMP::OpenMP_CXX)
