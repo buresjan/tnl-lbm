@@ -103,9 +103,9 @@ int sim(int RES, double Re)
 	using lat_t = Lattice<3, real, idx>;
 
 	int block_size = 32;
-	real ball_diameter = 0.10;		 // [m]
-	real real_domain_height = 0.41;	 // [m]
-	real real_domain_length = 2.00;	 // [m]
+	real ball_diameter = 0.10;						   // [m]
+	real real_domain_height = 11 * ball_diameter;	   // [m]
+	real real_domain_length = 2 * real_domain_height;  // [m]
 	idx LBM_Y = RES * block_size;
 	idx LBM_Z = LBM_Y;
 	real PHYS_DL = real_domain_height / ((real) LBM_Y - 2.0);
