@@ -241,13 +241,6 @@ struct LBM_CONFIG
 //#define USE_GEIER_CUM_2017 // use Geier 2017 Cummulant improvement A,B terms
 //#define USE_GEIER_CUM_ANTIALIAS // use antialiasing Dxu, Dyv, Dzw from Geier 2015/2017
 
-// TODO: replace these macros with functions TNL::min and TNL::max
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-
-#define SQ(x) ((x) * (x))  // square function; replaces SQ(x) by ((x) * (x)) in the code
-#define NORM(x, y, z) sqrt(SQ(x) + SQ(y) + SQ(z))
-
 // NOTE: df_sync_directions must be kept consistent with this enum!
 enum : std::uint8_t
 {

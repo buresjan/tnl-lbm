@@ -29,9 +29,9 @@ __global__ void dM_row_capacities_kernel(
 	idx fi_z = floor(LL[i].z() - (real) 0.5);
 
 	// FIXME: iterate over LBM blocks
-	for (idx gz = MAX(0, fi_z - support); gz < MIN(lbmBlockLocal.z(), fi_z + support); gz++)
-		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbmBlockLocal.y(), fi_y + support); gy++)
-			for (idx gx = MAX(0, fi_x - support); gx < MIN(lbmBlockLocal.x(), fi_x + support); gx++) {
+	for (idx gz = TNL::max(0, fi_z - support); gz < TNL::min(lbmBlockLocal.z(), fi_z + support); gz++)
+		for (idx gy = TNL::max(0, fi_y - support); gy < TNL::min(lbmBlockLocal.y(), fi_y + support); gy++)
+			for (idx gx = TNL::max(0, fi_x - support); gx < TNL::min(lbmBlockLocal.x(), fi_x + support); gx++) {
 				if (isDDNonZero(diracDeltaTypeEL, gx - LL[i].x()) && isDDNonZero(diracDeltaTypeEL, gy - LL[i].y())
 					&& isDDNonZero(diracDeltaTypeEL, gz - LL[i].z()))
 				{
@@ -74,9 +74,9 @@ __global__ void dM_construction_kernel(
 	idx fi_z = floor(LL[i].z() - (real) 0.5);
 
 	// FIXME: iterate over LBM blocks
-	for (idx gz = MAX(0, fi_z - support); gz < MIN(lbmBlockLocal.z(), fi_z + support); gz++)
-		for (idx gy = MAX(0, fi_y - support); gy < MIN(lbmBlockLocal.y(), fi_y + support); gy++)
-			for (idx gx = MAX(0, fi_x - support); gx < MIN(lbmBlockLocal.x(), fi_x + support); gx++) {
+	for (idx gz = TNL::max(0, fi_z - support); gz < TNL::min(lbmBlockLocal.z(), fi_z + support); gz++)
+		for (idx gy = TNL::max(0, fi_y - support); gy < TNL::min(lbmBlockLocal.y(), fi_y + support); gy++)
+			for (idx gx = TNL::max(0, fi_x - support); gx < TNL::min(lbmBlockLocal.x(), fi_x + support); gx++) {
 				if (isDDNonZero(diracDeltaTypeEL, gx - LL[i].x()) && isDDNonZero(diracDeltaTypeEL, gy - LL[i].y())
 					&& isDDNonZero(diracDeltaTypeEL, gz - LL[i].z()))
 				{

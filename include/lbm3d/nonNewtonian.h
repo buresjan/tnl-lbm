@@ -79,14 +79,14 @@ void LBMKernelCheckMap(
 		zm = (z == 0) ? (SD.Z()-1) : (z-1);
 	} else {
 		// handle overlaps between GPUs
-//		xp = (SD.overlap_right) ? x+1 : MIN(x+1, SD.X-1);
-//		xm = (SD.overlap_left) ? x-1 : MAX(x-1,0);
-		xp = (rank != nproc-1) ? x+1 : MIN(x+1, SD.X()-1);
-		xm = (rank != 0) ? x-1 : MAX(x-1,0);
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
+//		xp = (SD.overlap_right) ? x+1 : TNL::min(x+1, SD.X-1);
+//		xm = (SD.overlap_left) ? x-1 : TNL::max(x-1,0);
+		xp = (rank != nproc-1) ? x+1 : TNL::min(x+1, SD.X()-1);
+		xm = (rank != 0) ? x-1 : TNL::max(x-1,0);
+		yp = TNL::min(y+1, SD.Y()-1);
+		ym = TNL::max(y-1,0);
+		zp = TNL::min(z+1, SD.Z()-1);
+		zm = TNL::max(z-1,0);
 	}
 
 	map_t gi_map_xp = SD.map(xp, y, z);
@@ -177,14 +177,14 @@ void LBMKernelCheckVelocity(
 		zm = (z == 0) ? (SD.Z()-1) : (z-1);
 	} else {
 		// handle overlaps between GPUs
-//		xp = (SD.overlap_right) ? x+1 : MIN(x+1, SD.X-1);
-//		xm = (SD.overlap_left) ? x-1 : MAX(x-1,0);
-		xp = (rank != nproc-1) ? x+1 : MIN(x+1, SD.X()-1);
-		xm = (rank != 0) ? x-1 : MAX(x-1,0);
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
+//		xp = (SD.overlap_right) ? x+1 : TNL::min(x+1, SD.X-1);
+//		xm = (SD.overlap_left) ? x-1 : TNL::max(x-1,0);
+		xp = (rank != nproc-1) ? x+1 : TNL::min(x+1, SD.X()-1);
+		xm = (rank != 0) ? x-1 : TNL::max(x-1,0);
+		yp = TNL::min(y+1, SD.Y()-1);
+		ym = TNL::max(y-1,0);
+		zp = TNL::min(z+1, SD.Z()-1);
+		zm = TNL::max(z-1,0);
 	}
 
 	MACRO::getMacro(SD, KSxp, xp, y, z);

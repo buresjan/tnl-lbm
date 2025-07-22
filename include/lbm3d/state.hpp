@@ -213,7 +213,7 @@ void State<NSE>::write1Dcut(point_t from, point_t to, const std::string& fname)
 	FILE* fout = fopen(fname.c_str(), "wt");  // append information
 	point_t i = nse.lat.phys2lbmPoint(from);
 	point_t f = nse.lat.phys2lbmPoint(to);
-	real dist = NORM(i[0] - f[0], i[1] - f[1], i[2] - f[2]);
+	real dist = TNL::l2Norm(i - f);
 	real ds = 1.0 / (dist * 2.0);  // rozliseni najit
 	// special case: sampling along an axis
 	if ((i[0] == f[0] && i[1] == f[1]) || (i[1] == f[1] && i[2] == f[2]) || (i[0] == f[0] && i[2] == f[2]))

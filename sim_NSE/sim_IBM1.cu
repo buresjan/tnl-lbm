@@ -73,7 +73,7 @@ struct NSE_Data_SpecialInflow : NSE_Data<TRAITS>
 	CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
 	{
 		KS.vx = 16.0 * inflow_vx
-			  * MAX(0, (physDl * (y - 0.5) / H) * (physDl * (z - 0.5) / H) * (1.0 - physDl * (y - 0.5) / H) * (1.0 - physDl * (z - 0.5) / H));
+			  * TNL::max(0, (physDl * (y - 0.5) / H) * (physDl * (z - 0.5) / H) * (1.0 - physDl * (y - 0.5) / H) * (1.0 - physDl * (z - 0.5) / H));
 		//(no1 - ((physDl*y-y0)*(physDl*y-y0) + (physDl*z-z0)*(physDl*z-z0))/delta/delta);
 		//KS.vx = inflow_vx*(no1 - ((physDl*y-y0)*(physDl*y-y0) + (physDl*z-z0)*(physDl*z-z0))/delta/delta);
 		KS.vy = 0;

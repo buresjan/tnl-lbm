@@ -208,9 +208,9 @@ struct StateLocal : State<NSE>
 					real an = analytical_ux(j, k);
 					real diff = fabs(nse.blocks.front().hmacro(MACRO::e_vx, i, j, k) - an);
 					//local_la1sum += an;
-					//local_la2sum += SQ(an);
+					//local_la2sum += TNL::sqr(an);
 					local_l1sum += diff;
-					local_l2sum += SQ(diff);
+					local_l2sum += TNL::sqr(diff);
 				}
 
 		// MPI reduction of the local results
@@ -235,7 +235,7 @@ struct StateLocal : State<NSE>
 		l1prev /= errors_count;
 		real stddev = 0.0;
 		for (int i = 0; i < errors_count; i++)
-			stddev += SQ(l1errors[i] - l1prev);
+			stddev += TNL::sqr(l1errors[i] - l1prev);
 		stddev /= (errors_count - 1);
 		stddev = sqrt(stddev);
 		real stopping = abs(l1prev - l1error_phys) / l1error_phys;

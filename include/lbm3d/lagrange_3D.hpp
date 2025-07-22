@@ -198,9 +198,9 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		idx fi_z = floor(hLL_lat[i].z() - (dreal) 0.5);
 
 		// FIXME: iterate over LBM blocks
-		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
-			for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
-				for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++) {
+		for (idx gz = TNL::max(0, fi_z - support); gz < TNL::min(lbm.blocks.front().local.z(), fi_z + support); gz++)
+			for (idx gy = TNL::max(0, fi_y - support); gy < TNL::min(lbm.blocks.front().local.y(), fi_y + support); gy++)
+				for (idx gx = TNL::max(0, fi_x - support); gx < TNL::min(lbm.blocks.front().local.x(), fi_x + support); gx++) {
 					if (isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) && isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y())
 						&& isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z()))
 					{
@@ -229,9 +229,9 @@ void Lagrange3D<LBM>::constructMatricesCPU()
 		idx fi_z = floor(hLL_lat[i].z() - (dreal) 0.5);
 
 		// FIXME: iterate over LBM blocks
-		for (idx gz = MAX(0, fi_z - support); gz < MIN(lbm.blocks.front().local.z(), fi_z + support); gz++)
-			for (idx gy = MAX(0, fi_y - support); gy < MIN(lbm.blocks.front().local.y(), fi_y + support); gy++)
-				for (idx gx = MAX(0, fi_x - support); gx < MIN(lbm.blocks.front().local.x(), fi_x + support); gx++) {
+		for (idx gz = TNL::max(0, fi_z - support); gz < TNL::min(lbm.blocks.front().local.z(), fi_z + support); gz++)
+			for (idx gy = TNL::max(0, fi_y - support); gy < TNL::min(lbm.blocks.front().local.y(), fi_y + support); gy++)
+				for (idx gx = TNL::max(0, fi_x - support); gx < TNL::min(lbm.blocks.front().local.x(), fi_x + support); gx++) {
 					if (isDDNonZero(diracDeltaTypeEL, gx - hLL_lat[i].x()) && isDDNonZero(diracDeltaTypeEL, gy - hLL_lat[i].y())
 						&& isDDNonZero(diracDeltaTypeEL, gz - hLL_lat[i].z()))
 					{

@@ -85,10 +85,10 @@ void LBMComputeQCriterion(
 		// NOTE: ghost layers of lattice sites are assumed in the x-direction, so x+1 and x-1 always work
 		xp = x+1;
 		xm = x-1;
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
+		yp = TNL::min(y+1, SD.Y()-1);
+		ym = TNL::max(y-1,0);
+		zp = TNL::min(z+1, SD.Z()-1);
+		zm = TNL::max(z-1,0);
 	}
 
 		struct Tensor
@@ -203,10 +203,10 @@ void cudaLBMComputePhiGradMag(
 		// NOTE: ghost layers of lattice sites are assumed in the x-direction, so x+1 and x-1 always work
 		xp = x+1;
 		xm = x-1;
-		yp = MIN(y+1, SD.Y()-1);
-		ym = MAX(y-1,0);
-		zp = MIN(z+1, SD.Z()-1);
-		zm = MAX(z-1,0);
+		yp = TNL::min(y+1, SD.Y()-1);
+		ym = TNL::max(y-1,0);
+		zp = TNL::min(z+1, SD.Z()-1);
+		zm = TNL::max(z-1,0);
 	}
 
 		struct Vector
