@@ -24,7 +24,6 @@ struct LBM_BLOCK
 	using dlat_view_t = typename CONFIG::dlat_view_t;
 	using hmacro_array_t = typename CONFIG::hmacro_array_t;
 	using dmacro_array_t = typename CONFIG::dmacro_array_t;
-	using sync_array_t = typename CONFIG::sync_array_t;
 	using dreal_array_t = typename CONFIG::dreal_array_t;
 	using hreal_array_t = typename CONFIG::hreal_array_t;
 	using hboollat_array_t = typename CONFIG::hboollat_array_t;
@@ -80,7 +79,7 @@ struct LBM_BLOCK
 
 #ifdef HAVE_MPI
 	// synchronizers for dfs, macro and map
-	TNL::Containers::DistributedNDArraySynchronizer<typename sync_array_t::ViewType> dreal_sync[CONFIG::Q + MACRO::N];
+	TNL::Containers::DistributedNDArraySynchronizer<typename dreal_array_t::ViewType> dreal_sync[CONFIG::Q + MACRO::N];
 	TNL::Containers::DistributedNDArraySynchronizer<dmap_array_t> map_sync;
 #endif
 

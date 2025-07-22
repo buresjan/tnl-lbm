@@ -411,8 +411,8 @@ void LBM_BLOCK<CONFIG>::startDrealArraySynchronization(Array& array, int sync_of
 	constexpr bool is_df = std::is_same<typename Array::ConstViewType, typename dlat_array_t::ConstViewType>::value;
 
 	// empty view, but with correct sizes
-	typename sync_array_t::LocalViewType localView(nullptr, data.indexer);
-	typename sync_array_t::ViewType view(localView, dmap.getSizes(), dmap.getLocalBegins(), dmap.getLocalEnds(), dmap.getCommunicator());
+	typename dreal_array_t::LocalViewType localView(nullptr, data.indexer);
+	typename dreal_array_t::ViewType view(localView, dmap.getSizes(), dmap.getLocalBegins(), dmap.getLocalEnds(), dmap.getCommunicator());
 
 	for (int i = 0; i < N; i++) {
 		// rebind just the data pointer

@@ -194,8 +194,6 @@ struct LBM_CONFIG
 	using __dmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, DeviceType>;
 
 #ifdef HAVE_MPI
-	using sync_array_t = TNL::Containers::DistributedNDArray<typename TRAITS::template array3d<typename TRAITS::dreal, DeviceType>>;
-
 	using hmap_array_t = TNL::Containers::DistributedNDArray<__hmap_array_t>;
 	using dmap_array_t = TNL::Containers::DistributedNDArray<__dmap_array_t>;
 	using hbool_array_t = TNL::Containers::DistributedNDArray<__hbool_array_t>;
@@ -211,8 +209,6 @@ struct LBM_CONFIG
 	using hmacro_array_t = TNL::Containers::DistributedNDArray<__hmacro_array_t>;
 	using dmacro_array_t = TNL::Containers::DistributedNDArray<__dmacro_array_t>;
 #else
-	using sync_array_t = typename TRAITS::template array3d<typename TRAITS::dreal, DeviceType>;
-
 	using hmap_array_t = __hmap_array_t;
 	using dmap_array_t = __dmap_array_t;
 	using hbool_array_t = __hbool_array_t;
