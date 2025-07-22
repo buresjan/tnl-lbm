@@ -1,5 +1,8 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+#include "lbm_common/ciselnik.h"
+
 template <typename CONFIG>
 struct D3Q7_BC_All
 {
@@ -33,33 +36,33 @@ struct D3Q7_BC_All
 		GEO_SYM_FRONT
 	};
 
-	CUDA_HOSTDEV static bool isPeriodic(map_t mapgi)
+	__cuda_callable__ static bool isPeriodic(map_t mapgi)
 	{
 		return mapgi == GEO_PERIODIC;
 	}
 
-	CUDA_HOSTDEV static bool isFluid(map_t mapgi)
+	__cuda_callable__ static bool isFluid(map_t mapgi)
 	{
 		return mapgi == GEO_FLUID;
 	}
 
-	CUDA_HOSTDEV static bool isWall(map_t mapgi)
+	__cuda_callable__ static bool isWall(map_t mapgi)
 	{
 		return mapgi == GEO_WALL;
 	}
 
-	CUDA_HOSTDEV static bool isSolid(map_t mapgi)
+	__cuda_callable__ static bool isSolid(map_t mapgi)
 	{
 		return mapgi == GEO_SOLID;
 	}
 
-	CUDA_HOSTDEV static bool isSolidPhase(map_t mapgi)
+	__cuda_callable__ static bool isSolidPhase(map_t mapgi)
 	{
 		return mapgi == GEO_SOLID || mapgi == GEO_TRANSFER_SF || mapgi == GEO_TRANSFER_SW;
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void preCollision(DATA& SD, LBM_KS& KS, map_t mapgi, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void preCollision(DATA& SD, LBM_KS& KS, map_t mapgi, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		if (mapgi == GEO_NOTHING) {
 			// nema zadny vliv na vypocet, jen pro output
@@ -191,7 +194,7 @@ struct D3Q7_BC_All
 		}
 	}
 
-	CUDA_HOSTDEV static bool doCollision(map_t mapgi)
+	__cuda_callable__ static bool doCollision(map_t mapgi)
 	{
 		// by default, collision is done on non-BC sites only
 		// additionally, BCs which include the collision step should be specified here
@@ -200,7 +203,7 @@ struct D3Q7_BC_All
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void postCollision(DATA& SD, LBM_KS& KS, map_t mapgi, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void postCollision(DATA& SD, LBM_KS& KS, map_t mapgi, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		if (mapgi == GEO_NOTHING)
 			return;

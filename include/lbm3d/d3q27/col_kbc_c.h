@@ -1,3 +1,9 @@
+#pragma once
+
+#include "common.h"
+#include "eq.h"
+#include "eq_entropic.h"
+
 // KBC models by Karlin Bosch Chikatamarla 2015
 /* arXiv:1507.02518v1 [physics.flu-dyn]
 
@@ -14,8 +20,6 @@
  * see the above paper (and few others by K+B+C) for more details on D & T (and not only!), tilde ~ means central moments
  */
 // C1-C4 models with the central moment representation of DFs
-
-#include "common.h"
 
 // speed of sound
 #define _csqr n1o3
@@ -284,7 +288,7 @@ struct D3Q27_KBC_C1 : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "KBC_C1";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 #ifdef USE_GALILEAN_CORRECTION
 		const dreal m_200 = KS.f[mmm] + KS.f[mmp] + KS.f[mmz] + KS.f[mpm] + KS.f[mpp] + KS.f[mpz] + KS.f[mzm] + KS.f[mzp] + KS.f[mzz] + KS.f[pmm]
@@ -539,7 +543,7 @@ struct D3Q27_KBC_C2 : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "KBC_C2";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 #ifdef USE_GALILEAN_CORRECTION
 		const dreal m_200 = KS.f[mmm] + KS.f[mmp] + KS.f[mmz] + KS.f[mpm] + KS.f[mpp] + KS.f[mpz] + KS.f[mzm] + KS.f[mzp] + KS.f[mzz] + KS.f[pmm]
@@ -794,7 +798,7 @@ struct D3Q27_KBC_C3 : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "KBC_C3";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 #ifdef USE_GALILEAN_CORRECTION
 		const dreal m_200 = KS.f[mmm] + KS.f[mmp] + KS.f[mmz] + KS.f[mpm] + KS.f[mpp] + KS.f[mpz] + KS.f[mzm] + KS.f[mzp] + KS.f[mzz] + KS.f[pmm]
@@ -1049,7 +1053,7 @@ struct D3Q27_KBC_C4 : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "KBC_C4";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 #ifdef USE_GALILEAN_CORRECTION
 		const dreal m_200 = KS.f[mmm] + KS.f[mmp] + KS.f[mmz] + KS.f[mpm] + KS.f[mpp] + KS.f[mpz] + KS.f[mzm] + KS.f[mzp] + KS.f[mzz] + KS.f[pmm]

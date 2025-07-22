@@ -1,6 +1,10 @@
+#pragma once
+
+#include "common.h"
+#include "eq.h"
+
 // improved BRK (SRT) model by Geier 2017
 // for standard DF (no well-conditioned)
-#include "common.h"
 
 template <typename TRAITS, typename EQ = D3Q27_EQ<TRAITS>>
 struct D3Q27_BGK : D3Q27_COMMON<TRAITS, EQ>
@@ -10,7 +14,7 @@ struct D3Q27_BGK : D3Q27_COMMON<TRAITS, EQ>
 	static constexpr const char* id = "BGK";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		const dreal omega1 = no1 / (no3 * KS.lbmViscosity + n1o2);
 #ifdef USE_GALILEAN_CORRECTION

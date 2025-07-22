@@ -1,5 +1,7 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+
 // A-A pattern
 template <typename TRAITS>
 struct D3Q7_STREAMING
@@ -8,7 +10,8 @@ struct D3Q7_STREAMING
 	using dreal = typename TRAITS::dreal;
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void postCollisionStreaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void
+	postCollisionStreaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		if (SD.even_iter) {
 			// write to the same lattice site, but the opposite DF direction
@@ -33,7 +36,7 @@ struct D3Q7_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		if (SD.even_iter) {
 			// read from the same lattice site, same DF direction

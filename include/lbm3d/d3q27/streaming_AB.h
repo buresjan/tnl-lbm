@@ -1,5 +1,7 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+
 // pull-scheme
 template <typename TRAITS>
 struct D3Q27_STREAMING
@@ -8,7 +10,8 @@ struct D3Q27_STREAMING
 	using dreal = typename TRAITS::dreal;
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void postCollisionStreaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void
+	postCollisionStreaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// no streaming actually, write to the (x,y,z) site
 		for (int i = 0; i < 27; i++)
@@ -16,7 +19,8 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streaming(uint8_t type, LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void
+	streaming(uint8_t type, LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		KS.f[mmm] = TNL::Backend::ldg(SD.df(type, mmm, xp, yp, zp));
 		KS.f[mmz] = TNL::Backend::ldg(SD.df(type, mmz, xp, yp, z));
@@ -48,14 +52,14 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		streaming(df_cur, SD, KS, xm, x, xp, ym, y, yp, zm, z, zp);
 	}
 
 	// streaming with bounce-back rule applied
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streamingBounceBack(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streamingBounceBack(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		KS.f[ppp] = TNL::Backend::ldg(SD.df(df_cur, mmm, xp, yp, zp));
 		KS.f[ppz] = TNL::Backend::ldg(SD.df(df_cur, mmz, xp, yp, z));
@@ -87,7 +91,7 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streamingRho(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streamingRho(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// clang-format off
 		KS.rho =
@@ -122,7 +126,7 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streamingVx(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streamingVx(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// (KS.f[pz] + KS.f[pm] + KS.f[pp] - KS.f[mz] - KS.f[mm] - KS.f[mp] + n1o2*KS.fx)/KS.rho;
 		// clang-format off
@@ -149,7 +153,7 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streamingVy(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streamingVy(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// (KS.f[pz] + KS.f[pm] + KS.f[pp] - KS.f[mz] - KS.f[mm] - KS.f[mp] + n1o2*KS.fx)/KS.rho;
 		// clang-format off
@@ -176,7 +180,7 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streamingVz(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streamingVz(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// (KS.f[pz] + KS.f[pm] + KS.f[pp] - KS.f[mz] - KS.f[mm] - KS.f[mp] + n1o2*KS.fx)/KS.rho;
 		// clang-format off
@@ -203,7 +207,7 @@ struct D3Q27_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streamingInterpRight(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streamingInterpRight(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// streaming: interpolation from Geier - CuLBM (2015)
 		// NOTE: velocity is neglected (for the case velocity << speed of sound)

@@ -1,4 +1,8 @@
+#pragma once
+
 #include "common.h"
+#include "eq.h"
+#include "lbm_common/ciselnik.h"
 
 template <typename TRAITS, typename LBM_EQ = D3Q7_EQ<TRAITS>>
 struct D3Q7_SRT : D3Q7_COMMON<TRAITS, LBM_EQ>
@@ -8,7 +12,7 @@ struct D3Q7_SRT : D3Q7_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "SRT";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		const dreal tau = n1o2 + LBM_EQ::iCs2 * KS.lbmViscosity;
 		const dreal omega = no1 / tau;

@@ -1,4 +1,7 @@
+#pragma once
+
 #include "common.h"
+#include "eq.h"
 
 // FEI and LUO standard CLBM ... not working
 template <typename TRAITS, typename LBM_EQ = D3Q27_EQ<TRAITS>>
@@ -9,7 +12,7 @@ struct D3Q27_CLBM_FEI : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "CLBM_FEI";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		// CLBM Fei & Luo & Li
 		// generated from Maple file: clbm3d_fei_luo_li.mw

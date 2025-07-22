@@ -1,4 +1,8 @@
+#pragma once
+
 #include "common.h"
+#include "eq.h"
+#include "lbm_common/ciselnik.h"
 
 // CLBM non-og standard monomials
 // central moment equilibria
@@ -10,7 +14,7 @@ struct D3Q7_CLBM : D3Q7_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "CLBM";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		const dreal Cs2 = no1 / LBM_EQ::iCs2;
 

@@ -1,7 +1,10 @@
-// improved BRK (SRT) model by Geier 2017
-// for standard DF (no well-conditioned)
+#pragma once
 
 #include "common.h"
+#include "eq.h"
+
+// improved BRK (SRT) model by Geier 2017
+// for standard DF (no well-conditioned)
 
 template <typename TRAITS, typename LBM_EQ = D3Q27_EQ<TRAITS>>
 struct D3Q27_SRT : D3Q27_COMMON<TRAITS, LBM_EQ>
@@ -11,7 +14,7 @@ struct D3Q27_SRT : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "SRT";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		const dreal tau = no3 * KS.lbmViscosity + n1o2;
 

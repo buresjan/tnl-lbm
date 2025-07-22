@@ -1,6 +1,41 @@
 #pragma once
 
-#include "defs.h"
+// default
+#include "lbm_data.h"  // LBM_Data is a general template (for any Q)
+#include "d3q27/macro.h"
+#include "d3q27/bc.h"
+
+#include "d3q27/eq.h"
+#include "d3q27/eq_inv_cum.h"
+#include "d3q27/eq_well.h"
+#include "d3q27/eq_entropic.h"
+
+// exactly one streaming header must be included
+#ifdef AA_PATTERN
+	#include "d3q27/streaming_AA.h"
+#endif
+#ifdef AB_PATTERN
+	#include "d3q27/streaming_AB.h"
+#endif
+
+#include "d3q27/col_cum.h"
+#include "d3q27/col_bgk.h"
+#include "d3q27/col_clbm.h"
+#include "d3q27/col_fclbm.h"
+#include "d3q27/col_mrt.h"
+#include "d3q27/col_srt.h"
+#include "d3q27/col_cum_sgs.h"
+#include "d3q27/col_kbc_n.h"
+#include "d3q27/col_kbc_c.h"
+#include "d3q27/col_srt_modif_force.h"
+#include "d3q27/col_clbm_fei.h"
+
+#include "d3q27/col_srt_well.h"
+#include "d3q27/col_clbm_well.h"
+#include "d3q27/col_cum_well.h"
+#include "d3q27/col_bgk_well.h"
+
+
 #include "state.h"
 
 template <typename STATE>

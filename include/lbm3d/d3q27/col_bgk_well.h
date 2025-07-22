@@ -1,6 +1,10 @@
+#pragma once
+
+#include "common_well.h"
+#include "eq_well.h"
+
 // improved BRK (SRT) model by Geier 2017
 // well conditioned
-#include "common_well.h"
 
 template <typename TRAITS, typename LBM_EQ = D3Q27_EQ_WELL<TRAITS>>
 struct D3Q27_BGK_WELL : D3Q27_COMMON_WELL<TRAITS, LBM_EQ>
@@ -10,7 +14,7 @@ struct D3Q27_BGK_WELL : D3Q27_COMMON_WELL<TRAITS, LBM_EQ>
 	static constexpr const char* id = "BGK_WELL";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		const dreal omega1 = no1 / (no3 * KS.lbmViscosity + n1o2);
 

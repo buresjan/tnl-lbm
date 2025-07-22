@@ -1,4 +1,7 @@
+#pragma once
+
 #include "common.h"
+#include "eq.h"
 
 template <typename TRAITS, typename LBM_EQ = D3Q27_EQ<TRAITS>>
 struct D3Q27_MRT : D3Q27_COMMON<TRAITS, LBM_EQ>
@@ -8,7 +11,7 @@ struct D3Q27_MRT : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "MRT_LES";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 		dreal Pxx = KS.f[mmm] + KS.f[mmz] + KS.f[mmp] + KS.f[mzm] + KS.f[mzz] + KS.f[mzp] + KS.f[mpm] + KS.f[mpz] + KS.f[mpp] + KS.f[pmm] + KS.f[pmz]
 				  + KS.f[pmp] + KS.f[pzm] + KS.f[pzz] + KS.f[pzp] + KS.f[ppm] + KS.f[ppz] + KS.f[ppp];	//Second order moment Pi

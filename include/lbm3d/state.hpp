@@ -5,6 +5,7 @@
 
 #include "state.h"
 #include "kernels.h"
+#include "vtk_writer.h"
 
 #include "../lbm_common/png_tool.h"
 

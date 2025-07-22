@@ -1,5 +1,7 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+
 template <typename T_TRAITS, typename T_EQ>
 struct D3Q7_COMMON
 {
@@ -11,7 +13,7 @@ struct D3Q7_COMMON
 	using dreal = typename TRAITS::dreal;
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void computeDensityAndVelocity(LBM_KS& KS)
+	__cuda_callable__ static void computeDensityAndVelocity(LBM_KS& KS)
 	{
 		dreal phi = 0;
 		for (int i = 0; i < 7; i++)
@@ -25,17 +27,17 @@ struct D3Q7_COMMON
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void computeDensityAndVelocity_Wall(LBM_KS& KS)
+	__cuda_callable__ static void computeDensityAndVelocity_Wall(LBM_KS& KS)
 	{
-		KS.phi = no1;
+		KS.phi = 1;
 		// NOTE: does not make sense for ADE
-		//KS.vx = no0;
-		//KS.vy = no0;
-		//KS.vz = no0;
+		//KS.vx = 0;
+		//KS.vy = 0;
+		//KS.vz = 0;
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void setEquilibrium(LBM_KS& KS)
+	__cuda_callable__ static void setEquilibrium(LBM_KS& KS)
 	{
 		KS.f[mzz] = EQ::eq_mzz(KS.phi, KS.vx, KS.vy, KS.vz);
 		KS.f[zmz] = EQ::eq_zmz(KS.phi, KS.vx, KS.vy, KS.vz);
@@ -47,7 +49,7 @@ struct D3Q7_COMMON
 	}
 
 	template <typename LAT_DFS>
-	CUDA_HOSTDEV static void setEquilibriumLat(LAT_DFS& f, idx x, idx y, idx z, real phi, real vx, real vy, real vz)
+	__cuda_callable__ static void setEquilibriumLat(LAT_DFS& f, idx x, idx y, idx z, real phi, real vx, real vy, real vz)
 	{
 		f(mzz, x, y, z) = EQ::eq_mzz(phi, vx, vy, vz);
 		f(zmz, x, y, z) = EQ::eq_zmz(phi, vx, vy, vz);
@@ -59,7 +61,7 @@ struct D3Q7_COMMON
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void copyDFcur2KS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void copyDFcur2KS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		for (int i = 0; i < 7; i++)
 			KS.f[i] = SD.df(df_cur, i, x, y, z);

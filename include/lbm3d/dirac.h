@@ -1,5 +1,7 @@
 #pragma once
 
+#include <TNL/Math.h>
+
 #include "defs.h"
 
 template <typename real>
@@ -38,7 +40,7 @@ CUDA_HOSTDEV real diracDelta(int i, real r)
 		case 1:	 // VU: phi3
 			return 1 - fabs(r);
 		case 2:	 // VU: phi2
-			return (real) 0.25 * (1 + cos((real) PI * r * (real) 0.5));
+			return (real) 0.25 * (1 + cos((real) TNL::pi * r * (real) 0.5));
 		case 3:	 // VU: phi1
 			if (fabs(r) > (real) 1.0)
 				return (5 - 2 * fabs(r) - sqrt(-7 + 12 * fabs(r) - 4 * r * r)) / (real) 8.0;

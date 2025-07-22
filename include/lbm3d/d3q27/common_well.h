@@ -1,5 +1,8 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+#include "lbm_common/ciselnik.h"
+
 template <typename T_TRAITS, typename T_EQ>
 struct D3Q27_COMMON_WELL
 {
@@ -10,7 +13,7 @@ struct D3Q27_COMMON_WELL
 	using dreal = typename TRAITS::dreal;
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void computeDensityAndVelocity(LBM_KS& KS)
+	__cuda_callable__ static void computeDensityAndVelocity(LBM_KS& KS)
 	{
 #ifdef USE_HIGH_PRECISION_RHO
 		// src: https://en.wikipedia.org/wiki/Kahan_summation_algorithm
@@ -48,7 +51,7 @@ struct D3Q27_COMMON_WELL
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void setEquilibrium(LBM_KS& KS)
+	__cuda_callable__ static void setEquilibrium(LBM_KS& KS)
 	{
 		KS.f[mmm] = EQ::eq_mmm(KS.rho, KS.vx, KS.vy, KS.vz);
 		KS.f[mmz] = EQ::eq_mmz(KS.rho, KS.vx, KS.vy, KS.vz);
@@ -80,7 +83,7 @@ struct D3Q27_COMMON_WELL
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void copyDFtoKS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void copyDFtoKS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		for (int i = 0; i < 27; i++)
 			KS.f[i] = SD.cdf(i, x, y, z);

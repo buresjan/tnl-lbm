@@ -1,4 +1,7 @@
+#pragma once
+
 #include "common_well.h"
+#include "eq_well.h"
 
 template <typename TRAITS, typename LBM_EQ = D3Q27_EQ_WELL<TRAITS>>
 struct D3Q27_CUM_WELL : D3Q27_COMMON_WELL<TRAITS, LBM_EQ>
@@ -8,7 +11,7 @@ struct D3Q27_CUM_WELL : D3Q27_COMMON_WELL<TRAITS, LBM_EQ>
 	static constexpr const char* id = "CUM_WELL";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 #define K_mm0 n1o36
 #define K_zm0 n1o9

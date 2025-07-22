@@ -1,5 +1,7 @@
 #pragma once
 
+#include <TNL/Backend/Macros.h>
+
 // empty Macro containing required forcing quantities for IBM (see lbm.h -> hfx() etc.)
 template <typename TRAITS>
 struct D3Q27_MACRO_Base
@@ -27,7 +29,7 @@ struct D3Q27_MACRO_Base
 
 	// called from LBMKernelInit
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void zeroForcesInKS(LBM_KS& KS)
+	__cuda_callable__ static void zeroForcesInKS(LBM_KS& KS)
 	{
 		KS.fx = 0;
 		KS.fy = 0;
@@ -36,11 +38,11 @@ struct D3Q27_MACRO_Base
 
 	// compulsory method -- called from cudaLBMComputeVelocitiesStarAndZeroForce kernel
 	template <typename LBM_DATA>
-	CUDA_HOSTDEV static void zeroForces(LBM_DATA& SD, idx x, idx y, idx z)
+	__cuda_callable__ static void zeroForces(LBM_DATA& SD, idx x, idx y, idx z)
 	{}
 
 	template <typename LBM_BC, typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void computeForcing(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void computeForcing(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{}
 };
 
@@ -60,7 +62,7 @@ struct D3Q27_MACRO_Default : D3Q27_MACRO_Base<TRAITS>
 	};
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		SD.macro(e_rho, x, y, z) = KS.rho;
 		SD.macro(e_vx, x, y, z) = KS.vx;
@@ -69,7 +71,7 @@ struct D3Q27_MACRO_Default : D3Q27_MACRO_Base<TRAITS>
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		KS.lbmViscosity = SD.lbmViscosity;
 		KS.fx = SD.fx;
@@ -103,7 +105,7 @@ struct D3Q27_MACRO_Mean : D3Q27_MACRO_Base<TRAITS>
 	};
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		// Instant quantities
 		SD.macro(e_rho, x, y, z) = KS.rho;
@@ -159,7 +161,7 @@ struct D3Q27_MACRO_Mean : D3Q27_MACRO_Base<TRAITS>
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		KS.lbmViscosity = SD.lbmViscosity;
 		KS.fx = SD.fx;
@@ -177,10 +179,10 @@ struct D3Q27_MACRO_Void : D3Q27_MACRO_Base<TRAITS>
 	static const int N = 0;
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{}
 };

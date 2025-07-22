@@ -1,5 +1,7 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+
 // pull-scheme
 template <typename TRAITS>
 struct D3Q7_STREAMING
@@ -8,7 +10,8 @@ struct D3Q7_STREAMING
 	using dreal = typename TRAITS::dreal;
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void postCollisionStreaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void
+	postCollisionStreaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		// no streaming actually, write to the (x,y,z) site
 		for (int i = 0; i < 7; i++)
@@ -16,7 +19,7 @@ struct D3Q7_STREAMING
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void streaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
+	__cuda_callable__ static void streaming(LBM_DATA& SD, LBM_KS& KS, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
 	{
 		KS.f[mzz] = SD.df(df_cur, mzz, xp, y, z);
 		KS.f[zmz] = SD.df(df_cur, zmz, x, yp, z);

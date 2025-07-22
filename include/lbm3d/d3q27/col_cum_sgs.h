@@ -1,4 +1,7 @@
+#pragma once
+
 #include "common.h"
+#include "eq.h"
 
 // Cumulant operator (based on lbm_cum.h) + Smagorinsky LES
 // src: mail Robert Straka from 2018.09.15:
@@ -19,7 +22,7 @@ struct D3Q27_CUM_SGS : D3Q27_COMMON<TRAITS, LBM_EQ>
 	static constexpr const char* id = "CUM_SGS";
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void collision(LBM_KS& KS)
+	__cuda_callable__ static void collision(LBM_KS& KS)
 	{
 // for compatibility of notation
 #define C_011 k_011

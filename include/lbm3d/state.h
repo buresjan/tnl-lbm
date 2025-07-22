@@ -13,7 +13,6 @@
 #include "../lbm_common/logging.h"
 #include "../lbm_common/fileutils.h"
 #include "lbm.h"
-#include "vtk_writer.h"
 #include "checkpoint.h"
 
 // ibm: lagrangian filament/surface
@@ -71,7 +70,7 @@ struct counter
 	}
 };
 
-enum
+enum : std::uint8_t
 {
 	STAT_RESET,
 	STAT2_RESET,

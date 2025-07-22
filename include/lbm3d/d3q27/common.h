@@ -1,5 +1,8 @@
 #pragma once
 
+#include "lbm3d/defs.h"
+#include "lbm_common/ciselnik.h"
+
 template <typename T_TRAITS, typename T_EQ>
 struct D3Q27_COMMON
 {
@@ -11,7 +14,7 @@ struct D3Q27_COMMON
 	using dreal = typename TRAITS::dreal;
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void computeDensityAndVelocity(LBM_KS& KS)
+	__cuda_callable__ static void computeDensityAndVelocity(LBM_KS& KS)
 	{
 #ifdef USE_HIGH_PRECISION_RHO
 		// src: https://en.wikipedia.org/wiki/Kahan_summation_algorithm
@@ -47,16 +50,16 @@ struct D3Q27_COMMON
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void computeDensityAndVelocity_Wall(LBM_KS& KS)
+	__cuda_callable__ static void computeDensityAndVelocity_Wall(LBM_KS& KS)
 	{
-		KS.rho = no1;
-		KS.vx = no0;
-		KS.vy = no0;
-		KS.vz = no0;
+		KS.rho = 1;
+		KS.vx = 0;
+		KS.vy = 0;
+		KS.vz = 0;
 	}
 
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void setEquilibrium(LBM_KS& KS)
+	__cuda_callable__ static void setEquilibrium(LBM_KS& KS)
 	{
 		KS.f[mmm] = EQ::eq_mmm(KS.rho, KS.vx, KS.vy, KS.vz);
 		KS.f[mmz] = EQ::eq_mmz(KS.rho, KS.vx, KS.vy, KS.vz);
@@ -89,7 +92,7 @@ struct D3Q27_COMMON
 
 	// used in the "interpolated outflow boundary condition with decomposition" by Eichler https://doi.org/10.1016/j.camwa.2024.08.009
 	template <typename LBM_KS>
-	CUDA_HOSTDEV static void setEquilibriumDecomposition(LBM_KS& KS, dreal rho_out)
+	__cuda_callable__ static void setEquilibriumDecomposition(LBM_KS& KS, dreal rho_out)
 	{
 		KS.f[mmm] += EQ::eq_mmm(rho_out, KS.vx, KS.vy, KS.vz) - EQ::eq_mmm(KS.rho, KS.vx, KS.vy, KS.vz);
 		KS.f[mmz] += EQ::eq_mmz(rho_out, KS.vx, KS.vy, KS.vz) - EQ::eq_mmz(KS.rho, KS.vx, KS.vy, KS.vz);
@@ -121,7 +124,7 @@ struct D3Q27_COMMON
 	}
 
 	template <typename LAT_DFS>
-	CUDA_HOSTDEV static void setEquilibriumLat(LAT_DFS& f, idx x, idx y, idx z, real rho, real vx, real vy, real vz)
+	__cuda_callable__ static void setEquilibriumLat(LAT_DFS& f, idx x, idx y, idx z, real rho, real vx, real vy, real vz)
 	{
 		f(mmm, x, y, z) = EQ::eq_mmm(rho, vx, vy, vz);
 		f(zmm, x, y, z) = EQ::eq_zmm(rho, vx, vy, vz);
@@ -155,7 +158,7 @@ struct D3Q27_COMMON
 	}
 
 	template <typename LBM_DATA, typename LBM_KS>
-	CUDA_HOSTDEV static void copyDFcur2KS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+	__cuda_callable__ static void copyDFcur2KS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
 	{
 		for (int i = 0; i < 27; i++)
 			KS.f[i] = SD.df(df_cur, i, x, y, z);
