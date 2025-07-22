@@ -207,9 +207,7 @@ void LBMComputeVelocitiesStarAndZeroForce(
 	idx xp, xm, yp, ym, zp, zm;
 	kernelInitIndices<NSE>(SD, gi_map, nproc, x, y, z, xp, xm, yp, ym, zp, zm);
 
-	KS.fx = 0;
-	KS.fy = 0;
-	KS.fz = 0;
+	NSE::MACRO::zeroForcesInKS(KS);
 
 	// do streaming, compute density and velocity
 	NSE::BC::preCollision(SD, KS, gi_map, xm, x, xp, ym, y, yp, zm, z, zp);

@@ -19,7 +19,6 @@ struct D3Q7_MACRO_Default
 	// maximum width of overlaps for the macro arrays
 	static constexpr int overlap_width = 1;
 
-	// called from LBMKernelInit
 	template <typename LBM_KS>
 	__cuda_callable__ static void zeroForcesInKS(LBM_KS& KS)
 	{}
@@ -45,7 +44,6 @@ struct D3Q7_MACRO_Void
 
 	static const int N = 0;
 
-	// called from LBMKernelInit
 	template <typename LBM_KS>
 	__cuda_callable__ static void zeroForcesInKS(LBM_KS& KS)
 	{}
