@@ -113,7 +113,7 @@ struct Traits
 		idx,
 		d4_overlaps>;
 
-	using xyz_indexer_t = typename array3d<dreal, DeviceType>::IndexerType;
+	using lattice_indexer_t = typename array3d<dreal, DeviceType>::IndexerType;
 };
 
 using TraitsSP = Traits<float>;	 //_dreal is float only

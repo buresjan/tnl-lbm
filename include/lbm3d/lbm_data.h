@@ -9,7 +9,7 @@ struct LBM_Data
 	using idx = typename TRAITS::idx;
 	using dreal = typename TRAITS::dreal;
 	using map_t = typename TRAITS::map_t;
-	using indexer_t = typename TRAITS::xyz_indexer_t;
+	using indexer_t = typename TRAITS::lattice_indexer_t;
 
 	// even/odd iteration indicator for the A-A pattern
 	bool even_iter = true;
