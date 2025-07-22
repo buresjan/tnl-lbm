@@ -156,11 +156,4 @@ struct D3Q27_COMMON
 		f(zpp, x, y, z) = EQ::eq_zpp(rho, vx, vy, vz);
 		f(ppp, x, y, z) = EQ::eq_ppp(rho, vx, vy, vz);
 	}
-
-	template <typename LBM_DATA, typename LBM_KS>
-	__cuda_callable__ static void copyDFcur2KS(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
-	{
-		for (int i = 0; i < 27; i++)
-			KS.f[i] = SD.df(df_cur, i, x, y, z);
-	}
 };
