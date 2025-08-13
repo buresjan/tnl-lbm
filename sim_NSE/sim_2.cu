@@ -176,16 +176,16 @@ struct StateLocal : State<NSE>
 			}
 		}
 		if (index == k++)
-			return vtk_helper("lbm_analytical_ux", nse.lat.lbm2physVelocity(analytical_ux(y, z)), 1, desc, value, dofs);
+			return vtk_helper("analytical_ux", nse.lat.lbm2physVelocity(analytical_ux(y, z)), 1, desc, value, dofs);
 		if (index == k++)
-			return vtk_helper("lbm_ux", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx, x, y, z)), 1, desc, value, dofs);
+			return vtk_helper("ux", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx, x, y, z)), 1, desc, value, dofs);
 		if (index == k++)
-			return vtk_helper("lbm_uy", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy, x, y, z)), 1, desc, value, dofs);
+			return vtk_helper("uy", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy, x, y, z)), 1, desc, value, dofs);
 		if (index == k++)
-			return vtk_helper("lbm_uz", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vz, x, y, z)), 1, desc, value, dofs);
+			return vtk_helper("uz", nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vz, x, y, z)), 1, desc, value, dofs);
 		if (index == k++)
 			return vtk_helper(
-				"lbm_error_ux", nse.lat.lbm2physVelocity(fabs(block.hmacro(MACRO::e_vx, x, y, z) - analytical_ux(y, z))), 1, desc, value, dofs
+				"error_ux", nse.lat.lbm2physVelocity(fabs(block.hmacro(MACRO::e_vx, x, y, z) - analytical_ux(y, z))), 1, desc, value, dofs
 			);
 		return false;
 	}
