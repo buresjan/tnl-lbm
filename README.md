@@ -86,6 +86,10 @@ example, to build and run `sim_1` as in the previous example:
 
     ./sim_NSE/run sim_1 4
 
+For the 2D example:
+
+    ./sim_2D/run sim2d_1 4
+
 ## Getting involved
 
 The TNL project welcomes and encourages participation by everyone. While most of the work for TNL
