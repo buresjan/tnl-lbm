@@ -34,6 +34,72 @@ struct NSE2D_Data_ConstInflow : NSE_Data<TRAITS>
 	}
 };
 
+template <typename TRAITS>
+struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
+{
+    using dreal = typename TRAITS::dreal;
+    using idx   = typename TRAITS::idx;
+
+    // Keep default fields and extend with running sums for means
+    enum
+    {
+        e_rho,
+        e_vx,
+        e_vy,
+        e_svx,   // sum of vx (LBM units), gated by accumulate_means
+        e_svy,   // sum of vy (LBM units), gated by accumulate_means
+        N
+    };
+
+    // Write per-cell macro values each step
+    template <typename LBM_DATA, typename LBM_KS>
+    __cuda_callable__ static void outputMacro(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+    {
+        SD.macro(e_rho, x, y, z) = KS.rho;
+        SD.macro(e_vx , x, y, z) = KS.vx;
+        SD.macro(e_vy , x, y, z) = KS.vy;
+
+        // Accumulate only after warm-up (host toggles SD.accumulate_means)
+        if (SD.accumulate_means) {
+            SD.macro(e_svx, x, y, z) += KS.vx;
+            SD.macro(e_svy, x, y, z) += KS.vy;
+        }
+    }
+
+    // Provide KS with viscosity and body forces (2D)
+    template <typename LBM_DATA, typename LBM_KS>
+    __cuda_callable__ static void copyQuantities(LBM_DATA& SD, LBM_KS& KS, idx x, idx y, idx z)
+    {
+        KS.lbmViscosity = SD.lbmViscosity;
+        KS.fx = SD.fx;   // ok even if zero
+        KS.fy = SD.fy;
+    }
+};
+
+template <typename TRAITS>
+struct NSE2D_Data_ParabolicInflow : NSE_Data<TRAITS>
+{
+    using idx   = typename TRAITS::idx;
+    using dreal = typename TRAITS::dreal;
+
+    // Inputs (LBM units and indices), set each step from StateLocal::updateKernelVelocities()
+    dreal u_max_lbm = 0;     // U_max in LBM units ( = 1.5 * U_mean_phys mapped to LBM )
+    idx   y0 = 1;            // first interior fluid row
+    idx   y1 = 1;            // last interior fluid row
+    dreal inv_den = 1;       // 1.0 / (y1 - y0), precomputed
+    bool  accumulate_means = false; // gate for mean accumulation in Macro
+
+    template <typename LBM_KS>
+    CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
+    {
+        // Normalize to s in [0,1] across interior fluid rows
+        dreal s = (dreal)(y - y0) * inv_den;
+        if (s < 0) s = 0; else if (s > 1) s = 1;
+        KS.vx = u_max_lbm * (4.0 * s * (1.0 - s));
+        KS.vy = 0;
+    }
+};
+
 template <typename NSE>
 struct StateLocal : State<NSE>
 {
@@ -52,6 +118,11 @@ struct StateLocal : State<NSE>
 	using lat_t = Lattice<3, real, idx>;
 
 	real lbm_inflow_vx = 0;
+	real u_max_lbm = 0;
+
+	// Mean settings
+    real stats_start_time = 2.5;  // [s] ignore early transients
+    int  mean_samples = 0;        // number of steps accumulated (constant dt => time-weighted)
 
 	void setupBoundaries() override
 	{
@@ -91,16 +162,46 @@ struct StateLocal : State<NSE>
 					return vtk_helper("velocity", 0, 3, desc, value, dofs);
 			}
 		}
+		if (index == k++) {
+            // mean_vx (physical units) from sums and sample count
+            real mean_vx_phys = 0;
+            if (mean_samples > 0) {
+                real s = block.hmacro(MACRO::e_svx, x, y, z) / (real)mean_samples;
+                mean_vx_phys = nse.lat.lbm2physVelocity(s);
+            }
+            return vtk_helper("mean_vx", mean_vx_phys, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            // mean_vy (physical units)
+            real mean_vy_phys = 0;
+            if (mean_samples > 0) {
+                real s = block.hmacro(MACRO::e_svy, x, y, z) / (real)mean_samples;
+                mean_vy_phys = nse.lat.lbm2physVelocity(s);
+            }
+            return vtk_helper("mean_vy", mean_vy_phys, 1, desc, value, dofs);
+        }
+
 		return false;
 	}
 
-	void updateKernelVelocities() override
-	{
-		for (auto& block : nse.blocks) {
-			block.data.inflow_vx = lbm_inflow_vx;
-			block.data.inflow_vy = 0;
-		}
-	}
+	// Push inflow + mean-accumulation gate to device data each step
+    void updateKernelVelocities() override
+    {
+        const bool accumulate_now = (nse.physTime() >= stats_start_time);
+        if (accumulate_now) mean_samples++;
+
+        for (auto& block : nse.blocks) {
+            // Inflow profile params
+            block.data.u_max_lbm = u_max_lbm;
+            block.data.y0 = 1;
+            block.data.y1 = nse.lat.global.y() - 2;
+            const int denom = std::max(1, (int)(block.data.y1 - block.data.y0));
+            block.data.inv_den = 1.0 / (real)denom;
+
+            // Toggle mean accumulation in the Macro
+            block.data.accumulate_means = accumulate_now;
+        }
+    }
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 	: State<NSE>(id, communicator, std::move(lat))
@@ -123,7 +224,7 @@ int sim(int RESOLUTION = 2)
     real LBM_VISCOSITY  = 1.0e-3;               // tau = 0.5 + 3*nu = 0.56 (stable)
     real PHYS_HEIGHT    = 0.41;               // [m]
     real PHYS_VISCOSITY = 1.0e-3;             // [m^2/s] (benchmark fluid)  Re ≈ 100 when U_mean = 1.0 m/s
-    real PHYS_VELOCITY  = 1.0;                // [m/s] use uniform U_mean matching Re=100 (D≈0.1 m) per ST 2D-2
+    real PHYS_VELOCITY  = 1.0;      // [m/s] mean inflow; U_max = 1.5 * mean
 
     real PHYS_DL = PHYS_HEIGHT / ((real)Y - 2);
     real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY * PHYS_DL * PHYS_DL;
@@ -138,20 +239,21 @@ int sim(int RESOLUTION = 2)
     lat.physViscosity = PHYS_VISCOSITY;
 
     const std::string state_id =
-        fmt::format("sim2d_1_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
+        fmt::format("sim2d_2_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
     StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
 
     if (!state.canCompute())
         return 0;
 
-    // problem parameters
-    state.lbm_inflow_vx = lat.phys2lbmVelocity(PHYS_VELOCITY); // uniform inflow at U_mean
+	// Set U_max (LBM units) for the parabolic profile
+    real U_max_phys = 1.5 * PHYS_VELOCITY;
+    state.u_max_lbm = lat.phys2lbmVelocity(U_max_phys);
 
     state.nse.physFinalTime = 6.0;
     state.cnt[PRINT].period = 0.05;
 
     // 2D = cut in 3D at z=0
-    state.cnt[VTK2D].period = -0.05;
+    state.cnt[VTK2D].period = 0.05;
     state.add2Dcut_Z(0, "");
 
     execute(state);
@@ -167,12 +269,14 @@ void run(int RES)
 	using NSE_CONFIG = LBM_CONFIG<
 		TRAITS,
 		D2Q9_KernelStruct,
-		NSE2D_Data_ConstInflow<TRAITS>,
+		// NSE2D_Data_ConstInflow<TRAITS>,
+		NSE2D_Data_ParabolicInflow<TRAITS>,
 		COLL,
 		typename COLL::EQ,
 		D2Q9_STREAMING<TRAITS>,
 		D2Q9_BC_All,
-		D2Q9_MACRO_Default<TRAITS>>;
+		// D2Q9_MACRO_Default<TRAITS>>;
+		D2Q9_MACRO_WithMean<TRAITS>>;
 
 	sim<NSE_CONFIG>(RES);
 }
