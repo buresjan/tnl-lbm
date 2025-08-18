@@ -136,14 +136,26 @@ struct StateLocal : State<NSE>
 		nse.setBoundaryY(0, BC::GEO_NOTHING);						// back
 		nse.setBoundaryY(nse.lat.global.y() - 1, BC::GEO_NOTHING);	// front
 
-		// draw a wall with a hole
-		int cx = floor(0.20 / nse.lat.physDl);
-		int width = nse.lat.global.y() / 10;
-		for (int px = cx; px <= cx + width; px++)
-			for (int py = 1; py <= nse.lat.global.y() - 2; py++)
-				if (! (py >= nse.lat.global.y() * 4 / 10 && py <= nse.lat.global.y() * 6 / 10)) {
+		// Physical parameters: center (0.2, 0.2), diameter 0.1 m
+		real cx_phys = 0.20;           // [m] x-position of cylinder center
+		real cy_phys = 0.20;           // [m] y-position of cylinder center
+		real radius_phys = 0.05;       // [m] radius = 0.1 / 2
+
+		// convert to lattice indices
+		int cx = static_cast<int>(cx_phys / nse.lat.physDl + 0.5);
+		int cy = static_cast<int>(cy_phys / nse.lat.physDl + 0.5);
+		int radius = static_cast<int>(radius_phys / nse.lat.physDl + 0.5);
+
+		// loop over domain and mark all lattice sites inside circle as wall
+		for (int px = 1; px < nse.lat.global.x() - 1; px++) {
+			for (int py = 1; py < nse.lat.global.y() - 1; py++) {
+				int dx = px - cx;
+				int dy = py - cy;
+				if (dx*dx + dy*dy <= radius*radius) {
 					nse.setMap(px, py, 0, BC::GEO_WALL);
 				}
+			}
+		}
 	}
 
 	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
