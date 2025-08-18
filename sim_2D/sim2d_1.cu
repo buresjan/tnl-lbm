@@ -146,7 +146,7 @@ int sim(int RESOLUTION = 2)
 	// problem parameters
 	state.lbm_inflow_vx = lat.phys2lbmVelocity(PHYS_VELOCITY);
 
-	state.nse.physFinalTime = 1.0;
+	state.nse.physFinalTime = 15.0;
 	state.cnt[PRINT].period = 0.001;
 
 	// 2D = cut in 3D at z=0
