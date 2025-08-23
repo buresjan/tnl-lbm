@@ -301,6 +301,7 @@ struct StateLocal : State<NSE>
         // reached required consecutive stable checks -> freeze
         if (stable_hits >= mean_stable_required) {
             means_frozen     = true;
+            cout << means_frozen << std::endl;
             mean_freeze_time = t;
         }
     }
