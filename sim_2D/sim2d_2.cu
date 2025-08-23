@@ -50,6 +50,9 @@ struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
         e_vy,
         e_svx,   // sum of vx (LBM units), gated by accumulate_means
         e_svy,   // sum of vy (LBM units), gated by accumulate_means
+        e_mean_vx_frozen,   // per-cell frozen mean vx (LBM)
+        e_mean_vy_frozen,   // per-cell frozen mean vy (LBM)
+        e_smag_uprime,      // running sum of |u - <u>| (LBM); filled after freeze
         N
     };
 
@@ -65,6 +68,17 @@ struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
         if (SD.accumulate_means) {
             SD.macro(e_svx, x, y, z) += KS.vx;
             SD.macro(e_svy, x, y, z) += KS.vy;
+        }
+
+
+        // After the mean is frozen, accumulate |u - <u>| (LBM units)
+        if (SD.accumulate_flucs) {
+            const dreal mvx = SD.macro(e_mean_vx_frozen, x, y, z);
+            const dreal mvy = SD.macro(e_mean_vy_frozen, x, y, z);
+            const dreal dux = KS.vx - mvx;
+            const dreal duy = KS.vy - mvy;
+            const dreal mag = sqrt(dux * dux + duy * duy);
+            SD.macro(e_smag_uprime, x, y, z) += mag;
         }
     }
 
@@ -90,6 +104,7 @@ struct NSE2D_Data_ParabolicInflow : NSE_Data<TRAITS>
     idx   y1 = 1;            // last interior fluid row
     dreal inv_den = 1;       // 1.0 / (y1 - y0), precomputed
     bool  accumulate_means = false; // gate for mean accumulation in Macro
+    bool  accumulate_flucs = false;   // gate for |u - <u>| accumulation (after mean is frozen)
 
     template <typename LBM_KS>
     CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
@@ -128,8 +143,8 @@ struct StateLocal : State<NSE>
 
     // --- Mean convergence control (host-side) ---
     real mean_tol               = 1.0e-3;   // [m/s] |Δ(domain-avg |<u>|)| threshold between checks
-    real mean_check_period      = 0.10;     // [s]   cadence to evaluate stabilization
-    int  mean_stable_required   = 5;        // consecutive passes needed to declare convergence
+    real mean_check_period      = 0.05;     // [s]   cadence to evaluate stabilization
+    int  mean_stable_required   = 10;        // consecutive passes needed to declare convergence
 
     bool means_frozen           = false;    // latched once the mean is declared stable
     real mean_freeze_time       = -1;       // [s]   time when mean was frozen
@@ -137,6 +152,21 @@ struct StateLocal : State<NSE>
     // rolling bookkeeping for the check
     real next_mean_check_time   = stats_start_time + mean_check_period;
     real prev_domain_mean_speed = -1;       // previous domain-averaged |<u>| [m/s]
+    
+    // Fluc settings
+        // --- Fluctuation magnitude accumulation & stabilization (host-side) ---
+    int  fluc_samples             = 0;        // time-weighted sample count for |u - <u>| average
+
+    real fluc_tol                 = 1.0e-3;   // [m/s] |Δ(domain-avg <|u'|>)| threshold
+    real fluc_check_period        = 0.05;     // [s]
+    int  fluc_stable_required     = 10;        // consecutive passes
+
+    bool flucs_frozen             = false;    // latched once <|u'|> declared stable
+    real fluc_freeze_time         = -1;       // [s]
+
+    real next_fluc_check_time     = -1;       // [s]
+    real prev_domain_flucmag      = -1;       // previous domain-avg <|u'|> [m/s]
+
 
 
 	void setupBoundaries() override
@@ -208,6 +238,17 @@ struct StateLocal : State<NSE>
             return vtk_helper("mean_vy", mean_vy_phys, 1, desc, value, dofs);
         }
 
+        if (index == k++) {
+            // mean(|u'|) in physical units
+            real mean_fluc_mag_phys = 0;
+            if (fluc_samples > 0) {
+                const real s = block.hmacro(MACRO::e_smag_uprime, x, y, z) / (real)fluc_samples; // LBM
+                mean_fluc_mag_phys = nse.lat.lbm2physVelocity(s);
+            }
+            return vtk_helper("mean_fluc_mag", mean_fluc_mag_phys, 1, desc, value, dofs);
+        }
+
+
 		return false;
 	}
 
@@ -240,12 +281,68 @@ struct StateLocal : State<NSE>
 
             // If we just froze here, we also need to snapshot frozen mean & switch to flucts
             if (means_frozen) {
-                // snapshotFrozenMeansToMacro();    // (Section 2B)
+                snapshotFrozenMeansToMacro();    // (Section 2B)
                 // start fluctuation accumulation next step; samples reset there
             }
         }
+
+        // If mean already frozen, maintain fluctuation accumulation and stabilization
+        if (means_frozen) {
+            // samples advance only while not frozen and gate is on
+            const bool gate_on = (!flucs_frozen);
+            if (gate_on) fluc_samples++;
+
+            // keep the device gate in sync
+            for (auto& block : nse.blocks) {
+                block.data.accumulate_flucs = gate_on;
+            }
+
+            // stabilization check for <|u'|> (Section 4)
+            if (!flucs_frozen) checkAndMaybeFreezeFlucMag();
+        }
+
     }
 
+    void snapshotFrozenMeansToMacro()
+    {
+        // 1) Stop the mean accumulation at the device immediately
+        for (auto& block : nse.blocks) {
+            block.data.accumulate_means = false;
+        }
+
+        // 2) Snapshot per-cell frozen mean (in LBM units) into MACRO channels
+        const idx Nx = nse.lat.global.x();
+        const idx Ny = nse.lat.global.y();
+
+        for (auto& block : nse.blocks) {
+            for (idx x = 1; x < Nx - 1; ++x) {
+                for (idx y = 1; y < Ny - 1; ++y) {
+                    const real mvx_lbm = (mean_samples > 0)
+                        ? block.hmacro(MACRO::e_svx, x, y, 0) / (real)mean_samples
+                        : (real)0;
+                    const real mvy_lbm = (mean_samples > 0)
+                        ? block.hmacro(MACRO::e_svy, x, y, 0) / (real)mean_samples
+                        : (real)0;
+
+                    block.hmacro(MACRO::e_mean_vx_frozen, x, y, 0) = mvx_lbm;
+                    block.hmacro(MACRO::e_mean_vy_frozen, x, y, 0) = mvy_lbm;
+
+                    // also reset fluctuation sum so its average starts clean
+                    block.hmacro(MACRO::e_smag_uprime,    x, y, 0) = 0;
+                }
+            }
+        }
+
+        // 3) Initialize fluctuation accumulation (Section 3)
+        fluc_samples        = 0;
+        flucs_frozen        = false;
+        prev_domain_flucmag = (real)-1;
+        next_fluc_check_time = mean_freeze_time + fluc_check_period;
+
+        for (auto& block : nse.blocks) {
+            block.data.accumulate_flucs = true;   // device starts accumulating |u - <u>| next step
+        }
+    }
 
     real computeDomainAvgMeanSpeed_phys() const
     {
@@ -278,6 +375,32 @@ struct StateLocal : State<NSE>
         return (real)(sum_speed / (double)count);
     }
 
+    real computeDomainAvgFlucMag_phys() const
+    {
+        if (fluc_samples <= 0) return 0;
+
+        const idx Nx = nse.lat.global.x();
+        const idx Ny = nse.lat.global.y();
+
+        double sum = 0.0;
+        long long count = 0;
+
+        for (const auto& block : nse.blocks) {
+            for (idx x = 1; x < Nx - 1; ++x) {
+                for (idx y = 1; y < Ny - 1; ++y) {
+                    const real s_lbm = block.hmacro(MACRO::e_smag_uprime, x, y, 0) / (real)fluc_samples;
+                    const real mag_phys = nse.lat.lbm2physVelocity(s_lbm);
+                    sum += (double)mag_phys;
+                    ++count;
+                }
+            }
+        }
+
+        if (count == 0) return 0;
+        return (real)(sum / (double)count);
+    }
+
+
     void checkAndMaybeFreezeMeans()
     {
         const real t = nse.physTime();
@@ -306,7 +429,36 @@ struct StateLocal : State<NSE>
         }
     }
 
+    void checkAndMaybeFreezeFlucMag()
+    {
+        if (flucs_frozen || fluc_samples <= 0) return;
 
+        const real t = nse.physTime();
+        if (t + (real)1e-12 < next_fluc_check_time) return;
+
+        const real curr = computeDomainAvgFlucMag_phys();
+
+        static int stable_hits = 0;
+        if (prev_domain_flucmag < (real)0) {
+            stable_hits = 0; // first sample
+        } else {
+            const real delta = std::abs(curr - prev_domain_flucmag);
+            stable_hits = (delta <= fluc_tol) ? (stable_hits + 1) : 0;
+        }
+
+        prev_domain_flucmag  = curr;
+        next_fluc_check_time += fluc_check_period;
+
+        if (stable_hits >= fluc_stable_required) {
+            flucs_frozen  = true;
+            fluc_freeze_time = t;
+
+            // stop device-side accumulation
+            for (auto& block : nse.blocks) {
+                block.data.accumulate_flucs = false;
+            }
+        }
+    }
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 	: State<NSE>(id, communicator, std::move(lat))
