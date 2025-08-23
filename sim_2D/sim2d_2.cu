@@ -451,6 +451,7 @@ struct StateLocal : State<NSE>
 
         if (stable_hits >= fluc_stable_required) {
             flucs_frozen  = true;
+            std::cout << means_frozen << std::endl;
             fluc_freeze_time = t;
 
             // stop device-side accumulation
