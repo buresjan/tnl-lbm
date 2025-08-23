@@ -9,6 +9,8 @@
 #include "lbm3d/d2q9/col_clbm.h"
 #include "lbm3d/d2q9/macro.h"
 
+#include <cmath>     // std::sqrt, std::abs
+
 // exactly one streaming header must be included
 #ifdef AA_PATTERN
 	#include "lbm3d/d2q9/streaming_AA.h"
@@ -121,8 +123,21 @@ struct StateLocal : State<NSE>
 	real u_max_lbm = 0;
 
 	// Mean settings
-    real stats_start_time = 2.5;  // [s] ignore early transients
+    real stats_start_time = 1.5;  // [s] ignore early transients
     int  mean_samples = 0;        // number of steps accumulated (constant dt => time-weighted)
+
+    // --- Mean convergence control (host-side) ---
+    real mean_tol               = 1.0e-3;   // [m/s] |Δ(domain-avg |<u>|)| threshold between checks
+    real mean_check_period      = 0.10;     // [s]   cadence to evaluate stabilization
+    int  mean_stable_required   = 5;        // consecutive passes needed to declare convergence
+
+    bool means_frozen           = false;    // latched once the mean is declared stable
+    real mean_freeze_time       = -1;       // [s]   time when mean was frozen
+
+    // rolling bookkeeping for the check
+    real next_mean_check_time   = stats_start_time + mean_check_period;
+    real prev_domain_mean_speed = -1;       // previous domain-averaged |<u>| [m/s]
+
 
 	void setupBoundaries() override
 	{
@@ -199,21 +214,98 @@ struct StateLocal : State<NSE>
 	// Push inflow + mean-accumulation gate to device data each step
     void updateKernelVelocities() override
     {
-        const bool accumulate_now = (nse.physTime() >= stats_start_time);
-        if (accumulate_now) mean_samples++;
+        const real t = nse.physTime();
 
+        // 1) Mean accumulation gating (after warm-up, until frozen)
+        const bool do_acc_means = (!means_frozen) && (t >= stats_start_time);
+        if (do_acc_means) mean_samples++;  // time-weighted since dt is constant
+
+        // 2) Push inflow profile params + gates to device data
         for (auto& block : nse.blocks) {
-            // Inflow profile params
+            // inflow profile
             block.data.u_max_lbm = u_max_lbm;
             block.data.y0 = 1;
             block.data.y1 = nse.lat.global.y() - 2;
             const int denom = std::max(1, (int)(block.data.y1 - block.data.y0));
             block.data.inv_den = 1.0 / (real)denom;
 
-            // Toggle mean accumulation in the Macro
-            block.data.accumulate_means = accumulate_now;
+            // gates for device-side accumulation
+            block.data.accumulate_means = do_acc_means;
+            // fluctuations gate handled in section 3 (set below as we freeze means)
+        }
+
+        // 3) Host-side stabilization check for the mean
+        if (!means_frozen) {
+            checkAndMaybeFreezeMeans();
+
+            // If we just froze here, we also need to snapshot frozen mean & switch to flucts
+            if (means_frozen) {
+                // snapshotFrozenMeansToMacro();    // (Section 2B)
+                // start fluctuation accumulation next step; samples reset there
+            }
         }
     }
+
+
+    real computeDomainAvgMeanSpeed_phys() const
+    {
+        if (mean_samples <= 0) return 0;
+
+        const idx Nx = nse.lat.global.x();
+        const idx Ny = nse.lat.global.y();
+
+        double sum_speed = 0.0;
+        int count  = 0;
+
+        for (const auto& block : nse.blocks) {
+            for (idx x = 1; x < Nx - 1; ++x) {
+                for (idx y = 1; y < Ny - 1; ++y) {
+                    // running mean in LBM units
+                    real mvx_lbm = block.hmacro(MACRO::e_svx, x, y, 0) / (real)mean_samples;
+                    real mvy_lbm = block.hmacro(MACRO::e_svy, x, y, 0) / (real)mean_samples;
+
+                    // convert to physical [m/s]
+                    const real mvx = nse.lat.lbm2physVelocity(mvx_lbm);
+                    const real mvy = nse.lat.lbm2physVelocity(mvy_lbm);
+
+                    sum_speed += std::sqrt((double)mvx * mvx + (double)mvy * mvy);
+                    ++count;
+                }
+            }
+        }
+
+        if (count == 0) return 0;
+        return (real)(sum_speed / (double)count);
+    }
+
+    void checkAndMaybeFreezeMeans()
+    {
+        const real t = nse.physTime();
+        if (t < stats_start_time || means_frozen) return;
+        if (t + (real)1e-12 < next_mean_check_time) return; // not yet time to check
+
+        const real curr = computeDomainAvgMeanSpeed_phys();
+
+        static int stable_hits = 0;
+        if (prev_domain_mean_speed < (real)0) {
+            // first sample
+            stable_hits = 0;
+        } else {
+            const real delta = std::abs(curr - prev_domain_mean_speed);
+            stable_hits = (delta <= mean_tol) ? (stable_hits + 1) : 0;
+        }
+
+        prev_domain_mean_speed = curr;
+        next_mean_check_time  += mean_check_period;
+
+        // reached required consecutive stable checks -> freeze
+        if (stable_hits >= mean_stable_required) {
+            means_frozen     = true;
+            mean_freeze_time = t;
+        }
+    }
+
+
 
 	StateLocal(const std::string& id, const TNL::MPI::Comm& communicator, lat_t lat)
 	: State<NSE>(id, communicator, std::move(lat))
@@ -261,7 +353,7 @@ int sim(int RESOLUTION = 2)
     real U_max_phys = 1.5 * PHYS_VELOCITY;
     state.u_max_lbm = lat.phys2lbmVelocity(U_max_phys);
 
-    state.nse.physFinalTime = 6.0;
+    state.nse.physFinalTime = 8.0;
     state.cnt[PRINT].period = 0.05;
 
     // 2D = cut in 3D at z=0
