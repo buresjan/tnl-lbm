@@ -10,6 +10,7 @@
 #include "lbm3d/d2q9/macro.h"
 
 #include <cmath>     // std::sqrt, std::abs
+#include "lbm_common/fileutils.h"  // create_parent_directories
 
 // exactly one streaming header must be included
 #ifdef AA_PATTERN
@@ -167,6 +168,9 @@ struct StateLocal : State<NSE>
 
     real next_fluc_check_time     = -1;       // [s]
     real prev_domain_flucmag      = -1;       // previous domain-avg <|u'|> [m/s]
+    
+    // Export control
+    bool tke_value_written        = false;    // guard to write TKE once
 
 
 
@@ -310,6 +314,11 @@ struct StateLocal : State<NSE>
 
             // stabilization check for <|u'|> (Section 4)
             if (!flucs_frozen) checkAndMaybeFreezeFlucMag();
+
+            // If fluctuations just became frozen (or are already), export TKE once and terminate
+            if (flucs_frozen && !tke_value_written) {
+                exportThirdQuarterTKE_andTerminate();
+            }
         }
 
     }
@@ -463,6 +472,46 @@ struct StateLocal : State<NSE>
         // Convert discrete sum to physical integral by cell area (2D)
         const double cell_area = (double)nse.lat.physDl * (double)nse.lat.physDl; // [m^2]
         return (real)(sum_tke * cell_area); // [m^4/s^2]
+    }
+
+    void exportThirdQuarterTKE_andTerminate()
+    {
+        if (tke_value_written) return;
+
+        // Compute local integral (no MPI aggregation used)
+        const double value = (double)integrateTKE_ThirdQuarter_phys();
+
+        const std::string outpath = "sim_2D/values/value.txt";
+        create_parent_directories(outpath.c_str());
+        FILE* fp = fopen(outpath.c_str(), "wt");
+        if (fp) {
+            // print with high precision on one line
+            fprintf(fp, "%.17g\n", value);
+            fclose(fp);
+        }
+
+        tke_value_written = true;
+        // request graceful termination of the simulation loop
+        this->nse.terminate = true;
+    }
+
+    void AfterSimFinished() override
+    {
+        // If we didn’t export mid-run (e.g., flucs never stabilized),
+        // export now with whatever value is available (likely zero).
+        if (!tke_value_written) {
+            const double value = (double)integrateTKE_ThirdQuarter_phys();
+            const std::string outpath = "sim_2D/values/value.txt";
+            create_parent_directories(outpath.c_str());
+            FILE* fp = fopen(outpath.c_str(), "wt");
+            if (fp) {
+                fprintf(fp, "%.17g\n", value);
+                fclose(fp);
+            }
+            tke_value_written = true;
+        }
+        // call base finalization (logging)
+        State<NSE>::AfterSimFinished();
     }
 
 
