@@ -137,8 +137,9 @@ struct StateLocal : State<NSE>
 	real lbm_inflow_vx = 0;
 	real u_max_lbm = 0;
 
-	// Mean settings
+    // Mean settings
     real stats_start_time = 1.5;  // [s] ignore early transients
+    real stats_end_time   = 3.5;  // [s] fallback window end for mean
     int  mean_samples = 0;        // number of steps accumulated (constant dt => time-weighted)
 
     // --- Mean convergence control (host-side) ---
@@ -258,7 +259,9 @@ struct StateLocal : State<NSE>
         const real t = nse.physTime();
 
         // 1) Mean accumulation gating (after warm-up, until frozen)
-        const bool do_acc_means = (!means_frozen) && (t >= stats_start_time);
+        //    Limit accumulation to [stats_start_time, stats_end_time) so a fallback
+        //    mean over that window can be forced if stabilization does not occur.
+        const bool do_acc_means = (!means_frozen) && (t >= stats_start_time) && (t < stats_end_time);
         if (do_acc_means) mean_samples++;  // time-weighted since dt is constant
 
         // 2) Push inflow profile params + gates to device data
@@ -284,6 +287,14 @@ struct StateLocal : State<NSE>
                 snapshotFrozenMeansToMacro();    // (Section 2B)
                 // start fluctuation accumulation next step; samples reset there
             }
+        }
+
+        // 3B) Fallback: if stabilization did not occur by stats_end_time,
+        //      force-freeze the mean computed over [stats_start_time, stats_end_time].
+        if (!means_frozen && t >= stats_end_time) {
+            means_frozen     = true;
+            mean_freeze_time = stats_end_time;  // anchor to window end
+            snapshotFrozenMeansToMacro();
         }
 
         // If mean already frozen, maintain fluctuation accumulation and stabilization
