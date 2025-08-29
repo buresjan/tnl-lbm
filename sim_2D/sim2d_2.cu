@@ -411,6 +411,60 @@ struct StateLocal : State<NSE>
         return (real)(sum / (double)count);
     }
 
+    // Turbulent kinetic energy per cell [m^2/s^2],
+    // computed from the mean fluctuation magnitude after fluctuations are frozen.
+    // Returns 0 until flucs_frozen is true.
+    real computeCellTKE_phys(const BLOCK& block, idx x, idx y) const
+    {
+        if (!flucs_frozen) return (real)0;
+        if (fluc_samples <= 0) return (real)0;
+
+        // <|u'|> in LBM units
+        const real avg_mag_lbm = block.hmacro(MACRO::e_smag_uprime, x, y, 0) / (real)fluc_samples;
+        // convert to physical [m/s]
+        const real avg_mag_phys = nse.lat.lbm2physVelocity(avg_mag_lbm);
+
+        // Approximate TKE in 2D as 0.5 * <|u'|>^2
+        return (real)0.5 * avg_mag_phys * avg_mag_phys;
+    }
+
+    // Integrate TKE over the third quarter of the domain in X
+    // (i.e., x in [2/4*X, 3/4*X)), and in Y exclude 3 layers at the
+    // bottom and top (y in [3, Ny-3)). Returns 0 until fluctuations are frozen.
+    real integrateTKE_ThirdQuarter_phys() const
+    {
+        if (!flucs_frozen) return (real)0;
+
+        const idx Nx = nse.lat.global.x();
+        const idx Ny = nse.lat.global.y();
+
+        idx x0 = (2 * Nx) / 4;   // inclusive
+        idx x1 = (3 * Nx) / 4;   // exclusive
+        // Clamp to interior excluding the outermost layer like other loops
+        if (x0 < 1) x0 = 1;
+        if (x1 > Nx - 1) x1 = Nx - 1;
+
+        idx y0 = 3;             // inclusive
+        idx y1 = Ny - 3;        // exclusive
+        if (y0 < 1) y0 = 1;
+        if (y1 > Ny - 1) y1 = Ny - 1;
+
+        if (x0 >= x1 || y0 >= y1) return (real)0;
+
+        double sum_tke = 0.0; // [m^2/s^2]
+        for (const auto& block : nse.blocks) {
+            for (idx x = x0; x < x1; ++x) {
+                for (idx y = y0; y < y1; ++y) {
+                    sum_tke += (double)computeCellTKE_phys(block, x, y);
+                }
+            }
+        }
+
+        // Convert discrete sum to physical integral by cell area (2D)
+        const double cell_area = (double)nse.lat.physDl * (double)nse.lat.physDl; // [m^2]
+        return (real)(sum_tke * cell_area); // [m^4/s^2]
+    }
+
 
     void checkAndMaybeFreezeMeans()
     {
