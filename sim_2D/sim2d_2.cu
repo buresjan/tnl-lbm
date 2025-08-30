@@ -109,6 +109,7 @@ struct NSE2D_Data_ParabolicInflow : NSE_Data<TRAITS>
     dreal inv_den = 1;       // 1.0 / (y1 - y0), precomputed
     bool  accumulate_means = false; // gate for mean accumulation in Macro
     bool  accumulate_flucs = false;   // gate for |u - <u>| accumulation (after mean is frozen)
+    bool  use_bouzidi      = false;    // toggle for near-wall Bouzidi interpolation
 
     template <typename LBM_KS>
     CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
@@ -139,7 +140,8 @@ struct StateLocal : State<NSE>
 	using lat_t = Lattice<3, real, idx>;
 
 	real lbm_inflow_vx = 0;
-	real u_max_lbm = 0;
+    real u_max_lbm = 0;
+    bool enable_bouzidi = true;
 
     // Object file with per-voxel type and Bouzidi coefficients
     std::string object_filename;
@@ -426,6 +428,7 @@ struct StateLocal : State<NSE>
             block.data.y1 = nse.lat.global.y() - 2;
             const int denom = std::max(1, (int)(block.data.y1 - block.data.y0));
             block.data.inv_den = 1.0 / (real)denom;
+            block.data.use_bouzidi = enable_bouzidi;
 
             // gates for device-side accumulation
             block.data.accumulate_means = do_acc_means;
@@ -746,7 +749,7 @@ struct StateLocal : State<NSE>
 };
 
 template <typename NSE>
-int sim(int RESOLUTION = 2, const std::string& object_file = std::string())
+int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool enable_bouzidi = true)
 {
     using idx = typename NSE::TRAITS::idx;
     using real = typename NSE::TRAITS::real;
@@ -779,6 +782,7 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string())
         fmt::format("sim2d_2_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
     StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
     state.object_filename = object_file;
+    state.enable_bouzidi = enable_bouzidi;
 
     if (!state.canCompute())
         return 0;
@@ -799,7 +803,7 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string())
 }
 
 template <typename TRAITS = TraitsDP>
-void run(int RES, const std::string& object_file)
+void run(int RES, const std::string& object_file, bool enable_bouzidi)
 {
 	//using COLL = D2Q9_SRT<TRAITS>;
 	using COLL = D2Q9_CLBM<TRAITS>;
@@ -816,7 +820,7 @@ void run(int RES, const std::string& object_file)
 		// D2Q9_MACRO_Default<TRAITS>>;
 		D2Q9_MACRO_WithMean<TRAITS>>;
 
-	sim<NSE_CONFIG>(RES, object_file);
+	sim<NSE_CONFIG>(RES, object_file, enable_bouzidi);
 }
 
 int main(int argc, char** argv)
@@ -826,7 +830,8 @@ int main(int argc, char** argv)
 	argparse::ArgumentParser program("sim2d_1");
 	program.add_description("Simple incompressible Navier-Stokes simulation example.");
 	program.add_argument("resolution").help("resolution of the lattice").scan<'i', int>().default_value(1);
-	program.add_argument("object_file").help("object file from sim_2D/ellipses (e.g. 8.txt)").default_value(std::string("sim_2D/ellipses/0.txt"));
+    program.add_argument("object_file").help("object file from sim_2D/ellipses (e.g. 8.txt)").default_value(std::string("sim_2D/ellipses/0.txt"));
+    program.add_argument("--no-bouzidi").help("disable Bouzidi near-wall interpolation; treat near-wall as normal fluid").default_value(false).implicit_value(true);
 
 	try {
 		program.parse_args(argc, argv);
@@ -838,13 +843,14 @@ int main(int argc, char** argv)
 	}
 
 	const auto resolution = program.get<int>("resolution");
-	const auto object_file = program.get<std::string>("object_file");
+    const auto object_file = program.get<std::string>("object_file");
+    const bool no_bouzidi = program.get<bool>("no-bouzidi");
 	if (resolution < 1) {
 		fmt::println(stderr, "CLI error: resolution must be at least 1");
 		return 1;
 	}
 
-	run(resolution, object_file);
+	run(resolution, object_file, !no_bouzidi);
 
 	return 0;
 }

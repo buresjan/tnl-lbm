@@ -138,34 +138,37 @@ struct D2Q9_BC_All
 				TNL::swap(KS.f[mz], KS.f[pz]);
 				TNL::swap(KS.f[mp], KS.f[pm]);
 				break;
-			case GEO_FLUID_NEAR_WALL:
-			{
-				// Apply Bouzidi interpolation on the 8 non-rest directions using per-voxel coefficients.
-				// Direction order for coefficients: 0:east(pz),1:north(zp),2:west(mz),3:south(zm),4:ne(pp),5:nw(mp),6:sw(mm),7:se(pm)
-				dreal th_e = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(0, x, y, z) : (dreal)-1;
-				dreal th_n = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(1, x, y, z) : (dreal)-1;
-				dreal th_w = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(2, x, y, z) : (dreal)-1;
-				dreal th_s = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(3, x, y, z) : (dreal)-1;
-				dreal th_ne = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(4, x, y, z) : (dreal)-1;
-				dreal th_nw = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(5, x, y, z) : (dreal)-1;
-				dreal th_sw = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(6, x, y, z) : (dreal)-1;
-				dreal th_se = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(7, x, y, z) : (dreal)-1;
+            case GEO_FLUID_NEAR_WALL:
+            {
+                if (SD.bouzidi_coeff_ptr != nullptr && SD.use_bouzidi) {
+                    // Apply Bouzidi interpolation on the 8 non-rest directions using per-voxel coefficients.
+                    // Direction order for coefficients: 0:east(pz),1:north(zp),2:west(mz),3:south(zm),4:ne(pp),5:nw(mp),6:sw(mm),7:se(pm)
+                    dreal th_e  = SD.bouzidiCoeff(0, x, y, z);
+                    dreal th_n  = SD.bouzidiCoeff(1, x, y, z);
+                    dreal th_w  = SD.bouzidiCoeff(2, x, y, z);
+                    dreal th_s  = SD.bouzidiCoeff(3, x, y, z);
+                    dreal th_ne = SD.bouzidiCoeff(4, x, y, z);
+                    dreal th_nw = SD.bouzidiCoeff(5, x, y, z);
+                    dreal th_sw = SD.bouzidiCoeff(6, x, y, z);
+                    dreal th_se = SD.bouzidiCoeff(7, x, y, z);
 
-				// Override streamed values with Bouzidi interpolation
-				KS.f[pz] = f_bouzidi(SD, th_e,  mz, pz, x, y, z, xp, y,  xm, y,  KS.f[pz]);
-				KS.f[zp] = f_bouzidi(SD, th_n,  zm, zp, x, y, z, x,  yp, x,  ym, KS.f[zp]);
-				KS.f[mz] = f_bouzidi(SD, th_w,  pz, mz, x, y, z, xm, y,  xp, y,  KS.f[mz]);
-				KS.f[zm] = f_bouzidi(SD, th_s,  zp, zm, x, y, z, x,  ym, x,  yp, KS.f[zm]);
-				KS.f[pp] = f_bouzidi(SD, th_ne, mm, pp, x, y, z, xp, yp, xm, ym, KS.f[pp]);
-				KS.f[mp] = f_bouzidi(SD, th_nw, pm, mp, x, y, z, xm, yp, xp, ym, KS.f[mp]);
-				KS.f[mm] = f_bouzidi(SD, th_sw, pp, mm, x, y, z, xm, ym, xp, yp, KS.f[mm]);
-				KS.f[pm] = f_bouzidi(SD, th_se, mp, pm, x, y, z, xp, ym, xm, yp, KS.f[pm]);
-				
-				// Rest particle from ordinary streaming (already loaded), but ensure consistent with df_cur
-				KS.f[zz] = SD.df(df_cur, zz, x, y, z);
-				COLL::computeDensityAndVelocity(KS);
-				break;
-			}
+                    // Override streamed values with Bouzidi interpolation
+                    KS.f[pz] = f_bouzidi(SD, th_e,  mz, pz, x, y, z, xp, y,  xm, y,  KS.f[pz]);
+                    KS.f[zp] = f_bouzidi(SD, th_n,  zm, zp, x, y, z, x,  yp, x,  ym, KS.f[zp]);
+                    KS.f[mz] = f_bouzidi(SD, th_w,  pz, mz, x, y, z, xm, y,  xp, y,  KS.f[mz]);
+                    KS.f[zm] = f_bouzidi(SD, th_s,  zp, zm, x, y, z, x,  ym, x,  yp, KS.f[zm]);
+                    KS.f[pp] = f_bouzidi(SD, th_ne, mm, pp, x, y, z, xp, yp, xm, ym, KS.f[pp]);
+                    KS.f[mp] = f_bouzidi(SD, th_nw, pm, mp, x, y, z, xm, yp, xp, ym, KS.f[mp]);
+                    KS.f[mm] = f_bouzidi(SD, th_sw, pp, mm, x, y, z, xm, ym, xp, yp, KS.f[mm]);
+                    KS.f[pm] = f_bouzidi(SD, th_se, mp, pm, x, y, z, xp, ym, xm, yp, KS.f[pm]);
+
+                    // Rest particle from ordinary streaming (already loaded), but ensure consistent with df_cur
+                    KS.f[zz] = SD.df(df_cur, zz, x, y, z);
+                }
+                // either after interpolation or when disabled, proceed as normal fluid
+                COLL::computeDensityAndVelocity(KS);
+                break;
+            }
 			case GEO_SYM_LEFT:
 				KS.f[pm] = KS.f[mm];
 				KS.f[pz] = KS.f[mz];
