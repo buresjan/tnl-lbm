@@ -26,7 +26,8 @@ struct D2Q9_BC_All
 		GEO_SYM_TOP,
 		GEO_SYM_BOTTOM,
 		GEO_SYM_LEFT,
-		GEO_SYM_RIGHT
+		GEO_SYM_RIGHT,
+		GEO_FLUID_NEAR_WALL
 	};
 
 	__cuda_callable__ static bool isPeriodic(map_t mapgi)
