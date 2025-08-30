@@ -355,7 +355,7 @@ struct StateLocal : State<NSE>
         }
 
         // Bouzidi coefficients (theta per direction, -1 if none); guard against missing allocation
-        const bool have_bouzidi = (block.hBouzidi.getSize() > 0);
+        const bool have_bouzidi = (block.hBouzidi.getData() != nullptr);
         if (index == k++) {
             real v = (real)-1;
             if (have_bouzidi) v = (real) block.hBouzidi(0, x, y, z);
@@ -472,7 +472,7 @@ struct StateLocal : State<NSE>
     {
         State<NSE>::updateKernelData();
         for (auto& block : this->nse.blocks) {
-            if (block.dBouzidi.getSize() > 0)
+            if (block.dBouzidi.getData() != nullptr)
                 block.data.bouzidi_coeff_ptr = block.dBouzidi.getData();
             else
                 block.data.bouzidi_coeff_ptr = nullptr;
