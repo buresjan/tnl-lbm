@@ -247,6 +247,7 @@ struct StateLocal : State<NSE>
         long long parse_errors = 0;
         long long coeff_sets = 0;
         long long type_sets = 0;
+        long long near_boundary_nearwall = 0;
         typename TRAITS::idx max_x = -1, max_y = -1;
 
         std::string line;
@@ -280,6 +281,10 @@ struct StateLocal : State<NSE>
             }
             nse.setMap((idx)xi, (idx)yi, 0, mapval);
             type_sets++;
+            if (mapval == BC::GEO_FLUID_NEAR_WALL) {
+                if (xi <= 0 || xi >= X - 1 || yi <= 0 || yi >= Y - 1)
+                    near_boundary_nearwall++;
+            }
 
             // Store Bouzidi coefficients (always store; -1 used as sentinel as provided)
             for (auto& block : nse.blocks) {
@@ -304,8 +309,9 @@ struct StateLocal : State<NSE>
             throw std::runtime_error("Object file dimensions do not match simulation lattice");
         }
 
-        if (parse_errors > 0 || out_of_range > 0) {
-            spdlog::warn("While loading object: parse_errors={}, out_of_range={} (ignored)", parse_errors, out_of_range);
+        if (parse_errors > 0 || out_of_range > 0 || near_boundary_nearwall > 0) {
+            spdlog::warn("While loading object: parse_errors={}, out_of_range={}, near_boundary_nearwall={}",
+                         parse_errors, out_of_range, near_boundary_nearwall);
         }
     }
 
@@ -519,6 +525,9 @@ struct StateLocal : State<NSE>
             block.data.accumulate_flucs = true;   // device starts accumulating |u - <u>| next step
         }
     }
+
+    // Disable 3D VTK for this 2D simulation (avoid 3D output even on NaN)
+    void writeVTKs_3D() override {}
 
     real computeDomainAvgMeanSpeed_phys() const
     {

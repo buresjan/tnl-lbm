@@ -47,18 +47,29 @@ struct D2Q9_BC_All
 
 	// Bouzidi interpolation helper (only used for D2Q9 GEO_FLUID_NEAR_WALL)
 	// Returns the interpolated incoming DF using the coefficient theta for the given direction.
-	// If theta < 0, performs ordinary streaming for the direction (using opposite DF from neighbor xs,ys).
+	// If theta < 0 or neighbor indices are out of bounds, returns 'fallback' (typically streamed KS.f[dir]).
 	template <typename LBM_DATA>
 	__cuda_callable__ static dreal f_bouzidi(LBM_DATA& SD, dreal theta, int k, int k_opposite, idx x, idx y, idx z,
-	                                       idx xff, idx yff, idx xs, idx ys)
+	                                       idx xff, idx yff, idx xs, idx ys, dreal fallback)
 	{
 		const dreal one = (dreal)1;
 		const dreal two = (dreal)2;
 		const dreal half = (dreal)0.5;
 
-		// No Bouzidi: ordinary streaming value from opposite DF at neighbor (pull scheme equivalent)
+		// No Bouzidi on this dir
 		if (theta < (dreal)0)
-			return SD.df(df_cur, k_opposite, xs, ys, z);
+			return fallback;
+
+		// Bounds safety: avoid out-of-range accesses near domain boundaries
+		auto in_range = [&](idx xx, idx yy) -> bool {
+			return (xx >= 0 && xx < SD.X() && yy >= 0 && yy < SD.Y());
+		};
+		if (!in_range(xff, yff) || !in_range(xs, ys))
+			return fallback;
+
+		// clamp theta to [0,1] to avoid invalid inputs
+		if (theta < (dreal)0) return fallback; // redundant but explicit
+		if (theta > (dreal)1) theta = (dreal)1;
 
 		if (theta <= half) {
 			// (1 - 2*theta) * f_k(x+e, y+e) + (2*theta) * f_k(x, y)
@@ -138,14 +149,14 @@ struct D2Q9_BC_All
 				dreal th_se = SD.bouzidi_coeff_ptr ? SD.bouzidiCoeff(7, x, y, z) : (dreal)-1;
 
 				// Override streamed values with Bouzidi interpolation
-				KS.f[pz] = f_bouzidi(SD, th_e, mz, pz, x, y, z, xp, y, xm, y);
-				KS.f[zp] = f_bouzidi(SD, th_n, zm, zp, x, y, z, x, yp, x, ym);
-				KS.f[mz] = f_bouzidi(SD, th_w, pz, mz, x, y, z, xm, y, xp, y);
-				KS.f[zm] = f_bouzidi(SD, th_s, zp, zm, x, y, z, x, ym, x, yp);
-				KS.f[pp] = f_bouzidi(SD, th_ne, mm, pp, x, y, z, xp, yp, xm, ym);
-				KS.f[mp] = f_bouzidi(SD, th_nw, pm, mp, x, y, z, xm, yp, xp, ym);
-				KS.f[mm] = f_bouzidi(SD, th_sw, pp, mm, x, y, z, xm, ym, xp, yp);
-				KS.f[pm] = f_bouzidi(SD, th_se, mp, pm, x, y, z, xp, ym, xm, yp);
+				KS.f[pz] = f_bouzidi(SD, th_e,  mz, pz, x, y, z, xp, y,  xm, y,  KS.f[pz]);
+				KS.f[zp] = f_bouzidi(SD, th_n,  zm, zp, x, y, z, x,  yp, x,  ym, KS.f[zp]);
+				KS.f[mz] = f_bouzidi(SD, th_w,  pz, mz, x, y, z, xm, y,  xp, y,  KS.f[mz]);
+				KS.f[zm] = f_bouzidi(SD, th_s,  zp, zm, x, y, z, x,  ym, x,  yp, KS.f[zm]);
+				KS.f[pp] = f_bouzidi(SD, th_ne, mm, pp, x, y, z, xp, yp, xm, ym, KS.f[pp]);
+				KS.f[mp] = f_bouzidi(SD, th_nw, pm, mp, x, y, z, xm, yp, xp, ym, KS.f[mp]);
+				KS.f[mm] = f_bouzidi(SD, th_sw, pp, mm, x, y, z, xm, ym, xp, yp, KS.f[mm]);
+				KS.f[pm] = f_bouzidi(SD, th_se, mp, pm, x, y, z, xp, ym, xm, yp, KS.f[pm]);
 				
 				// Rest particle from ordinary streaming (already loaded), but ensure consistent with df_cur
 				KS.f[zz] = SD.df(df_cur, zz, x, y, z);
