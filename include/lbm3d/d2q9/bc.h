@@ -48,41 +48,44 @@ struct D2Q9_BC_All
 	// Bouzidi interpolation helper (only used for D2Q9 GEO_FLUID_NEAR_WALL)
 	// Returns the interpolated incoming DF using the coefficient theta for the given direction.
 	// If theta < 0 or neighbor indices are out of bounds, returns 'fallback' (typically streamed KS.f[dir]).
-	template <typename LBM_DATA>
-	__cuda_callable__ static dreal f_bouzidi(LBM_DATA& SD, dreal theta, int k, int k_opposite, idx x, idx y, idx z,
-	                                       idx xff, idx yff, idx xs, idx ys, dreal fallback)
-	{
-		const dreal one = (dreal)1;
-		const dreal two = (dreal)2;
-		const dreal half = (dreal)0.5;
+    template <typename LBM_DATA>
+    __cuda_callable__ static dreal f_bouzidi(LBM_DATA& SD, dreal theta, int k, int k_opposite, idx x, idx y, idx z,
+                                           idx xff, idx yff, idx xs, idx ys, dreal fallback)
+    {
+        const dreal one = (dreal)1;
+        const dreal two = (dreal)2;
+        const dreal half = (dreal)0.5;
 
-		// No Bouzidi on this dir
-		if (theta < (dreal)0)
-			return fallback;
+        // No Bouzidi on this dir
+        if (theta < (dreal)0)
+            return fallback;
 
-		// Bounds safety: avoid out-of-range accesses near domain boundaries
-		auto in_range = [&](idx xx, idx yy) -> bool {
-			return (xx >= 0 && xx < SD.X() && yy >= 0 && yy < SD.Y());
-		};
-		if (!in_range(xff, yff) || !in_range(xs, ys))
-			return fallback;
+        // clamp theta to [0,1] to avoid invalid inputs
+        if (theta < (dreal)0) return fallback; // redundant but explicit
+        if (theta > (dreal)1) theta = (dreal)1;
 
-		// clamp theta to [0,1] to avoid invalid inputs
-		if (theta < (dreal)0) return fallback; // redundant but explicit
-		if (theta > (dreal)1) theta = (dreal)1;
-
-		if (theta <= half) {
-			// (1 - 2*theta) * f_k(x+e, y+e) + (2*theta) * f_k(x, y)
-			return (one - two * theta) * SD.df(df_cur, k, xff, yff, z)
-			     + (two * theta) * SD.df(df_cur, k, x, y, z);
-		}
-		else {
-			// (1 - 1/(2*theta)) * f_k_opposite(x,y) + (1/(2*theta)) * f_k(x,y)
-			const dreal w = half / theta;
-			return (one - w) * SD.df(df_cur, k_opposite, x, y, z)
-			     + w * SD.df(df_cur, k, x, y, z);
-		}
-	}
+        if (theta <= half) {
+            // Bounds safety needed only for the neighbor access branch
+            auto in_range = [&](idx xx, idx yy) -> bool {
+                return (xx >= 0 && xx < SD.X() && yy >= 0 && yy < SD.Y());
+            };
+            if (!in_range(xff, yff) || !in_range(xs, ys))
+                return fallback;
+            // (1 - 2*theta) * f_k(x+e, y+e) + (2*theta) * f_k(x, y)
+            dreal out = (one - two * theta) * SD.df(df_cur, k, xff, yff, z)
+                      + (two * theta) * SD.df(df_cur, k, x, y, z);
+            if (!(out == out)) return fallback; // NaN guard
+            return out;
+        }
+        else {
+            // (1 - 1/(2*theta)) * f_k_opposite(x,y) + (1/(2*theta)) * f_k(x,y)
+            const dreal w = half / theta;
+            dreal out = (one - w) * SD.df(df_cur, k_opposite, x, y, z)
+                      + w * SD.df(df_cur, k, x, y, z);
+            if (!(out == out)) return fallback; // NaN guard
+            return out;
+        }
+    }
 
 	template <typename LBM_KS>
 	__cuda_callable__ static void preCollision(DATA& SD, LBM_KS& KS, map_t mapgi, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
