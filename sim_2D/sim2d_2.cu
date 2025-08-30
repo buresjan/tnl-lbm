@@ -781,7 +781,7 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool
     real LBM_VISCOSITY  = 1.0e-3;               // tau = 0.5 + 3*nu = 0.56 (stable)
     real PHYS_HEIGHT    = 0.41;               // [m]
     real PHYS_VISCOSITY = 1.0e-3;             // [m^2/s] (benchmark fluid)  Re ≈ 100 when U_mean = 1.0 m/s
-    real PHYS_VELOCITY  = 1.0;      // [m/s] mean inflow; U_max = 1.5 * mean
+    real PHYS_VELOCITY  = 2.5;      // [m/s] mean inflow; U_max = 1.5 * mean
 
     real PHYS_DL = PHYS_HEIGHT / ((real)Y - 2);
     real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY * PHYS_DL * PHYS_DL;
