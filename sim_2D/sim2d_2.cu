@@ -109,7 +109,7 @@ struct NSE2D_Data_ParabolicInflow : NSE_Data<TRAITS>
     dreal inv_den = 1;       // 1.0 / (y1 - y0), precomputed
     bool  accumulate_means = false; // gate for mean accumulation in Macro
     bool  accumulate_flucs = false;   // gate for |u - <u>| accumulation (after mean is frozen)
-    bool  use_bouzidi      = false;    // toggle for near-wall Bouzidi interpolation
+    bool  use_bouzidi      = true;    // toggle for near-wall Bouzidi interpolation
 
     template <typename LBM_KS>
     CUDA_HOSTDEV void inflow(LBM_KS& KS, idx x, idx y, idx z)
@@ -253,6 +253,7 @@ struct StateLocal : State<NSE>
         typename TRAITS::idx max_x = -1, max_y = -1;
 
         std::string line;
+        long long line_no = 0;
         while (getline(fin, line)) {
             if (line.empty()) continue;
             std::istringstream iss(line);
@@ -262,6 +263,16 @@ struct StateLocal : State<NSE>
             if (!(iss >> xi >> yi >> cell_type >> c[0] >> c[1] >> c[2] >> c[3] >> c[4] >> c[5] >> c[6] >> c[7])) {
                 parse_errors++;
                 continue;
+            }
+            line_no++;
+
+            // Validate theta range: allow -1 (sentinel) or [0,1]. If any > 1, abort.
+            for (int d = 0; d < 8; ++d) {
+                if (c[d] > 1.0) {
+                    spdlog::error("Invalid Bouzidi theta > 1 at line {} (x={}, y={}, dir={}, theta={}) in {}",
+                                   (long long)line_no, xi, yi, d, c[d], path.string());
+                    throw std::runtime_error("Bouzidi theta out of range (>1)");
+                }
             }
             count++;
             if (xi >= 0 && yi >= 0) {
