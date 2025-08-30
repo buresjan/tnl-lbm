@@ -27,6 +27,10 @@ struct LBM_Data
 	dreal* dmacro;
 	map_t* dmap;
 
+	// Optional Bouzidi interpolation coefficients per direction (8 for D2Q9 2D use).
+	// Layout matches df/macro: dir * XYZ + index(x,y,z). May be nullptr if unused.
+	dreal* bouzidi_coeff_ptr = nullptr;
+
 	// sizes NOT including overlaps
 	CUDA_HOSTDEV idx X()
 	{
@@ -59,6 +63,13 @@ struct LBM_Data
 	CUDA_HOSTDEV dreal& macro(int id, idx x, idx y, idx z)
 	{
 		return dmacro[Fxyz(id, x, y, z)];
+	}
+
+	// Accessor for Bouzidi coefficients. 'dir' in [0..7] follows order:
+	// 0:east,1:north,2:west,3:south,4:ne,5:nw,6:sw,7:se. Pointer may be nullptr.
+	CUDA_HOSTDEV dreal& bouzidiCoeff(int dir, idx x, idx y, idx z)
+	{
+		return bouzidi_coeff_ptr[dir * XYZ + indexer.getStorageIndex(x, y, z)];
 	}
 };
 

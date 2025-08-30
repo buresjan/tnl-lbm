@@ -82,8 +82,15 @@ void LBM<CONFIG>::setMap(idx x, idx y, idx z, map_t value)
 template <typename CONFIG>
 void LBM<CONFIG>::allocatePhiTransferDirectionArrays()
 {
-	for (auto& block : blocks)
-		block.allocatePhiTransferDirectionArrays();
+    for (auto& block : blocks)
+        block.allocatePhiTransferDirectionArrays();
+}
+
+template <typename CONFIG>
+void LBM<CONFIG>::allocateBouzidiCoeffArrays()
+{
+    for (auto& block : blocks)
+        block.allocateBouzidiCoeffArrays();
 }
 
 template <typename CONFIG>

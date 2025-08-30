@@ -347,6 +347,9 @@ void LBM_BLOCK<CONFIG>::copyMapToHost()
 	hmap = dmap;
 	hdiffusionCoeff = ddiffusionCoeff;
 	hphiTransferDirection = dphiTransferDirection;
+	// Bouzidi coefficients (if allocated)
+	if (dBouzidi.getSize() > 0)
+		hBouzidi = dBouzidi;
 }
 
 template <typename CONFIG>
@@ -355,6 +358,9 @@ void LBM_BLOCK<CONFIG>::copyMapToDevice()
 	dmap = hmap;
 	ddiffusionCoeff = hdiffusionCoeff;
 	dphiTransferDirection = hphiTransferDirection;
+	// Bouzidi coefficients (if allocated)
+	if (hBouzidi.getSize() > 0)
+		dBouzidi = hBouzidi;
 }
 
 template <typename CONFIG>
@@ -585,6 +591,7 @@ void LBM_BLOCK<CONFIG>::allocateDeviceData()
 	data.XYZ = data.indexer.getStorageSize();
 	data.dmap = dmap.getData();
 	data.dmacro = dmacro.getData();
+	// bouzidi_coeff_ptr is set later when arrays are allocated (updateKernelData in State)
 }
 
 template <typename CONFIG>
@@ -727,6 +734,22 @@ void LBM_BLOCK<CONFIG>::allocatePhiTransferDirectionArrays()
 				hmap(x, y, z) = CONFIG::BC::GEO_TRANSFER_SW;
 		}
 	);
+}
+
+template <typename CONFIG>
+void LBM_BLOCK<CONFIG>::allocateBouzidiCoeffArrays()
+{
+	// Allocate 8 x X x Y x Z arrays on host and device (distributed in X).
+	hBouzidi.setSizes(8, global.x(), global.y(), global.z());
+	dBouzidi.setSizes(8, global.x(), global.y(), global.z());
+#ifdef HAVE_MPI
+	hBouzidi.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+	hBouzidi.allocate();
+	dBouzidi.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+	dBouzidi.allocate();
+#endif
+	// Initialize to sentinel -1 for all entries
+	hBouzidi.setValue((typename TRAITS::dreal) -1);
 }
 
 template <typename CONFIG>

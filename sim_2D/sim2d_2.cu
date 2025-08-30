@@ -10,6 +10,9 @@
 #include "lbm3d/d2q9/macro.h"
 
 #include <cmath>     // std::sqrt, std::abs
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 #include "lbm_common/fileutils.h"  // create_parent_directories
 
 // exactly one streaming header must be included
@@ -138,6 +141,9 @@ struct StateLocal : State<NSE>
 	real lbm_inflow_vx = 0;
 	real u_max_lbm = 0;
 
+    // Object file with per-voxel type and Bouzidi coefficients
+    std::string object_filename;
+
     // Mean settings
     real stats_start_time = 1.5;  // [s] ignore early transients
     real stats_end_time   = 3.5;  // [s] fallback window end for mean
@@ -176,6 +182,10 @@ struct StateLocal : State<NSE>
 
 	void setupBoundaries() override
 	{
+		// Load geometry/object map and Bouzidi coefficients before BCs
+		if (!object_filename.empty()) {
+			projectObjectFromFile(object_filename);
+		}
 		nse.setBoundaryX(0, BC::GEO_INFLOW);							  // left
 		nse.setBoundaryX(nse.lat.global.x() - 1, BC::GEO_OUTFLOW_RIGHT);  // right
 
@@ -191,22 +201,113 @@ struct StateLocal : State<NSE>
 		real cy_phys = 0.20;           // [m] y-position of cylinder center
 		real radius_phys = 0.05;       // [m] radius = 0.1 / 2
 
-		// convert to lattice indices
-		int cx = static_cast<int>(cx_phys / nse.lat.physDl + 0.5);
-		int cy = static_cast<int>(cy_phys / nse.lat.physDl + 0.5);
-		int radius = static_cast<int>(radius_phys / nse.lat.physDl + 0.5);
+		// // convert to lattice indices
+		// int cx = static_cast<int>(cx_phys / nse.lat.physDl + 0.5);
+		// int cy = static_cast<int>(cy_phys / nse.lat.physDl + 0.5);
+		// int radius = static_cast<int>(radius_phys / nse.lat.physDl + 0.5);
 
-		// loop over domain and mark all lattice sites inside circle as wall
-		for (int px = 1; px < nse.lat.global.x() - 1; px++) {
-			for (int py = 1; py < nse.lat.global.y() - 1; py++) {
-				int dx = px - cx;
-				int dy = py - cy;
-				if (dx*dx + dy*dy <= radius*radius) {
-					nse.setMap(px, py, 0, BC::GEO_WALL);
-				}
-			}
-		}
+		// // loop over domain and mark all lattice sites inside circle as wall
+		// for (int px = 1; px < nse.lat.global.x() - 1; px++) {
+		// 	for (int py = 1; py < nse.lat.global.y() - 1; py++) {
+		// 		int dx = px - cx;
+		// 		int dy = py - cy;
+		// 		if (dx*dx + dy*dy <= radius*radius) {
+		// 			nse.setMap(px, py, 0, BC::GEO_WALL);
+		// 		}
+		// 	}
+		// }
 	}
+
+    // Allocate arrays and load per-voxel map and Bouzidi coefficients
+    void projectObjectFromFile(const std::string& fileArg)
+    {
+        using std::getline;
+        namespace fs = std::filesystem;
+
+        // Determine path: if contains path separator use as-is; otherwise prepend sim_2D/ellipses/
+        fs::path path = fileArg;
+        if (!fileArg.empty() && fileArg.find('/') == std::string::npos && fileArg.find('\\') == std::string::npos) {
+            path = fs::path("sim_2D/ellipses") / fileArg;
+        }
+
+        // Allocate Bouzidi arrays across blocks
+        nse.allocateBouzidiCoeffArrays();
+
+        std::ifstream fin(path);
+        if (!fin) {
+            spdlog::error("Failed to open object file: {}", path.string());
+            throw std::runtime_error("Cannot open object file");
+        }
+
+        const auto X = nse.lat.global.x();
+        const auto Y = nse.lat.global.y();
+
+        long long count = 0;
+        long long out_of_range = 0;
+        long long parse_errors = 0;
+        long long coeff_sets = 0;
+        long long type_sets = 0;
+        typename TRAITS::idx max_x = -1, max_y = -1;
+
+        std::string line;
+        while (getline(fin, line)) {
+            if (line.empty()) continue;
+            std::istringstream iss(line);
+            long long xi, yi;
+            int cell_type;
+            double c[8];
+            if (!(iss >> xi >> yi >> cell_type >> c[0] >> c[1] >> c[2] >> c[3] >> c[4] >> c[5] >> c[6] >> c[7])) {
+                parse_errors++;
+                continue;
+            }
+            count++;
+            if (xi >= 0 && yi >= 0) {
+                if (xi > max_x) max_x = (typename TRAITS::idx) xi;
+                if (yi > max_y) max_y = (typename TRAITS::idx) yi;
+            }
+            if (xi < 0 || yi < 0 || xi >= X || yi >= Y) {
+                out_of_range++;
+                continue;
+            }
+
+            // Set map according to type
+            typename BC::map_t mapval = BC::GEO_FLUID;
+            switch (cell_type) {
+                case 0: mapval = BC::GEO_FLUID; break;
+                case 1: mapval = BC::GEO_FLUID_NEAR_WALL; break;
+                case 2: mapval = BC::GEO_WALL; break;
+                default: mapval = BC::GEO_FLUID; break;
+            }
+            nse.setMap((idx)xi, (idx)yi, 0, mapval);
+            type_sets++;
+
+            // Store Bouzidi coefficients (always store; -1 used as sentinel as provided)
+            for (auto& block : nse.blocks) {
+                if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
+                for (int d = 0; d < 8; ++d) {
+                    // Directions order per user spec mapped to indices 0..7
+                    block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
+                }
+                coeff_sets++;
+                break;
+            }
+        }
+
+        // Basic dimension checks
+        const auto infer_X = max_x + 1;
+        const auto infer_Y = max_y + 1;
+        bool dims_ok = (infer_X == X && infer_Y == Y);
+        bool count_ok = (count == (long long)X * (long long)Y);
+        if (!dims_ok || !count_ok) {
+            spdlog::error("Object grid mismatch or incomplete: file dim=({},{}) inferred from max coords, count={} vs expected {}x{}={}.",
+                          (long long)infer_X, (long long)infer_Y, count, (long long)X, (long long)Y, (long long)X * (long long)Y);
+            throw std::runtime_error("Object file dimensions do not match simulation lattice");
+        }
+
+        if (parse_errors > 0 || out_of_range > 0) {
+            spdlog::warn("While loading object: parse_errors={}, out_of_range={} (ignored)", parse_errors, out_of_range);
+        }
+    }
 
 	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
@@ -253,9 +354,52 @@ struct StateLocal : State<NSE>
             return vtk_helper("mean_fluc_mag", mean_fluc_mag_phys, 1, desc, value, dofs);
         }
 
+        // Bouzidi coefficients (theta per direction, -1 if none); guard against missing allocation
+        const bool have_bouzidi = (block.hBouzidi.getSize() > 0);
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(0, x, y, z);
+            return vtk_helper("bouzidi_east", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(1, x, y, z);
+            return vtk_helper("bouzidi_north", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(2, x, y, z);
+            return vtk_helper("bouzidi_west", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(3, x, y, z);
+            return vtk_helper("bouzidi_south", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(4, x, y, z);
+            return vtk_helper("bouzidi_ne", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(5, x, y, z);
+            return vtk_helper("bouzidi_nw", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(6, x, y, z);
+            return vtk_helper("bouzidi_sw", v, 1, desc, value, dofs);
+        }
+        if (index == k++) {
+            real v = (real)-1;
+            if (have_bouzidi) v = (real) block.hBouzidi(7, x, y, z);
+            return vtk_helper("bouzidi_se", v, 1, desc, value, dofs);
+        }
 
-		return false;
-	}
+        
+			return false;
+		}
 
 	// Push inflow + mean-accumulation gate to device data each step
     void updateKernelVelocities() override
@@ -321,6 +465,18 @@ struct StateLocal : State<NSE>
             }
         }
 
+    }
+
+    // Also push Bouzidi coeff pointers once arrays are allocated
+    void updateKernelData() override
+    {
+        State<NSE>::updateKernelData();
+        for (auto& block : this->nse.blocks) {
+            if (block.dBouzidi.getSize() > 0)
+                block.data.bouzidi_coeff_ptr = block.dBouzidi.getData();
+            else
+                block.data.bouzidi_coeff_ptr = nullptr;
+        }
     }
 
     void snapshotFrozenMeansToMacro()
@@ -581,7 +737,7 @@ struct StateLocal : State<NSE>
 };
 
 template <typename NSE>
-int sim(int RESOLUTION = 2)
+int sim(int RESOLUTION = 2, const std::string& object_file = std::string())
 {
     using idx = typename NSE::TRAITS::idx;
     using real = typename NSE::TRAITS::real;
@@ -613,6 +769,7 @@ int sim(int RESOLUTION = 2)
     const std::string state_id =
         fmt::format("sim2d_2_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
     StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
+    state.object_filename = object_file;
 
     if (!state.canCompute())
         return 0;
@@ -633,7 +790,7 @@ int sim(int RESOLUTION = 2)
 }
 
 template <typename TRAITS = TraitsDP>
-void run(int RES)
+void run(int RES, const std::string& object_file)
 {
 	//using COLL = D2Q9_SRT<TRAITS>;
 	using COLL = D2Q9_CLBM<TRAITS>;
@@ -650,7 +807,7 @@ void run(int RES)
 		// D2Q9_MACRO_Default<TRAITS>>;
 		D2Q9_MACRO_WithMean<TRAITS>>;
 
-	sim<NSE_CONFIG>(RES);
+	sim<NSE_CONFIG>(RES, object_file);
 }
 
 int main(int argc, char** argv)
@@ -660,6 +817,7 @@ int main(int argc, char** argv)
 	argparse::ArgumentParser program("sim2d_1");
 	program.add_description("Simple incompressible Navier-Stokes simulation example.");
 	program.add_argument("resolution").help("resolution of the lattice").scan<'i', int>().default_value(1);
+	program.add_argument("object_file").help("object file from sim_2D/ellipses (e.g. 8.txt)").default_value(std::string("sim_2D/ellipses/0.txt"));
 
 	try {
 		program.parse_args(argc, argv);
@@ -671,12 +829,13 @@ int main(int argc, char** argv)
 	}
 
 	const auto resolution = program.get<int>("resolution");
+	const auto object_file = program.get<std::string>("object_file");
 	if (resolution < 1) {
 		fmt::println(stderr, "CLI error: resolution must be at least 1");
 		return 1;
 	}
 
-	run(resolution);
+	run(resolution, object_file);
 
 	return 0;
 }
