@@ -666,7 +666,7 @@ struct StateLocal : State<NSE>
         // Compute local integral (no MPI aggregation used)
         const double value = (double)integrateTKE_ThirdQuarter_phys();
 
-        const std::string outpath = "sim_2D/values/value.txt";
+        const std::string outpath = fmt::format("sim_2D/values/value_{}", std::filesystem::path(object_filename).filename().string());
         create_parent_directories(outpath.c_str());
         FILE* fp = fopen(outpath.c_str(), "wt");
         if (fp) {
@@ -686,7 +686,7 @@ struct StateLocal : State<NSE>
         // export now with whatever value is available (likely zero).
         if (!tke_value_written) {
             const double value = (double)integrateTKE_ThirdQuarter_phys();
-            const std::string outpath = "sim_2D/values/value.txt";
+            const std::string outpath = fmt::format("sim_2D/values/value_{}", std::filesystem::path(object_filename).filename().string());
             create_parent_directories(outpath.c_str());
             FILE* fp = fopen(outpath.c_str(), "wt");
             if (fp) {
@@ -795,8 +795,10 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool
     lat.physDt        = PHYS_DT;
     lat.physViscosity = PHYS_VISCOSITY;
 
+    // Include the object file basename in the state ID so different shapes are distinguishable
+    std::string obj_base = std::filesystem::path(object_file.empty() ? std::string("none") : object_file).filename().string();
     const std::string state_id =
-        fmt::format("sim2d_2_res{:02d}_np{:03d}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD));
+        fmt::format("sim2d_2_res{:02d}_np{:03d}_{}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD), obj_base);
     StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
     state.object_filename = object_file;
     state.enable_bouzidi = enable_bouzidi;
