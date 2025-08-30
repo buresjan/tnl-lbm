@@ -362,6 +362,12 @@ struct StateLocal : State<NSE>
             return vtk_helper("mean_fluc_mag", mean_fluc_mag_phys, 1, desc, value, dofs);
         }
 
+        if (index == k++) {
+            real velocity_xx = nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx, x, y, z)) * nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx, x, y, z));
+            real velocity_yy = nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy, x, y, z)) * nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy, x, y, z));
+            return vtk_helper("velocity_magnitude", std::sqrt(velocity_xx + velocity_yy), 1, desc, value, dofs);
+        }
+
         // Bouzidi coefficients (theta per direction, -1 if none); guard against missing allocation
         const bool have_bouzidi = (block.hBouzidi.getData() != nullptr);
         if (index == k++) {
