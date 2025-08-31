@@ -47,6 +47,14 @@ struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
     using idx   = typename TRAITS::idx;
 
     // Keep default fields and extend with running sums for means
+    // Macro channels (LBM units unless noted). Channels are sized like the distributions (Q x X x Y x Z).
+    //
+    // e_svx, e_svy: running sums of velocity components in LBM units. Host keeps mean_samples and
+    //                divides to obtain running means when needed. Accumulation gated by accumulate_means.
+    // e_mean_vx_frozen, e_mean_vy_frozen: per-cell frozen means in LBM units copied to device before
+    //                                      fluctuation accumulation starts.
+    // e_smag_uprime: running sum of |u - <u>| in LBM units; average by dividing with fluc_samples;
+    //                accumulation gated by accumulate_flucs.
     enum
     {
         e_rho,
@@ -103,6 +111,10 @@ struct NSE2D_Data_ParabolicInflow : NSE_Data<TRAITS>
     using dreal = typename TRAITS::dreal;
 
     // Inputs (LBM units and indices), set each step from StateLocal::updateKernelVelocities()
+    // u_max_lbm defines a Poiseuille-like inflow profile. y0..y1 define interior fluid rows used for
+    // normalization to s in [0,1].
+    // accumulate_means / accumulate_flucs are device-side gates to toggle accumulation phases.
+    // use_bouzidi toggles Bouzidi interpolation at near-wall nodes.
     dreal u_max_lbm = 0;     // U_max in LBM units ( = 1.5 * U_mean_phys mapped to LBM )
     idx   y0 = 1;            // first interior fluid row
     idx   y1 = 1;            // last interior fluid row
@@ -146,7 +158,7 @@ struct StateLocal : State<NSE>
     // Object file with per-voxel type and Bouzidi coefficients
     std::string object_filename;
 
-    // Mean settings
+    // Mean settings — host-side control of accumulation, stabilization and freeze of <u>
     real stats_start_time = 1.5;  // [s] ignore early transients
     real stats_end_time   = 3.5;  // [s] fallback window end for mean
     int  mean_samples = 0;        // number of steps accumulated (constant dt => time-weighted)
@@ -163,8 +175,7 @@ struct StateLocal : State<NSE>
     real next_mean_check_time   = stats_start_time + mean_check_period;
     real prev_domain_mean_speed = -1;       // previous domain-averaged |<u>| [m/s]
     
-    // Fluc settings
-        // --- Fluctuation magnitude accumulation & stabilization (host-side) ---
+    // Fluc settings — host-side gate and stabilization for <|u'|>
     int  fluc_samples             = 0;        // time-weighted sample count for |u - <u>| average
 
     real fluc_tol                 = 1.0e-3;   // [m/s] |Δ(domain-avg <|u'|>)| threshold
@@ -182,12 +193,14 @@ struct StateLocal : State<NSE>
 
 
 
-	void setupBoundaries() override
-	{
-		// Load geometry/object map and Bouzidi coefficients before BCs
-		if (!object_filename.empty()) {
-			projectObjectFromFile(object_filename);
-		}
+    void setupBoundaries() override
+    {
+        // Load geometry/object map and Bouzidi coefficients before BCs
+        // The file describes per-voxel x y type and Bouzidi thetas (-1 means "no Bouzidi").
+        // Types are mapped to GEO_FLUID / GEO_FLUID_NEAR_WALL / GEO_WALL.
+        if (!object_filename.empty()) {
+            projectObjectFromFile(object_filename);
+        }
 		nse.setBoundaryX(0, BC::GEO_INFLOW);							  // left
 		nse.setBoundaryX(nse.lat.global.x() - 1, BC::GEO_OUTFLOW_RIGHT);  // right
 
@@ -221,6 +234,10 @@ struct StateLocal : State<NSE>
 	}
 
     // Allocate arrays and load per-voxel map and Bouzidi coefficients
+    //
+    // File format: one row per lattice cell (x y type theta_E theta_N theta_W theta_S theta_NE theta_NW theta_SW theta_SE)
+    // Coeff order is in the cardinal/diagonal order noted above. We later use opposite-direction theta
+    // when applying Bouzidi in the BC. Theta -1 means "no Bouzidi"; theta in (0,1] defines sub-grid wall location.
     void projectObjectFromFile(const std::string& fileArg)
     {
         using std::getline;
@@ -311,7 +328,7 @@ struct StateLocal : State<NSE>
             }
         }
 
-        // Basic dimension checks
+        // Basic dimension checks — ensure the file matches XxY domain
         const auto infer_X = max_x + 1;
         const auto infer_Y = max_y + 1;
         bool dims_ok = (infer_X == X && infer_Y == Y);
@@ -328,7 +345,15 @@ struct StateLocal : State<NSE>
         }
     }
 
-	bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
+    // Exposed fields in 2D VTK/probes, queried by index in a deterministic order.
+    //
+    // 0: lbm_density                (LBM units)
+    // 1: velocity (vector, 2D embedded in 3) (physical units)
+    // 2: mean_vx, 3: mean_vy        (physical units; mean over accumulated window)
+    // 4: mean_fluc_mag              (<|u'|>, physical units)
+    // 5: mean_vel_mag               (|<u>|, physical units; frozen mean if available)
+    // 6..13: bouzidi_* thetas       (raw theta per direction; -1 if "none")
+    bool outputData(const BLOCK& block, int index, int dof, char* desc, idx x, idx y, idx z, real& value, int& dofs) override
 	{
 		int k = 0;
 		if (index == k++)
@@ -371,6 +396,23 @@ struct StateLocal : State<NSE>
                 mean_fluc_mag_phys = nse.lat.lbm2physVelocity(s);
             }
             return vtk_helper("mean_fluc_mag", mean_fluc_mag_phys, 1, desc, value, dofs);
+        }
+
+        if (index == k++) {
+            // mean velocity magnitude (physical units)
+            real mean_vel_mag_phys = 0;
+            if (means_frozen) {
+                const real mvx_lbm = block.hmacro(MACRO::e_mean_vx_frozen, x, y, z);
+                const real mvy_lbm = block.hmacro(MACRO::e_mean_vy_frozen, x, y, z);
+                const real mag_lbm = sqrt(mvx_lbm * mvx_lbm + mvy_lbm * mvy_lbm);
+                mean_vel_mag_phys = nse.lat.lbm2physVelocity(mag_lbm);
+            } else if (mean_samples > 0) {
+                const real mvx_lbm = block.hmacro(MACRO::e_svx, x, y, z) / (real)mean_samples;
+                const real mvy_lbm = block.hmacro(MACRO::e_svy, x, y, z) / (real)mean_samples;
+                const real mag_lbm = sqrt(mvx_lbm * mvx_lbm + mvy_lbm * mvy_lbm);
+                mean_vel_mag_phys = nse.lat.lbm2physVelocity(mag_lbm);
+            }
+            return vtk_helper("mean_vel_mag", mean_vel_mag_phys, 1, desc, value, dofs);
         }
 
         if (index == k++) {
@@ -452,7 +494,7 @@ struct StateLocal : State<NSE>
             // fluctuations gate handled in section 3 (set below as we freeze means)
         }
 
-        // 3) Host-side stabilization check for the mean
+        // 3) Host-side stabilization check for the mean — freezes <u> upon stabilization
         if (!means_frozen) {
             checkAndMaybeFreezeMeans();
 
@@ -505,8 +547,19 @@ struct StateLocal : State<NSE>
         }
     }
 
+    // Freeze the running mean <u> into MACRO channels and start the fluctuation phase.
+    //
+    // Steps:
+    // 0) Pull latest macro from device to host (to get current sums)
+    // 1) Stop mean accumulation on device
+    // 2) Compute and write frozen mean to host MACRO; reset e_smag_uprime to 0
+    // 3) Push host MACRO to device so kernels see the frozen mean
+    // 4) Reset fluc_samples and enable accumulate_flucs
     void snapshotFrozenMeansToMacro()
     {
+        // 0) Pull the latest running sums from device so we base the frozen mean on up-to-date data
+        nse.copyMacroToHost();
+
         // 1) Stop the mean accumulation at the device immediately
         for (auto& block : nse.blocks) {
             block.data.accumulate_means = false;
@@ -535,7 +588,10 @@ struct StateLocal : State<NSE>
             }
         }
 
-        // 3) Initialize fluctuation accumulation (Section 3)
+        // 3) Push frozen means and reset accumulators to device so the kernel sees correct <u>
+        nse.copyMacroToDevice();
+
+        // 4) Initialize fluctuation accumulation (Section 3)
         fluc_samples        = 0;
         flucs_frozen        = false;
         prev_domain_flucmag = (real)-1;
@@ -549,6 +605,7 @@ struct StateLocal : State<NSE>
     // Disable 3D VTK for this 2D simulation (avoid 3D output even on NaN)
     void writeVTKs_3D() override {}
 
+    // Domain-averaged |<u>| over the full interior (physical units)
     real computeDomainAvgMeanSpeed_phys() const
     {
         if (mean_samples <= 0) return 0;
@@ -580,6 +637,7 @@ struct StateLocal : State<NSE>
         return (real)(sum_speed / (double)count);
     }
 
+    // Domain-averaged <|u'|> over the full interior (physical units)
     real computeDomainAvgFlucMag_phys() const
     {
         if (fluc_samples <= 0) return 0;
@@ -626,6 +684,11 @@ struct StateLocal : State<NSE>
     // Integrate TKE over the third quarter of the domain in X
     // (i.e., x in [2/4*X, 3/4*X)), and in Y exclude 3 layers at the
     // bottom and top (y in [3, Ny-3)).
+    //
+    // Fallbacks:
+    //  A) If we have fluctuation samples: use 0.5 * <|u'|>^2 from accumulated e_smag_uprime.
+    //  B1) Else, if running means exist: use last-step |u - <u>| based on running means.
+    //  B2) Else, estimate mean within the integration region from the instantaneous field.
     real integrateTKE_ThirdQuarter_phys() const
     {
         const idx Nx = nse.lat.global.x();
@@ -712,6 +775,8 @@ struct StateLocal : State<NSE>
         }
     }
 
+    // Compute and export the integral (as above) and request termination.
+    // The output file name is suffixed with the object file basename.
     void exportThirdQuarterTKE_andTerminate()
     {
         if (tke_value_written) return;
