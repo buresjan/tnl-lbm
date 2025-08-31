@@ -610,7 +610,8 @@ struct StateLocal : State<NSE>
     // Returns 0 until flucs_frozen is true.
     real computeCellTKE_phys(const BLOCK& block, idx x, idx y) const
     {
-        if (!flucs_frozen) return (real)0;
+        // Provide a meaningful value even if fluctuations have not stabilized yet.
+        // Use whatever samples are available; if none, return 0.
         if (fluc_samples <= 0) return (real)0;
 
         // <|u'|> in LBM units
@@ -624,11 +625,9 @@ struct StateLocal : State<NSE>
 
     // Integrate TKE over the third quarter of the domain in X
     // (i.e., x in [2/4*X, 3/4*X)), and in Y exclude 3 layers at the
-    // bottom and top (y in [3, Ny-3)). Returns 0 until fluctuations are frozen.
+    // bottom and top (y in [3, Ny-3)).
     real integrateTKE_ThirdQuarter_phys() const
     {
-        if (!flucs_frozen) return (real)0;
-
         const idx Nx = nse.lat.global.x();
         const idx Ny = nse.lat.global.y();
 
@@ -645,18 +644,72 @@ struct StateLocal : State<NSE>
 
         if (x0 >= x1 || y0 >= y1) return (real)0;
 
-        double sum_tke = 0.0; // [m^2/s^2]
-        for (const auto& block : nse.blocks) {
-            for (idx x = x0; x < x1; ++x) {
-                for (idx y = y0; y < y1; ++y) {
-                    sum_tke += (double)computeCellTKE_phys(block, x, y);
+        // Path A: use accumulated fluctuation magnitudes if we have any samples
+        if (fluc_samples > 0) {
+            double sum_tke = 0.0; // [m^2/s^2]
+            for (const auto& block : nse.blocks) {
+                for (idx x = x0; x < x1; ++x) {
+                    for (idx y = y0; y < y1; ++y) {
+                        sum_tke += (double)computeCellTKE_phys(block, x, y);
+                    }
                 }
             }
+            const double cell_area = (double)nse.lat.physDl * (double)nse.lat.physDl; // [m^2]
+            return (real)(sum_tke * cell_area); // [m^4/s^2]
         }
 
-        // Convert discrete sum to physical integral by cell area (2D)
-        const double cell_area = (double)nse.lat.physDl * (double)nse.lat.physDl; // [m^2]
-        return (real)(sum_tke * cell_area); // [m^4/s^2]
+        // Path B: fallback if fluctuations never started accumulating
+        // B1: If we have a running mean (mean_samples>0), estimate |u'| from last-step velocities vs running mean
+        if (mean_samples > 0) {
+            double sum_tke = 0.0;
+            for (const auto& block : nse.blocks) {
+                for (idx x = x0; x < x1; ++x) {
+                    for (idx y = y0; y < y1; ++y) {
+                        const real vx_lbm = block.hmacro(MACRO::e_vx, x, y, 0);
+                        const real vy_lbm = block.hmacro(MACRO::e_vy, x, y, 0);
+                        const real mvx_lbm = block.hmacro(MACRO::e_svx, x, y, 0) / (real)mean_samples;
+                        const real mvy_lbm = block.hmacro(MACRO::e_svy, x, y, 0) / (real)mean_samples;
+                        const real dux_phys = nse.lat.lbm2physVelocity(vx_lbm - mvx_lbm);
+                        const real duy_phys = nse.lat.lbm2physVelocity(vy_lbm - mvy_lbm);
+                        const double mag2 = (double)dux_phys * (double)dux_phys + (double)duy_phys * (double)duy_phys;
+                        sum_tke += 0.5 * mag2;
+                    }
+                }
+            }
+            const double cell_area = (double)nse.lat.physDl * (double)nse.lat.physDl;
+            return (real)(sum_tke * cell_area);
+        }
+
+        // B2: As a last resort, estimate mean from instantaneous field over the region
+        {
+            double sx = 0.0, sy = 0.0; long long cnt = 0;
+            for (const auto& block : nse.blocks) {
+                for (idx x = x0; x < x1; ++x) {
+                    for (idx y = y0; y < y1; ++y) {
+                        sx += (double)block.hmacro(MACRO::e_vx, x, y, 0);
+                        sy += (double)block.hmacro(MACRO::e_vy, x, y, 0);
+                        ++cnt;
+                    }
+                }
+            }
+            if (cnt == 0) return (real)0;
+            const real mvx_lbm = (real)(sx / (double)cnt);
+            const real mvy_lbm = (real)(sy / (double)cnt);
+
+            double sum_tke = 0.0;
+            for (const auto& block : nse.blocks) {
+                for (idx x = x0; x < x1; ++x) {
+                    for (idx y = y0; y < y1; ++y) {
+                        const real dux_phys = nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx, x, y, 0) - mvx_lbm);
+                        const real duy_phys = nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy, x, y, 0) - mvy_lbm);
+                        const double mag2 = (double)dux_phys * (double)dux_phys + (double)duy_phys * (double)duy_phys;
+                        sum_tke += 0.5 * mag2;
+                    }
+                }
+            }
+            const double cell_area = (double)nse.lat.physDl * (double)nse.lat.physDl;
+            return (real)(sum_tke * cell_area);
+        }
     }
 
     void exportThirdQuarterTKE_andTerminate()
@@ -781,7 +834,7 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool
     real LBM_VISCOSITY  = 1.0e-3;               // tau = 0.5 + 3*nu = 0.56 (stable)
     real PHYS_HEIGHT    = 0.41;               // [m]
     real PHYS_VISCOSITY = 1.0e-3;             // [m^2/s] (benchmark fluid)  Re ≈ 100 when U_mean = 1.0 m/s
-    real PHYS_VELOCITY  = 2.5;      // [m/s] mean inflow; U_max = 1.5 * mean
+    real PHYS_VELOCITY  = 1.5;      // [m/s] mean inflow; U_max = 1.5 * mean
 
     real PHYS_DL = PHYS_HEIGHT / ((real)Y - 2);
     real PHYS_DT = LBM_VISCOSITY / PHYS_VISCOSITY * PHYS_DL * PHYS_DL;
