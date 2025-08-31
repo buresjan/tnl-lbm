@@ -288,7 +288,7 @@ struct StateLocal : State<NSE>
             typename BC::map_t mapval = BC::GEO_FLUID;
             switch (cell_type) {
                 case 0: mapval = BC::GEO_FLUID; break;
-                case 1: mapval = BC::GEO_FLUID_NEAR_WALL; break;
+                case 1: mapval = BC::GEO_FLUID; break;
                 case 2: mapval = BC::GEO_WALL; break;
                 default: mapval = BC::GEO_FLUID; break;
             }
