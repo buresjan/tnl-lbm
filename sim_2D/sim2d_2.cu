@@ -848,10 +848,11 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool
     lat.physDt        = PHYS_DT;
     lat.physViscosity = PHYS_VISCOSITY;
 
-    // Include the object file basename in the state ID so different shapes are distinguishable
-    std::string obj_base = std::filesystem::path(object_file.empty() ? std::string("none") : object_file).filename().string();
+    // Include object file name without extension in the state ID
+    auto obj_path_for_id = std::filesystem::path(object_file.empty() ? std::string("none") : object_file);
+    std::string obj_name_no_ext = obj_path_for_id.stem().string();
     const std::string state_id =
-        fmt::format("sim2d_2_res{:02d}_np{:03d}_{}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD), obj_base);
+        fmt::format("sim2d_2_res{:02d}_np{:03d}_{}", RESOLUTION, TNL::MPI::GetSize(MPI_COMM_WORLD), obj_name_no_ext);
     StateLocal<NSE> state(state_id, MPI_COMM_WORLD, lat);
     state.object_filename = object_file;
     state.enable_bouzidi = enable_bouzidi;
