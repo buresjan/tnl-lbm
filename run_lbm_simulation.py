@@ -162,7 +162,7 @@ fi
 
 rm -f "$VALUE_SOURCE"
 
-"$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS" "${EXTRA_ARGS[@]}"
+"$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
 
 if [ ! -f "$VALUE_SOURCE" ]; then
     echo "Result file $VALUE_SOURCE not produced" >&2
