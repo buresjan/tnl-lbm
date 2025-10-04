@@ -30,6 +30,14 @@ fi
 # CUDA arch list (override with: CUDA_ARCHS="60;61;70;75;80;86" ./run ...)
 CUDA_ARCHS="${CUDA_ARCHS:-60;61;70;75;80;86}"
 
+# configure the build (dir missing OR not configured)
+if [[ ! -f "$BUILD_DIR/CMakeCache.txt" ]]; then
+    cmake -B "$BUILD_DIR" -S "$PROJECT_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHS"
+fi
+
+# build the target
+cmake --build "$BUILD_DIR" --target "$TARGET"
+
 # run the target
 echo "Running $TARGET $@"
 "$BUILD_DIR/sim_2D/$TARGET" "$@"
