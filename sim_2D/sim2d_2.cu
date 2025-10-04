@@ -9,6 +9,7 @@
 #include "lbm3d/d2q9/col_clbm.h"
 #include "lbm3d/d2q9/macro.h"
 
+#include <algorithm>
 #include <cmath>     // std::sqrt, std::abs
 #include <fstream>
 #include <sstream>
@@ -61,6 +62,7 @@ struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
     //                                      fluctuation accumulation starts.
     // e_smag_uprime: running sum of |u - <u>| in LBM units; average by dividing with fluc_samples;
     //                accumulation gated by accumulate_flucs.
+    // e_suprime2_sum / e_svprime2_sum: running sums of squared fluctuation components in LBM units.
     enum
     {
         e_rho,
@@ -71,6 +73,8 @@ struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
         e_mean_vx_frozen,   // per-cell frozen mean vx (LBM)
         e_mean_vy_frozen,   // per-cell frozen mean vy (LBM)
         e_smag_uprime,      // running sum of |u - <u>| (LBM); filled after freeze
+        e_suprime2_sum,     // running sum of (u'_^2) (LBM^2)
+        e_svprime2_sum,     // running sum of (v'_^2) (LBM^2)
         N
     };
 
@@ -97,6 +101,8 @@ struct D2Q9_MACRO_WithMean : D2Q9_MACRO_Base<TRAITS>
             const dreal duy = KS.vy - mvy;
             const dreal mag = sqrt(dux * dux + duy * duy);
             SD.macro(e_smag_uprime, x, y, z) += mag;
+            SD.macro(e_suprime2_sum, x, y, z) += dux * dux;
+            SD.macro(e_svprime2_sum, x, y, z) += duy * duy;
         }
     }
 
@@ -181,18 +187,18 @@ struct StateLocal : State<NSE>
     real next_mean_check_time   = stats_start_time + mean_check_period;
     real prev_domain_mean_speed = -1;       // previous domain-averaged |<u>| [m/s]
     
-    // Fluc settings — host-side gate and stabilization for <|u'|>
-    int  fluc_samples             = 0;        // time-weighted sample count for |u - <u>| average
+    // Fluc settings — host-side gate and stabilization for fluctuation RMS speed
+    int  fluc_samples             = 0;        // time-weighted sample count for fluctuation statistics
 
-    real fluc_tol                 = 1.0e-3;   // [m/s] |Δ(domain-avg <|u'|>)| threshold
+    real fluc_tol                 = 1.0e-3;   // [m/s] |Δ(domain RMS(|u'|))| threshold between checks
     real fluc_check_period        = 0.05;     // [s]
     int  fluc_stable_required     = 10;        // consecutive passes
 
-    bool flucs_frozen             = false;    // latched once <|u'|> declared stable
+    bool flucs_frozen             = false;    // latched once RMS(|u'|) declared stable
     real fluc_freeze_time         = -1;       // [s]
 
     real next_fluc_check_time     = -1;       // [s]
-    real prev_domain_flucmag      = -1;       // previous domain-avg <|u'|> [m/s]
+    real prev_domain_fluc_rms     = -1;       // previous domain RMS(|u'|) [m/s]
     
     // Export control
     bool tke_value_written        = false;    // guard to write TKE once
@@ -532,7 +538,7 @@ struct StateLocal : State<NSE>
                 block.data.accumulate_flucs = gate_on;
             }
 
-            // stabilization check for <|u'|> (Section 4)
+            // stabilization check for RMS(|u'|) (Section 4)
             if (!flucs_frozen) checkAndMaybeFreezeFlucMag();
 
             // If fluctuations just became frozen (or are already), export TKE once and terminate
@@ -592,6 +598,8 @@ struct StateLocal : State<NSE>
 
                     // also reset fluctuation sum so its average starts clean
                     block.hmacro(MACRO::e_smag_uprime,    x, y, 0) = 0;
+                    block.hmacro(MACRO::e_suprime2_sum,   x, y, 0) = 0;
+                    block.hmacro(MACRO::e_svprime2_sum,   x, y, 0) = 0;
                 }
             }
         }
@@ -602,7 +610,7 @@ struct StateLocal : State<NSE>
         // 4) Initialize fluctuation accumulation (Section 3)
         fluc_samples        = 0;
         flucs_frozen        = false;
-        prev_domain_flucmag = (real)-1;
+        prev_domain_fluc_rms = (real)-1;
         next_fluc_check_time = mean_freeze_time + fluc_check_period;
 
         for (auto& block : nse.blocks) {
@@ -612,6 +620,11 @@ struct StateLocal : State<NSE>
 
     // Disable 3D VTK for this 2D simulation (avoid 3D output even on NaN)
     void writeVTKs_3D() override {}
+
+    bool isFluidLocal(const BLOCK& block, idx x, idx y) const
+    {
+        return BC::isFluid(block.hmap(x, y, 0));
+    }
 
     // Domain-averaged |<u>| over the full interior (physical units)
     real computeDomainAvgMeanSpeed_phys() const
@@ -625,8 +638,17 @@ struct StateLocal : State<NSE>
         int count  = 0;
 
         for (const auto& block : nse.blocks) {
-            for (idx x = 1; x < Nx - 1; ++x) {
-                for (idx y = 1; y < Ny - 1; ++y) {
+            const idx x_begin = std::max<idx>(1, block.offset.x());
+            const idx x_end   = std::min<idx>(Nx - 1, block.offset.x() + block.local.x());
+            const idx y_begin = std::max<idx>(1, block.offset.y());
+            const idx y_end   = std::min<idx>(Ny - 1, block.offset.y() + block.local.y());
+
+            if (x_begin >= x_end || y_begin >= y_end) continue;
+
+            for (idx x = x_begin; x < x_end; ++x) {
+                for (idx y = y_begin; y < y_end; ++y) {
+                    if (!block.isLocalIndex(x, y, 0)) continue;
+                    if (!isFluidLocal(block, x, y)) continue;
                     // running mean in LBM units
                     real mvx_lbm = block.hmacro(MACRO::e_svx, x, y, 0) / (real)mean_samples;
                     real mvy_lbm = block.hmacro(MACRO::e_svy, x, y, 0) / (real)mean_samples;
@@ -645,30 +667,42 @@ struct StateLocal : State<NSE>
         return (real)(sum_speed / (double)count);
     }
 
-    // Domain-averaged <|u'|> over the full interior (physical units)
-    real computeDomainAvgFlucMag_phys() const
+    // Domain RMS fluctuation speed over the full interior (physical units)
+    real computeDomainRMSFlucSpeed_phys() const
     {
         if (fluc_samples <= 0) return 0;
 
         const idx Nx = nse.lat.global.x();
         const idx Ny = nse.lat.global.y();
 
-        double sum = 0.0;
+        double sum_sq_lbm = 0.0;
         long long count = 0;
 
         for (const auto& block : nse.blocks) {
-            for (idx x = 1; x < Nx - 1; ++x) {
-                for (idx y = 1; y < Ny - 1; ++y) {
-                    const real s_lbm = block.hmacro(MACRO::e_smag_uprime, x, y, 0) / (real)fluc_samples;
-                    const real mag_phys = nse.lat.lbm2physVelocity(s_lbm);
-                    sum += (double)mag_phys;
+            const idx x_begin = std::max<idx>(1, block.offset.x());
+            const idx x_end   = std::min<idx>(Nx - 1, block.offset.x() + block.local.x());
+            const idx y_begin = std::max<idx>(1, block.offset.y());
+            const idx y_end   = std::min<idx>(Ny - 1, block.offset.y() + block.local.y());
+
+            if (x_begin >= x_end || y_begin >= y_end) continue;
+
+            for (idx x = x_begin; x < x_end; ++x) {
+                for (idx y = y_begin; y < y_end; ++y) {
+                    if (!block.isLocalIndex(x, y, 0)) continue;
+                    if (!isFluidLocal(block, x, y)) continue;
+                    const real up2_lbm = block.hmacro(MACRO::e_suprime2_sum, x, y, 0) / (real)fluc_samples;
+                    const real vp2_lbm = block.hmacro(MACRO::e_svprime2_sum, x, y, 0) / (real)fluc_samples;
+                    sum_sq_lbm += (double)(up2_lbm + vp2_lbm);
                     ++count;
                 }
             }
         }
 
         if (count == 0) return 0;
-        return (real)(sum / (double)count);
+        const double avg_sq_lbm = sum_sq_lbm / (double)count;
+        const real vel_scale = nse.lat.lbm2physVelocity((real)1);
+        const double avg_sq_phys = avg_sq_lbm * (double)vel_scale * (double)vel_scale;
+        return (real)std::sqrt(std::max(0.0, avg_sq_phys));
     }
 
     // Turbulent kinetic energy per cell [m^2/s^2],
@@ -680,13 +714,16 @@ struct StateLocal : State<NSE>
         // Use whatever samples are available; if none, return 0.
         if (fluc_samples <= 0) return (real)0;
 
-        // <|u'|> in LBM units
-        const real avg_mag_lbm = block.hmacro(MACRO::e_smag_uprime, x, y, 0) / (real)fluc_samples;
-        // convert to physical [m/s]
-        const real avg_mag_phys = nse.lat.lbm2physVelocity(avg_mag_lbm);
+        const real avg_up2_lbm = block.hmacro(MACRO::e_suprime2_sum, x, y, 0) / (real) fluc_samples;
+        const real avg_vp2_lbm = block.hmacro(MACRO::e_svprime2_sum, x, y, 0) / (real) fluc_samples;
 
-        // Approximate TKE in 2D as 0.5 * <|u'|>^2
-        return (real)0.5 * avg_mag_phys * avg_mag_phys;
+        // Convert squared fluctuations to physical units. lbm2physVelocity is linear, so
+        // scaling by the velocity conversion factor squared is sufficient.
+        const real vel_scale = nse.lat.lbm2physVelocity((real)1);
+        const real avg_up2_phys = avg_up2_lbm * vel_scale * vel_scale;
+        const real avg_vp2_phys = avg_vp2_lbm * vel_scale * vel_scale;
+
+        return (real)0.5 * (avg_up2_phys + avg_vp2_phys);
     }
 
     // Integrate TKE over the third quarter of the domain in X
@@ -694,9 +731,9 @@ struct StateLocal : State<NSE>
     // bottom and top (y in [3, Ny-3)).
     //
     // Fallbacks:
-    //  A) If we have fluctuation samples: use 0.5 * <|u'|>^2 from accumulated e_smag_uprime.
-    //  B1) Else, if running means exist: use last-step |u - <u>| based on running means.
-    //  B2) Else, estimate mean within the integration region from the instantaneous field.
+    //  A) If we have fluctuation samples: integrate TKE from accumulated squared fluctuations.
+    //  B1) Else, if running means exist: approximate TKE from last-step deviations vs running mean.
+    //  B2) Else, estimate the mean inside the region from the instantaneous field and use that.
     real integrateTKE_ThirdQuarter_phys() const
     {
         const idx Nx = nse.lat.global.x();
@@ -715,12 +752,21 @@ struct StateLocal : State<NSE>
 
         if (x0 >= x1 || y0 >= y1) return (real)0;
 
-        // Path A: use accumulated fluctuation magnitudes if we have any samples
+        // Path A: accumulated fluctuation squares are available -> compute TKE directly
         if (fluc_samples > 0) {
             double sum_tke = 0.0; // [m^2/s^2]
             for (const auto& block : nse.blocks) {
-                for (idx x = x0; x < x1; ++x) {
-                    for (idx y = y0; y < y1; ++y) {
+                const idx bx0 = std::max<idx>(x0, block.offset.x());
+                const idx bx1 = std::min<idx>(x1, block.offset.x() + block.local.x());
+                const idx by0 = std::max<idx>(y0, block.offset.y());
+                const idx by1 = std::min<idx>(y1, block.offset.y() + block.local.y());
+
+                if (bx0 >= bx1 || by0 >= by1) continue;
+
+                for (idx x = bx0; x < bx1; ++x) {
+                    for (idx y = by0; y < by1; ++y) {
+                        if (!block.isLocalIndex(x, y, 0)) continue;
+                        if (!isFluidLocal(block, x, y)) continue;
                         sum_tke += (double)computeCellTKE_phys(block, x, y);
                     }
                 }
@@ -730,12 +776,21 @@ struct StateLocal : State<NSE>
         }
 
         // Path B: fallback if fluctuations never started accumulating
-        // B1: If we have a running mean (mean_samples>0), estimate |u'| from last-step velocities vs running mean
+        // B1: If we have a running mean (mean_samples>0), estimate TKE from last-step deviations
         if (mean_samples > 0) {
             double sum_tke = 0.0;
             for (const auto& block : nse.blocks) {
-                for (idx x = x0; x < x1; ++x) {
-                    for (idx y = y0; y < y1; ++y) {
+                const idx bx0 = std::max<idx>(x0, block.offset.x());
+                const idx bx1 = std::min<idx>(x1, block.offset.x() + block.local.x());
+                const idx by0 = std::max<idx>(y0, block.offset.y());
+                const idx by1 = std::min<idx>(y1, block.offset.y() + block.local.y());
+
+                if (bx0 >= bx1 || by0 >= by1) continue;
+
+                for (idx x = bx0; x < bx1; ++x) {
+                    for (idx y = by0; y < by1; ++y) {
+                        if (!block.isLocalIndex(x, y, 0)) continue;
+                        if (!isFluidLocal(block, x, y)) continue;
                         const real vx_lbm = block.hmacro(MACRO::e_vx, x, y, 0);
                         const real vy_lbm = block.hmacro(MACRO::e_vy, x, y, 0);
                         const real mvx_lbm = block.hmacro(MACRO::e_svx, x, y, 0) / (real)mean_samples;
@@ -755,8 +810,17 @@ struct StateLocal : State<NSE>
         {
             double sx = 0.0, sy = 0.0; long long cnt = 0;
             for (const auto& block : nse.blocks) {
-                for (idx x = x0; x < x1; ++x) {
-                    for (idx y = y0; y < y1; ++y) {
+                const idx bx0 = std::max<idx>(x0, block.offset.x());
+                const idx bx1 = std::min<idx>(x1, block.offset.x() + block.local.x());
+                const idx by0 = std::max<idx>(y0, block.offset.y());
+                const idx by1 = std::min<idx>(y1, block.offset.y() + block.local.y());
+
+                if (bx0 >= bx1 || by0 >= by1) continue;
+
+                for (idx x = bx0; x < bx1; ++x) {
+                    for (idx y = by0; y < by1; ++y) {
+                        if (!block.isLocalIndex(x, y, 0)) continue;
+                        if (!isFluidLocal(block, x, y)) continue;
                         sx += (double)block.hmacro(MACRO::e_vx, x, y, 0);
                         sy += (double)block.hmacro(MACRO::e_vy, x, y, 0);
                         ++cnt;
@@ -769,8 +833,17 @@ struct StateLocal : State<NSE>
 
             double sum_tke = 0.0;
             for (const auto& block : nse.blocks) {
-                for (idx x = x0; x < x1; ++x) {
-                    for (idx y = y0; y < y1; ++y) {
+                const idx bx0 = std::max<idx>(x0, block.offset.x());
+                const idx bx1 = std::min<idx>(x1, block.offset.x() + block.local.x());
+                const idx by0 = std::max<idx>(y0, block.offset.y());
+                const idx by1 = std::min<idx>(y1, block.offset.y() + block.local.y());
+
+                if (bx0 >= bx1 || by0 >= by1) continue;
+
+                for (idx x = bx0; x < bx1; ++x) {
+                    for (idx y = by0; y < by1; ++y) {
+                        if (!block.isLocalIndex(x, y, 0)) continue;
+                        if (!isFluidLocal(block, x, y)) continue;
                         const real dux_phys = nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vx, x, y, 0) - mvx_lbm);
                         const real duy_phys = nse.lat.lbm2physVelocity(block.hmacro(MACRO::e_vy, x, y, 0) - mvy_lbm);
                         const double mag2 = (double)dux_phys * (double)dux_phys + (double)duy_phys * (double)duy_phys;
@@ -832,6 +905,8 @@ struct StateLocal : State<NSE>
         if (t < stats_start_time || means_frozen) return;
         if (t + (real)1e-12 < next_mean_check_time) return; // not yet time to check
 
+        nse.copyMacroToHost();
+
         const real curr = computeDomainAvgMeanSpeed_phys();
 
         static int stable_hits = 0;
@@ -861,22 +936,24 @@ struct StateLocal : State<NSE>
         const real t = nse.physTime();
         if (t + (real)1e-12 < next_fluc_check_time) return;
 
-        const real curr = computeDomainAvgFlucMag_phys();
+        nse.copyMacroToHost();
+
+        const real curr = computeDomainRMSFlucSpeed_phys();
 
         static int stable_hits = 0;
-        if (prev_domain_flucmag < (real)0) {
+        if (prev_domain_fluc_rms < (real)0) {
             stable_hits = 0; // first sample
         } else {
-            const real delta = std::abs(curr - prev_domain_flucmag);
+            const real delta = std::abs(curr - prev_domain_fluc_rms);
             stable_hits = (delta <= fluc_tol) ? (stable_hits + 1) : 0;
         }
 
-        prev_domain_flucmag  = curr;
+        prev_domain_fluc_rms  = curr;
         next_fluc_check_time += fluc_check_period;
 
         if (stable_hits >= fluc_stable_required) {
             flucs_frozen  = true;
-            std::cout << means_frozen << std::endl;
+            std::cout << flucs_frozen << std::endl;
             fluc_freeze_time = t;
 
             // stop device-side accumulation
