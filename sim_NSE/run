@@ -17,7 +17,7 @@ BUILD_DIR="$PROJECT_DIR/build"
 # parse command line arguments
 if [[ "$#" == "0" ]]; then
     echo "Usage: $0 SIM [args...]" >&2
-    echo "For example: $0 sim2d_1 4" >&2
+    echo "For example: $0 sim_1 4" >&2
     exit 1
 fi
 TARGET="$1"
@@ -27,9 +27,14 @@ if [[ ! -f "$THIS_DIR/$TARGET.cu" ]]; then
     exit 1
 fi
 
-# CUDA arch list (override with: CUDA_ARCHS="60;61;70;75;80;86" ./run ...)
-CUDA_ARCHS="${CUDA_ARCHS:-60;61;70;75;80;86}"
+# configure the build
+if [[ ! -d "$BUILD_DIR" ]]; then
+    cmake -B "$BUILD_DIR" -S "$PROJECT_DIR" -DCMAKE_BUILD_TYPE=Release
+fi
+
+# build the target
+cmake --build "$BUILD_DIR" --target "$TARGET"
 
 # run the target
 echo "Running $TARGET $@"
-"$BUILD_DIR/sim_2D/$TARGET" "$@"
+"$BUILD_DIR/sim_NSE/$TARGET" "$@"
