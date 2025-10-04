@@ -2,3 +2,4 @@
 .cache/
 results_*/
 .vscode/
+__pycache__/
