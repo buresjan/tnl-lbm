@@ -15,6 +15,12 @@
 #include <filesystem>
 #include "lbm_common/fileutils.h"  // create_parent_directories
 
+namespace {
+// Toggle whether geometry type 1 cells should be treated as Bouzidi near-wall fluid by default.
+constexpr bool kDefaultUseBouzidiForType1 = true;
+bool gUseBouzidiForType1 = kDefaultUseBouzidiForType1;
+}
+
 // exactly one streaming header must be included
 #ifdef AA_PATTERN
 	#include "lbm3d/d2q9/streaming_AA.h"
@@ -305,7 +311,9 @@ struct StateLocal : State<NSE>
             typename BC::map_t mapval = BC::GEO_FLUID;
             switch (cell_type) {
                 case 0: mapval = BC::GEO_FLUID; break;
-                case 1: mapval = BC::GEO_FLUID; break;
+                case 1:
+                    mapval = gUseBouzidiForType1 ? BC::GEO_FLUID_NEAR_WALL : BC::GEO_FLUID;
+                    break;
                 case 2: mapval = BC::GEO_WALL; break;
                 default: mapval = BC::GEO_FLUID; break;
             }
@@ -970,6 +978,11 @@ int main(int argc, char** argv)
 	program.add_argument("resolution").help("resolution of the lattice").scan<'i', int>().default_value(1);
     program.add_argument("object_file").help("object file from sim_2D/ellipses (e.g. 8.txt)").default_value(std::string("sim_2D/ellipses/0.txt"));
     program.add_argument("--no-bouzidi").help("disable Bouzidi near-wall interpolation; treat near-wall as normal fluid").default_value(false).implicit_value(true);
+    program.add_argument("--type1-bouzidi")
+        .help("control whether geometry type 1 cells use Bouzidi ('on', 'off', or 'auto' to use build default)")
+        .choices("auto", "on", "off")
+        .default_value(std::string("auto"))
+        .nargs(1);
 
 	try {
 		program.parse_args(argc, argv);
@@ -983,10 +996,19 @@ int main(int argc, char** argv)
 	const auto resolution = program.get<int>("resolution");
     const auto object_file = program.get<std::string>("object_file");
     const bool no_bouzidi = program.get<bool>("no-bouzidi");
+    const auto type1_mode = program.get<std::string>("--type1-bouzidi");
 	if (resolution < 1) {
 		fmt::println(stderr, "CLI error: resolution must be at least 1");
 		return 1;
 	}
+
+    if (type1_mode == "on") {
+        gUseBouzidiForType1 = true;
+    } else if (type1_mode == "off") {
+        gUseBouzidiForType1 = false;
+    } else {
+        gUseBouzidiForType1 = kDefaultUseBouzidiForType1;
+    }
 
 	run(resolution, object_file, !no_bouzidi);
 

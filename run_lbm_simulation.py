@@ -48,6 +48,7 @@ class Submission:
     mem: str
     walltime: str
     job_name: str
+    type1_bouzidi: str
     job_id: Optional[str] = None
 
     @property
@@ -116,6 +117,7 @@ def build_sbatch_script(
     walltime: str,
     job_name: str,
     result_filename: str,
+    type1_bouzidi: str,
 ) -> str:
     stdout_name = "stdout.log"
     stderr_name = "stderr.log"
@@ -129,6 +131,8 @@ def build_sbatch_script(
     value_source = Path("sim_2D") / "values" / value_basename
     value_source_abs_quoted = shlex.quote(str(project_root / value_source))
     result_name_quoted = shlex.quote(result_filename)
+    type1_mode = ensure_ascii(type1_bouzidi)
+    type1_mode_quoted = shlex.quote(type1_mode)
 
     script = f"""#!/bin/bash
 #SBATCH --job-name={ensure_ascii(job_name)}
@@ -149,10 +153,16 @@ GEOMETRY_FILE={geometry_name_quoted}
 GEOMETRY_ABS={geometry_abs_quoted}
 VALUE_SOURCE={value_source_abs_quoted}
 RESULT_FILE={result_name_quoted}
+TYPE1_BOUZIDI={type1_mode_quoted}
+
+EXTRA_ARGS=()
+if [ "$TYPE1_BOUZIDI" != "auto" ]; then
+    EXTRA_ARGS+=(--type1-bouzidi "$TYPE1_BOUZIDI")
+fi
 
 rm -f "$VALUE_SOURCE"
 
-"$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS"
+"$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS" "${EXTRA_ARGS[@]}"
 
 if [ ! -f "$VALUE_SOURCE" ]; then
     echo "Result file $VALUE_SOURCE not produced" >&2
@@ -293,6 +303,7 @@ def prepare_submission(
     mem: str,
     runs_root: str,
     job_name: Optional[str],
+    type1_bouzidi: str,
 ) -> Submission:
     project_root = Path(__file__).resolve().parent
     geometry_path = resolve_geometry(geometry, project_root)
@@ -323,6 +334,7 @@ def prepare_submission(
         walltime=walltime,
         job_name=actual_job_name,
         result_filename=result_filename,
+        type1_bouzidi=type1_bouzidi,
     )
 
     sbatch_path = run_dir / "job.sbatch"
@@ -342,6 +354,7 @@ def prepare_submission(
         "result_file": result_filename,
         "prepared_at": prepared_at,
         "job_name": actual_job_name,
+        "type1_bouzidi": type1_bouzidi,
     }
     manifest_path = make_manifest(run_dir, manifest)
 
@@ -361,6 +374,7 @@ def prepare_submission(
         mem=mem,
         walltime=walltime,
         job_name=actual_job_name,
+        type1_bouzidi=type1_bouzidi,
     )
 
 
@@ -441,6 +455,7 @@ def submit_and_collect(
     mem: str = "16G",
     runs_root: str = "lbm_runs",
     job_name: Optional[str] = None,
+    type1_bouzidi: str = "auto",
     poll_interval: float = 30.0,
     timeout: Optional[float] = None,
     result_timeout: Optional[float] = None,
@@ -456,6 +471,7 @@ def submit_and_collect(
         mem=mem,
         runs_root=runs_root,
         job_name=job_name,
+        type1_bouzidi=type1_bouzidi,
     )
     submission = submit_prepared(submission)
     return collect_submission(
@@ -487,6 +503,12 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         "--runs-root",
         default="lbm_runs",
         help="Directory (relative to repo root) where run folders are created (default: lbm_runs).",
+    )
+    parser.add_argument(
+        "--type1-bouzidi",
+        choices=["auto", "on", "off"],
+        default="auto",
+        help="Control mapping of geometry type 1 cells to Bouzidi near-wall (auto|on|off); 'auto' uses build default.",
     )
     parser.add_argument(
         "--dry-run",
@@ -533,6 +555,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             mem=args.mem,
             runs_root=args.runs_root,
             job_name=args.job_name,
+            type1_bouzidi=args.type1_bouzidi,
         )
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
