@@ -308,7 +308,8 @@ def prepare_submission(
     shutil.copy2(geometry_path, staged_geometry_path)
 
     result_filename = f"tke_{run_id}.txt"
-    actual_job_name = job_name or f"lbm-{run_id}"
+    unique_suffix = run_id.rsplit("-", 1)[-1]
+    actual_job_name = job_name or f"lbm-{unique_suffix}"
     sbatch_text = build_sbatch_script(
         project_root=project_root,
         run_id=run_id,
