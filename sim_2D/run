@@ -27,12 +27,9 @@ if [[ ! -f "$THIS_DIR/$TARGET.cu" ]]; then
     exit 1
 fi
 
-# CUDA arch list (override with: CUDA_ARCHS="61;70;75;80;86" ./run ...)
-CUDA_ARCHS="${CUDA_ARCHS:-61;70;75;80;86}"
-
 # configure the build
 if [[ ! -d "$BUILD_DIR" ]]; then
-    cmake -B "$BUILD_DIR" -S "$PROJECT_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHS"
+    cmake -B "$BUILD_DIR" -S "$PROJECT_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="61;75;86"
 fi
 
 # build the target

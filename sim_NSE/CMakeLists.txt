@@ -2,10 +2,6 @@ set(POTENTIAL_TARGETS
         sim_1
         sim_2
         sim_3
-        sim_IBM1
-        sim_IBM2
-        sim_IBM3
-        sim_IBM4
 )
 
 foreach(target IN ITEMS ${POTENTIAL_TARGETS})
