@@ -12,7 +12,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
@@ -195,7 +195,7 @@ def update_manifest(run_dir: Path, updates: dict) -> dict:
 
 
 def generate_run_id() -> str:
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     suffix = uuid.uuid4().hex[:8]
     return f"run-{timestamp}-{suffix}"
 
@@ -328,7 +328,7 @@ def prepare_submission(
     sbatch_path = run_dir / "job.sbatch"
     sbatch_path.write_text(sbatch_text, encoding="ascii")
 
-    prepared_at = datetime.utcnow().isoformat() + "Z"
+    prepared_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     manifest = {
         "run_id": run_id,
         "geometry_source": str(geometry_path),
@@ -374,7 +374,7 @@ def submit_prepared(submission: Submission, *, dry_run: bool = False) -> Submiss
         submission.run_dir,
         {
             "job_id": job_id,
-            "submitted_at": datetime.utcnow().isoformat() + "Z",
+            "submitted_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         },
     )
     return submission
@@ -397,7 +397,7 @@ def collect_submission(
         timeout=timeout,
         progress_callback=progress_callback,
     )
-    finished_at = datetime.utcnow().isoformat() + "Z"
+    finished_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     update_manifest(
         submission.run_dir,
         {
