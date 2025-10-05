@@ -8,7 +8,7 @@ import csv
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import run_lbm_simulation
 
@@ -22,6 +22,9 @@ class GeometryRecord:
     tke_value: str = ""
     state: str = "PENDING"
     error: Optional[str] = None
+
+
+BATCH_SIZE = 4
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,8 +93,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--type1-bouzidi",
         choices=["auto", "on", "off"],
-        default="on",
-        help="Value for --type1-bouzidi passed to run_lbm_simulation (default: on).",
+        default="auto",
+        help="Value for --type1-bouzidi passed to run_lbm_simulation (default: auto).",
     )
     parser.add_argument(
         "--poll-interval",
@@ -121,9 +124,15 @@ def parse_args() -> argparse.Namespace:
 
 def submit_geometries(
     args: argparse.Namespace,
+    *,
+    batch_size: int = BATCH_SIZE,
+    batch_callback: Optional[
+        Callable[[list[tuple[GeometryRecord, run_lbm_simulation.Submission]]], None]
+    ] = None,
 ) -> tuple[list[GeometryRecord], list[tuple[GeometryRecord, run_lbm_simulation.Submission]]]:
     records: list[GeometryRecord] = []
     submissions: list[tuple[GeometryRecord, run_lbm_simulation.Submission]] = []
+    batch: list[tuple[GeometryRecord, run_lbm_simulation.Submission]] = []
 
     for geometry_number in range(args.start, args.end + 1):
         geometry_name = f"{geometry_number}.txt"
@@ -184,7 +193,15 @@ def submit_geometries(
         record.job_id = submission.job_id
         record.state = "SUBMITTED"
         submissions.append((record, submission))
+        batch.append((record, submission))
         print(f"  -> submitted job_id={record.job_id} run_id={record.run_id}")
+
+        if batch_callback and len(batch) >= batch_size:
+            batch_callback(batch.copy())
+            batch.clear()
+
+    if batch_callback and batch:
+        batch_callback(batch.copy())
 
     return records, submissions
 
@@ -256,20 +273,27 @@ def main() -> int:
         print("--start must be <= --end", file=sys.stderr)
         return 2
 
-    records, submissions = submit_geometries(args)
+    def wait_for_batch(
+        batch: list[tuple[GeometryRecord, run_lbm_simulation.Submission]]
+    ) -> None:
+        collect_results(
+            batch,
+            poll_interval=args.poll_interval,
+            timeout=args.timeout,
+            result_timeout=args.result_timeout,
+        )
+
+    records, submissions = submit_geometries(
+        args,
+        batch_size=BATCH_SIZE,
+        batch_callback=None if args.dry_run else wait_for_batch,
+    )
 
     if args.dry_run:
         print(
             f"Prepared {len(submissions)} submissions (dry run); skipping wait and CSV output."
         )
         return 0
-
-    collect_results(
-        submissions,
-        poll_interval=args.poll_interval,
-        timeout=args.timeout,
-        result_timeout=args.result_timeout,
-    )
 
     write_csv(records, args.output)
     return 0
