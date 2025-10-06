@@ -162,7 +162,11 @@ fi
 
 rm -f "$VALUE_SOURCE"
 
-"$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
+# run the solver from the repo root so values land under sim_2D/values
+(
+    cd "$PROJECT_ROOT"
+    "$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
+)
 
 if [ ! -f "$VALUE_SOURCE" ]; then
     echo "Result file $VALUE_SOURCE not produced" >&2
