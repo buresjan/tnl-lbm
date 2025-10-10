@@ -336,9 +336,18 @@ struct StateLocal : State<NSE>
             bool assigned = false;
             for (auto& block : nse.blocks) {
                 if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
-                const auto lx = (idx)xi - block.offset.x();
-                const auto ly = (idx)yi - block.offset.y();
-                const auto lz = 0 - block.offset.z();
+                if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
+                    spdlog::error("Bouzidi host array not allocated for block with offset=({}, {}, {})", block.offset.x(), block.offset.y(), block.offset.z());
+                    bouzidi_assign_warnings++;
+                }
+#ifdef HAVE_MPI
+                auto coeff_view = block.hBouzidi.getLocalView();
+#else
+                auto coeff_view = block.hBouzidi.getView();
+#endif
+                const idx lx = (idx)xi - block.offset.x();
+                const idx ly = (idx)yi - block.offset.y();
+                const idx lz = 0 - block.offset.z();
                 if ((lx < 0 || lx >= block.local.x() || ly < 0 || ly >= block.local.y() || lz < 0 || lz >= block.local.z()) &&
                     bouzidi_assign_warnings < 5) {
                     spdlog::error(
@@ -358,13 +367,9 @@ struct StateLocal : State<NSE>
                     );
                     bouzidi_assign_warnings++;
                 }
-                if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
-                    spdlog::error("Bouzidi host array not allocated for block with offset=({}, {}, {})", block.offset.x(), block.offset.y(), block.offset.z());
-                    bouzidi_assign_warnings++;
-                }
                 for (int d = 0; d < 8; ++d) {
                     // Directions order per user spec mapped to indices 0..7
-                    block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
+                    coeff_view(d, lx, ly, lz) = (typename TRAITS::dreal) c[d];
                 }
                 coeff_sets++;
                 assigned = true;
@@ -406,6 +411,12 @@ struct StateLocal : State<NSE>
         if (parse_errors > 0 || out_of_range > 0 || near_boundary_nearwall > 0) {
             spdlog::warn("While loading object: parse_errors={}, out_of_range={}, near_boundary_nearwall={}",
                          parse_errors, out_of_range, near_boundary_nearwall);
+        }
+
+        for (auto& block : nse.blocks) {
+            if (block.dBouzidi.getData() != nullptr) {
+                block.dBouzidi = block.hBouzidi;
+            }
         }
     }
 
