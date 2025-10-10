@@ -337,39 +337,17 @@ struct StateLocal : State<NSE>
             for (auto& block : nse.blocks) {
                 if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
                 if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
-                    spdlog::error("Bouzidi host array not allocated for block with offset=({}, {}, {})", block.offset.x(), block.offset.y(), block.offset.z());
-                    bouzidi_assign_warnings++;
-                }
-#ifdef HAVE_MPI
-                auto coeff_view = block.hBouzidi.getLocalView();
-#else
-                auto coeff_view = block.hBouzidi.getView();
-#endif
-                const idx lx = (idx)xi - block.offset.x();
-                const idx ly = (idx)yi - block.offset.y();
-                const idx lz = 0 - block.offset.z();
-                if ((lx < 0 || lx >= block.local.x() || ly < 0 || ly >= block.local.y() || lz < 0 || lz >= block.local.z()) &&
-                    bouzidi_assign_warnings < 5) {
                     spdlog::error(
-                        "Bouzidi local index out of range: global=({},{},{}), local=({},{},{}), offset=({},{},{}), block local=({},{},{})",
-                        xi,
-                        yi,
-                        0,
-                        lx,
-                        ly,
-                        lz,
+                        "Bouzidi host array not allocated for block with offset=({}, {}, {})",
                         block.offset.x(),
                         block.offset.y(),
-                        block.offset.z(),
-                        block.local.x(),
-                        block.local.y(),
-                        block.local.z()
+                        block.offset.z()
                     );
                     bouzidi_assign_warnings++;
                 }
                 for (int d = 0; d < 8; ++d) {
                     // Directions order per user spec mapped to indices 0..7
-                    coeff_view(d, lx, ly, lz) = (typename TRAITS::dreal) c[d];
+                    block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
                 }
                 coeff_sets++;
                 assigned = true;
@@ -393,14 +371,15 @@ struct StateLocal : State<NSE>
         bool dims_ok = (infer_X == X && infer_Y == Y);
         bool count_ok = (count == (long long)X * (long long)Y);
         spdlog::info(
-            "Geometry load stats: rows={}, inferred dims={} x {}, type sets={}, coeff sets={}, parse errors={}, out-of-range={}",
+            "Geometry load stats: rows={}, inferred dims={} x {}, type sets={}, coeff sets={}, parse errors={}, out-of-range={}, geometry='{}'",
             count,
             (long long)infer_X,
             (long long)infer_Y,
             type_sets,
             coeff_sets,
             parse_errors,
-            out_of_range
+            out_of_range,
+            path.string()
         );
         if (!dims_ok || !count_ok) {
             spdlog::error("Object grid mismatch or incomplete: file dim=({},{}) inferred from max coords, count={} vs expected {}x{}={}.",

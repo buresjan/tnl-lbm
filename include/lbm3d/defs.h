@@ -221,8 +221,8 @@ struct LBM_CONFIG
 
 	using hmacro_array_t = TNL::Containers::DistributedNDArray<__hmacro_array_t>;
 	using dmacro_array_t = TNL::Containers::DistributedNDArray<__dmacro_array_t>;
-	using hbouzidi_array_t = TNL::Containers::DistributedNDArray<__hbouzidi_array_t>;
-	using dbouzidi_array_t = TNL::Containers::DistributedNDArray<__dbouzidi_array_t>;
+	using hbouzidi_array_t = __hbouzidi_array_t;
+	using dbouzidi_array_t = __dbouzidi_array_t;
 #else
 	using hmap_array_t = __hmap_array_t;
 	using dmap_array_t = __dmap_array_t;
