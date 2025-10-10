@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Batch submit LBM simulations for numbered geometries and collect TKE results."""
+"""Batch submit LBM simulations for numbered geometries and collect TKE results.
+
+The script is a thin orchestrator around :mod:`run_lbm_simulation`.  It will:
+
+1. Generate one submission per numbered geometry (``0.txt``, ``1.txt``, …).
+2. Submit the jobs to Slurm, waiting in configurable batches so we do not overload the queue.
+3. Write a CSV file that captures the Run ID and TKE integral for each geometry.
+
+Usage example::
+
+    python run_all_geometries.py --start 0 --end 180 --resolution 8 --wait
+
+Pass ``--dry-run`` to inspect the jobs that *would* be submitted without actually
+contacting Slurm.  All heavy lifting happens in :func:`run_lbm_simulation.prepare_submission`.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +29,8 @@ import run_lbm_simulation
 
 @dataclass
 class GeometryRecord:
+    """Capture submission state for a single geometry."""
+
     geometry_number: int
     geometry_name: str
     run_id: str = ""
@@ -28,6 +44,7 @@ BATCH_SIZE = 6
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description=(
             "Submit run_lbm_simulation jobs for a range of numbered geometries "
@@ -130,6 +147,7 @@ def submit_geometries(
         Callable[[list[tuple[GeometryRecord, run_lbm_simulation.Submission]]], None]
     ] = None,
 ) -> tuple[list[GeometryRecord], list[tuple[GeometryRecord, run_lbm_simulation.Submission]]]:
+    """Prepare and submit jobs for all geometries, streaming batches via ``batch_callback``."""
     records: list[GeometryRecord] = []
     submissions: list[tuple[GeometryRecord, run_lbm_simulation.Submission]] = []
     batch: list[tuple[GeometryRecord, run_lbm_simulation.Submission]] = []
@@ -197,10 +215,12 @@ def submit_geometries(
         print(f"  -> submitted job_id={record.job_id} run_id={record.run_id}")
 
         if batch_callback and len(batch) >= batch_size:
+            # Hand off a copy so the callback can mutate without affecting us.
             batch_callback(batch.copy())
             batch.clear()
 
     if batch_callback and batch:
+        # Flush any leftovers smaller than ``batch_size``.
         batch_callback(batch.copy())
 
     return records, submissions
@@ -213,6 +233,7 @@ def collect_results(
     timeout: Optional[float],
     result_timeout: Optional[float],
 ) -> None:
+    """Consume a collection of submissions, waiting for results."""
     for record, submission in submissions:
         if submission.job_id is None:
             continue
@@ -252,6 +273,7 @@ def collect_results(
 
 
 def write_csv(records: list[GeometryRecord], output_path: Path) -> None:
+    """Persist the aggregated TKE values for later analysis."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -268,6 +290,7 @@ def write_csv(records: list[GeometryRecord], output_path: Path) -> None:
 
 
 def main() -> int:
+    """CLI entry point."""
     args = parse_args()
     if args.start > args.end:
         print("--start must be <= --end", file=sys.stderr)
@@ -276,6 +299,7 @@ def main() -> int:
     def wait_for_batch(
         batch: list[tuple[GeometryRecord, run_lbm_simulation.Submission]]
     ) -> None:
+        """Collect results for the current batch before submitting more work."""
         collect_results(
             batch,
             poll_interval=args.poll_interval,

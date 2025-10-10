@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
-"""Submit and collect 2D LBM simulations on Slurm."""
+"""Submit and collect 2D LBM simulations on Slurm.
+
+This script is intended to be both an importable helper module and a small CLI.
+The typical lifecycle is:
+
+1. Locate and copy a geometry file into a dedicated run directory.
+2. Generate an ``sbatch`` file that launches ``sim_2D/run`` with the requested
+   resolution and optional solver flags.
+3. Submit the job to Slurm and (optionally) wait until a numerical result is
+   produced.
+
+The CLI exposes these steps with sensible defaults::
+
+    python run_lbm_simulation.py 32.txt 8 --wait
+
+For programmatic use, ``prepare_submission`` returns a :class:`Submission`
+object that can be fed into ``submit_prepared`` and ``collect_submission``.
+"""
 
 from __future__ import annotations
 
@@ -33,6 +50,8 @@ FAILED_STATES = {
 
 @dataclass
 class Submission:
+    """Describe the on-disk artefacts and scheduler metadata for a run."""
+
     project_root: Path
     run_id: str
     run_dir: Path
@@ -58,6 +77,8 @@ class Submission:
 
 @dataclass
 class SimulationResult:
+    """Capture the essential data produced by a finished run."""
+
     job_id: str
     run_id: str
     run_dir: Path
@@ -69,7 +90,7 @@ class SimulationResult:
 
 
 def resolve_geometry(name: str, project_root: Path) -> Path:
-    """Locate the geometry file ignoring case within known directories."""
+    """Locate a geometry file, performing a case-insensitive search."""
     candidate = Path(name)
     if candidate.is_absolute() and candidate.is_file():
         return candidate
@@ -96,6 +117,7 @@ def resolve_geometry(name: str, project_root: Path) -> Path:
 
 
 def ensure_ascii(text: str) -> str:
+    """Validate that ``text`` contains ASCII characters only."""
     try:
         text.encode("ascii")
     except UnicodeEncodeError as exc:
@@ -119,6 +141,7 @@ def build_sbatch_script(
     result_filename: str,
     type1_bouzidi: str,
 ) -> str:
+    """Return the contents of the ``sbatch`` script for a single run."""
     stdout_name = "stdout.log"
     stderr_name = "stderr.log"
 
@@ -180,7 +203,43 @@ echo "Stored result in $RESULT_FILE"
     return script
 
 
+def iso_timestamp() -> str:
+    """Return the current UTC time as an ISO-8601 string with a ``Z`` suffix."""
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def create_run_directory(project_root: Path, runs_root: str, run_id: str) -> Path:
+    """Create and return the fresh run directory."""
+    run_root = project_root / runs_root
+    run_root.mkdir(parents=True, exist_ok=True)
+    run_dir = run_root / run_id
+    run_dir.mkdir(parents=False, exist_ok=False)
+    return run_dir
+
+
+def stage_geometry_file(geometry_path: Path, run_dir: Path, run_id: str) -> Path:
+    """Copy the geometry into the run directory with a unique prefix."""
+    staged_name = f"{run_id}_{geometry_path.name}"
+    staged_path = run_dir / staged_name
+    shutil.copy2(geometry_path, staged_path)
+    return staged_path
+
+
+def write_sbatch(run_dir: Path, script_text: str) -> Path:
+    """Persist the generated ``sbatch`` script."""
+    sbatch_path = run_dir / "job.sbatch"
+    sbatch_path.write_text(script_text, encoding="ascii")
+    return sbatch_path
+
+
+def default_job_name(run_id: str) -> str:
+    """Create a short, stable job name from a run identifier."""
+    unique_suffix = run_id.rsplit("-", 1)[-1]
+    return f"lbm-{unique_suffix}"
+
+
 def submit_job(sbatch_path: Path) -> str:
+    """Submit the given ``sbatch`` script and return the Slurm job id."""
     proc = subprocess.run(
         ["sbatch", "--parsable", sbatch_path.name],
         cwd=sbatch_path.parent,
@@ -192,12 +251,14 @@ def submit_job(sbatch_path: Path) -> str:
 
 
 def make_manifest(run_dir: Path, data: dict) -> Path:
+    """Write the manifest JSON file and return its path."""
     manifest_path = run_dir / "manifest.json"
     manifest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return manifest_path
 
 
 def update_manifest(run_dir: Path, updates: dict) -> dict:
+    """Merge updates into the manifest JSON file and return the combined data."""
     manifest_path = run_dir / "manifest.json"
     if manifest_path.exists():
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -209,12 +270,14 @@ def update_manifest(run_dir: Path, updates: dict) -> dict:
 
 
 def generate_run_id() -> str:
+    """Create a monotonic, collisions-resistant identifier."""
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     suffix = uuid.uuid4().hex[:8]
     return f"run-{timestamp}-{suffix}"
 
 
 def query_job_state(job_id: str) -> str:
+    """Return Slurm's best-known state for ``job_id``."""
     def first_nonempty(text: str) -> Optional[str]:
         for line in text.splitlines():
             stripped = line.strip()
@@ -253,6 +316,7 @@ def wait_for_job_completion(
     timeout: Optional[float] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> str:
+    """Poll Slurm until the job reaches a terminal state."""
     poll_interval = max(poll_interval, 1.0)
     deadline = time.monotonic() + timeout if timeout else None
     last_state = ""
@@ -277,6 +341,7 @@ def wait_for_result_file(
     poll_interval: float = 5.0,
     timeout: Optional[float] = None,
 ) -> Path:
+    """Wait until ``path`` exists on disk."""
     poll_interval = max(poll_interval, 1.0)
     deadline = time.monotonic() + timeout if timeout else None
     while True:
@@ -288,6 +353,7 @@ def wait_for_result_file(
 
 
 def read_result_file(path: Path) -> tuple[str, Optional[float]]:
+    """Return the raw text and optional float value stored in ``path``."""
     raw = path.read_text(encoding="ascii").strip()
     try:
         numeric = float(raw)
@@ -309,22 +375,16 @@ def prepare_submission(
     job_name: Optional[str],
     type1_bouzidi: str,
 ) -> Submission:
+    """Prepare on-disk artefacts for a single Slurm submission."""
     project_root = Path(__file__).resolve().parent
     geometry_path = resolve_geometry(geometry, project_root)
 
     run_id = generate_run_id()
-    run_root = project_root / runs_root
-    run_root.mkdir(parents=True, exist_ok=True)
-    run_dir = run_root / run_id
-    run_dir.mkdir(parents=False, exist_ok=False)
-
-    staged_geometry_name = f"{run_id}_{geometry_path.name}"
-    staged_geometry_path = run_dir / staged_geometry_name
-    shutil.copy2(geometry_path, staged_geometry_path)
+    run_dir = create_run_directory(project_root, runs_root, run_id)
+    staged_geometry_path = stage_geometry_file(geometry_path, run_dir, run_id)
 
     result_filename = f"tke_{run_id}.txt"
-    unique_suffix = run_id.rsplit("-", 1)[-1]
-    actual_job_name = job_name or f"lbm-{unique_suffix}"
+    actual_job_name = job_name or default_job_name(run_id)
     sbatch_text = build_sbatch_script(
         project_root=project_root,
         run_id=run_id,
@@ -341,10 +401,9 @@ def prepare_submission(
         type1_bouzidi=type1_bouzidi,
     )
 
-    sbatch_path = run_dir / "job.sbatch"
-    sbatch_path.write_text(sbatch_text, encoding="ascii")
+    sbatch_path = write_sbatch(run_dir, sbatch_text)
 
-    prepared_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    prepared_at = iso_timestamp()
     manifest = {
         "run_id": run_id,
         "geometry_source": str(geometry_path),
@@ -383,6 +442,7 @@ def prepare_submission(
 
 
 def submit_prepared(submission: Submission, *, dry_run: bool = False) -> Submission:
+    """Submit a prepared run directory to Slurm unless ``dry_run`` is set."""
     if dry_run:
         return submission
 
@@ -392,7 +452,7 @@ def submit_prepared(submission: Submission, *, dry_run: bool = False) -> Submiss
         submission.run_dir,
         {
             "job_id": job_id,
-            "submitted_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "submitted_at": iso_timestamp(),
         },
     )
     return submission
@@ -406,6 +466,7 @@ def collect_submission(
     result_timeout: Optional[float] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> SimulationResult:
+    """Block until the submitted job has finished and a result file is available."""
     if not submission.job_id:
         raise ValueError("Cannot collect submission without a job id.")
 
@@ -415,7 +476,7 @@ def collect_submission(
         timeout=timeout,
         progress_callback=progress_callback,
     )
-    finished_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    finished_at = iso_timestamp()
     update_manifest(
         submission.run_dir,
         {
@@ -465,6 +526,7 @@ def submit_and_collect(
     result_timeout: Optional[float] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> SimulationResult:
+    """Convenience helper that prepares, submits, and collects in one call."""
     submission = prepare_submission(
         geometry=geometry,
         resolution=resolution,
@@ -488,6 +550,7 @@ def submit_and_collect(
 
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
+    """Return command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Submit sim2d_2 runs to Slurm and manage per-run outputs.",
     )
@@ -546,6 +609,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
+    """CLI entry point."""
     args = parse_args(argv)
 
     try:
