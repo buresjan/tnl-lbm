@@ -118,6 +118,18 @@ struct Traits
 using TraitsSP = Traits<float>;	 //_dreal is float only
 using TraitsDP = Traits<double>;
 
+// KernelStruct - D2Q9
+template <typename REAL>
+struct D2Q9_KernelStruct
+{
+	static constexpr int D = 2;
+	static constexpr int Q = 9;
+	REAL f[Q];
+	REAL fx = 0, fy = 0;
+	REAL vx = 0, vy = 0;
+	REAL rho = 1.0, lbmViscosity = 1.0;
+};
+
 // KernelStruct - D3Q7
 template <typename REAL>
 struct D3Q7_KernelStruct
@@ -235,6 +247,21 @@ struct LBM_CONFIG
 //#define USE_GALILEAN_CORRECTION // Geier 2015: use Gal correction in BKG and CUM?
 //#define USE_GEIER_CUM_2017 // use Geier 2017 Cummulant improvement A,B terms
 //#define USE_GEIER_CUM_ANTIALIAS // use antialiasing Dxu, Dyv, Dzw from Geier 2015/2017
+
+enum : std::uint8_t
+{
+	// Q5
+	zz = 0,
+	pz = 1,
+	mz = 2,
+	zp = 3,
+	zm = 4,
+	// +Q9
+	pp = 5,
+	mm = 6,
+	pm = 7,
+	mp = 8,
+};
 
 // NOTE: df_sync_directions must be kept consistent with this enum!
 enum : std::uint8_t
