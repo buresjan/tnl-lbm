@@ -102,6 +102,7 @@ def resolve_geometry(name: str, project_root: Path) -> Path:
     target_lower = candidate.name.lower()
     search_roots: Iterable[Path] = (
         project_root / "sim_2D",
+        project_root / "sim_2D" / "geometries",
         project_root / "sim_2D" / "ellipses",
         project_root / "geometries",
     )
@@ -110,9 +111,10 @@ def resolve_geometry(name: str, project_root: Path) -> Path:
             for path in root.rglob("*"):
                 if path.is_file() and path.name.lower() == target_lower:
                     return path
-
+    search_list = ", ".join(str(root) for root in search_roots if root.exists())
     raise FileNotFoundError(
-        f"Geometry file '{name}' not found (case-insensitive search)."
+        f"Geometry file '{name}' not found (case-insensitive search). "
+        f"Searched: {search_list or 'no geometry directories present'}."
     )
 
 
