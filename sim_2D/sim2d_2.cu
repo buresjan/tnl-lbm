@@ -273,6 +273,14 @@ struct StateLocal : State<NSE>
             spdlog::error("Failed to open object file: {}", path.string());
             throw std::runtime_error("Cannot open object file");
         }
+        const bool simulation_is_2d = (nse.lat.global.z() == 1);
+        spdlog::info(
+            "Opened geometry file '{}' (resolved path '{}'); file dimension=2D, simulation dimension={} -> {}",
+            fileArg,
+            path.string(),
+            simulation_is_2d ? "2D" : "3D",
+            simulation_is_2d ? "match" : "mismatch"
+        );
 
         long long count = 0;
         long long out_of_range = 0;
@@ -313,9 +321,15 @@ struct StateLocal : State<NSE>
                 // Validate theta range: allow -1 (sentinel) or [0,1]. If any > 1, abort.
                 for (int d = 0; d < 8; ++d) {
                     if (c[d] > 1.0) {
-                        spdlog::error("Invalid Bouzidi theta > 1 at line {} (x={}, y={}, dir={}, theta={}) in {}",
-                                       (long long)line_no, xi, yi, d, c[d], path.string());
-                        throw std::runtime_error("Bouzidi theta out of range (>1)");
+                        throw std::runtime_error(fmt::format(
+                            "Bouzidi theta out of range (>1) at line {} (x={}, y={}, dir={}, theta={}) in {}",
+                            (long long)line_no,
+                            xi,
+                            yi,
+                            d,
+                            c[d],
+                            path.string()
+                        ));
                     }
                 }
                 count++;
@@ -346,36 +360,14 @@ struct StateLocal : State<NSE>
                 }
 
                 // Store Bouzidi coefficients (always store; -1 used as sentinel as provided)
-                static int bouzidi_assign_warnings = 0;
-                bool assigned = false;
                 for (auto& block : nse.blocks) {
                     if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
-                    if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
-                        spdlog::error(
-                            "Bouzidi host array not allocated for block with offset=({}, {}, {})",
-                            block.offset.x(),
-                            block.offset.y(),
-                            block.offset.z()
-                        );
-                        bouzidi_assign_warnings++;
-                    }
                     for (int d = 0; d < 8; ++d) {
                         // Directions order per user spec mapped to indices 0..7
                         block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
                     }
                     coeff_sets++;
-                    assigned = true;
                     break;
-                }
-                if (!assigned && bouzidi_assign_warnings < 5) {
-                    spdlog::error(
-                        "Bouzidi coefficients for global cell ({},{},{}) did not match any block (blocks={} entries).",
-                        xi,
-                        yi,
-                        0,
-                        nse.blocks.size()
-                    );
-                    bouzidi_assign_warnings++;
                 }
             }
         } catch (const std::exception& err) {
