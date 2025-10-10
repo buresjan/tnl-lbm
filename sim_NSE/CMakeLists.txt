@@ -1,7 +1,5 @@
 set(POTENTIAL_TARGETS
-        sim_1
         sim_2
-        sim_3
 )
 
 foreach(target IN ITEMS ${POTENTIAL_TARGETS})
