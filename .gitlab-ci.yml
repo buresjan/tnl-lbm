@@ -1,4 +1,5 @@
 default:
+  interruptible: true
   image: "jlk.fjfi.cvut.cz:5000/fjfi-mmg/archlinux-tnl-cuda:latest"
   before_script:
     # make sure that $PATH and other essential variables are set correctly
@@ -19,7 +20,16 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
 stages:
+  - lint
   - build
+
+typos:
+  stage: lint
+  image: "quay.io/archlinux/archlinux:base"
+  before_script:
+    - pacman -Syu --needed --noconfirm typos
+  script:
+    - typos --color always --sort
 
 build_Release:
   stage: build
