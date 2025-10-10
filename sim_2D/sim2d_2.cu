@@ -264,14 +264,15 @@ struct StateLocal : State<NSE>
         // Allocate Bouzidi arrays across blocks
         nse.allocateBouzidiCoeffArrays();
 
+        const auto X = nse.lat.global.x();
+        const auto Y = nse.lat.global.y();
+        spdlog::info("Loading geometry '{}' (resolved path '{}'), expected domain {} x {}", fileArg, path.string(), X, Y);
+
         std::ifstream fin(path);
         if (!fin) {
             spdlog::error("Failed to open object file: {}", path.string());
             throw std::runtime_error("Cannot open object file");
         }
-
-        const auto X = nse.lat.global.x();
-        const auto Y = nse.lat.global.y();
 
         long long count = 0;
         long long out_of_range = 0;
@@ -347,6 +348,16 @@ struct StateLocal : State<NSE>
         const auto infer_Y = max_y + 1;
         bool dims_ok = (infer_X == X && infer_Y == Y);
         bool count_ok = (count == (long long)X * (long long)Y);
+        spdlog::info(
+            "Geometry load stats: rows={}, inferred dims={} x {}, type sets={}, coeff sets={}, parse errors={}, out-of-range={}",
+            count,
+            (long long)infer_X,
+            (long long)infer_Y,
+            type_sets,
+            coeff_sets,
+            parse_errors,
+            out_of_range
+        );
         if (!dims_ok || !count_ok) {
             spdlog::error("Object grid mismatch or incomplete: file dim=({},{}) inferred from max coords, count={} vs expected {}x{}={}.",
                           (long long)infer_X, (long long)infer_Y, count, (long long)X, (long long)Y, (long long)X * (long long)Y);
