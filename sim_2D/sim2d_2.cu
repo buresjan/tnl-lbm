@@ -332,14 +332,53 @@ struct StateLocal : State<NSE>
             }
 
             // Store Bouzidi coefficients (always store; -1 used as sentinel as provided)
+            static int bouzidi_assign_warnings = 0;
+            bool assigned = false;
             for (auto& block : nse.blocks) {
                 if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
+                const auto lx = (idx)xi - block.offset.x();
+                const auto ly = (idx)yi - block.offset.y();
+                const auto lz = 0 - block.offset.z();
+                if ((lx < 0 || lx >= block.local.x() || ly < 0 || ly >= block.local.y() || lz < 0 || lz >= block.local.z()) &&
+                    bouzidi_assign_warnings < 5) {
+                    spdlog::error(
+                        "Bouzidi local index out of range: global=({},{},{}), local=({},{},{}), offset=({},{},{}), block local=({},{},{})",
+                        xi,
+                        yi,
+                        0,
+                        lx,
+                        ly,
+                        lz,
+                        block.offset.x(),
+                        block.offset.y(),
+                        block.offset.z(),
+                        block.local.x(),
+                        block.local.y(),
+                        block.local.z()
+                    );
+                    bouzidi_assign_warnings++;
+                }
+                if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
+                    spdlog::error("Bouzidi host array not allocated for block with offset=({}, {}, {})", block.offset.x(), block.offset.y(), block.offset.z());
+                    bouzidi_assign_warnings++;
+                }
                 for (int d = 0; d < 8; ++d) {
                     // Directions order per user spec mapped to indices 0..7
                     block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
                 }
                 coeff_sets++;
+                assigned = true;
                 break;
+            }
+            if (!assigned && bouzidi_assign_warnings < 5) {
+                spdlog::error(
+                    "Bouzidi coefficients for global cell ({},{},{}) did not match any block (blocks={} entries).",
+                    xi,
+                    yi,
+                    0,
+                    nse.blocks.size()
+                );
+                bouzidi_assign_warnings++;
             }
         }
 
