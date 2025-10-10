@@ -91,8 +91,6 @@ void LBM<CONFIG>::allocateBouzidiCoeffArrays()
 {
     for (auto& block : blocks)
         block.allocateBouzidiCoeffArrays();
-	for (auto& block : blocks)
-		block.allocatePhiTransferDirectionArrays();
 }
 
 template <typename CONFIG>

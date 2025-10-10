@@ -739,10 +739,33 @@ void LBM_BLOCK<CONFIG>::allocatePhiTransferDirectionArrays()
 template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::allocateBouzidiCoeffArrays()
 {
-    // Allocate 8 x X x Y x Z arrays on host and device (no MPI distribution wiring for this aux array).
-    hBouzidi.setSizes(0, global.x(), global.y(), global.z());
-    dBouzidi.setSizes(0, global.x(), global.y(), global.z());
-	// Initialize to sentinel -1 for all entries and mirror to device buffer
+	// Allocate Bouzidi theta storage (8 directions × lattice) aligned with the local block layout.
+	hBouzidi.setSizes(0, global.x(), global.y(), global.z());
+	dBouzidi.setSizes(0, global.x(), global.y(), global.z());
+#ifdef HAVE_MPI
+	if (local.x() != global.x())
+		hBouzidi.getOverlaps().template setSize<1>(overlap_width);
+	if (local.y() != global.y())
+		hBouzidi.getOverlaps().template setSize<2>(overlap_width);
+	if (local.z() != global.z())
+		hBouzidi.getOverlaps().template setSize<3>(overlap_width);
+	hBouzidi.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+	hBouzidi.template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+	hBouzidi.template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
+	hBouzidi.allocate();
+
+	if (local.x() != global.x())
+		dBouzidi.getOverlaps().template setSize<1>(overlap_width);
+	if (local.y() != global.y())
+		dBouzidi.getOverlaps().template setSize<2>(overlap_width);
+	if (local.z() != global.z())
+		dBouzidi.getOverlaps().template setSize<3>(overlap_width);
+	dBouzidi.template setDistribution<1>(offset.x(), offset.x() + local.x(), communicator);
+	dBouzidi.template setDistribution<2>(offset.y(), offset.y() + local.y(), communicator);
+	dBouzidi.template setDistribution<3>(offset.z(), offset.z() + local.z(), communicator);
+	dBouzidi.allocate();
+#endif
+	// Initialize sentinels and mirror host → device.
 	hBouzidi.setValue((typename TRAITS::dreal) -1);
 	dBouzidi = hBouzidi;
 }
