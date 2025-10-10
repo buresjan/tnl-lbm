@@ -208,4 +208,3 @@ target_compile_definitions(TNL_LBM INTERFACE "-DUSE_CUDA")
 # Add project subdirectories
 add_subdirectory(include)
 add_subdirectory(sim_2D)
-add_subdirectory(sim_NSE)
