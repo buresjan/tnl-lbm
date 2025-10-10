@@ -284,85 +284,119 @@ struct StateLocal : State<NSE>
 
         std::string line;
         long long line_no = 0;
-        while (getline(fin, line)) {
-            if (line.empty()) continue;
-            std::istringstream iss(line);
-            long long xi, yi;
-            int cell_type;
-            double c[8];
-            if (!(iss >> xi >> yi >> cell_type >> c[0] >> c[1] >> c[2] >> c[3] >> c[4] >> c[5] >> c[6] >> c[7])) {
-                parse_errors++;
-                continue;
-            }
-            line_no++;
+        long long last_processed_line = 0;
+        long long last_x = -1;
+        long long last_y = -1;
+        int last_type = -1;
+        double last_coeffs[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
-            // Validate theta range: allow -1 (sentinel) or [0,1]. If any > 1, abort.
-            for (int d = 0; d < 8; ++d) {
-                if (c[d] > 1.0) {
-                    spdlog::error("Invalid Bouzidi theta > 1 at line {} (x={}, y={}, dir={}, theta={}) in {}",
-                                   (long long)line_no, xi, yi, d, c[d], path.string());
-                    throw std::runtime_error("Bouzidi theta out of range (>1)");
+        try {
+            while (getline(fin, line)) {
+                if (line.empty()) continue;
+                std::istringstream iss(line);
+                long long xi, yi;
+                int cell_type;
+                double c[8];
+                if (!(iss >> xi >> yi >> cell_type >> c[0] >> c[1] >> c[2] >> c[3] >> c[4] >> c[5] >> c[6] >> c[7])) {
+                    parse_errors++;
+                    continue;
                 }
-            }
-            count++;
-            if (xi >= 0 && yi >= 0) {
-                if (xi > max_x) max_x = (typename TRAITS::idx) xi;
-                if (yi > max_y) max_y = (typename TRAITS::idx) yi;
-            }
-            if (xi < 0 || yi < 0 || xi >= X || yi >= Y) {
-                out_of_range++;
-                continue;
-            }
+                line_no++;
+                last_processed_line = line_no;
+                last_x = xi;
+                last_y = yi;
+                last_type = cell_type;
+                for (int d = 0; d < 8; ++d) {
+                    last_coeffs[d] = c[d];
+                }
 
-            // Set map according to type
-            typename BC::map_t mapval = BC::GEO_FLUID;
-            switch (cell_type) {
-                case 0: mapval = BC::GEO_FLUID; break;
-                case 1:
-                    mapval = gUseBouzidiForType1 ? BC::GEO_FLUID_NEAR_WALL : BC::GEO_FLUID;
+                // Validate theta range: allow -1 (sentinel) or [0,1]. If any > 1, abort.
+                for (int d = 0; d < 8; ++d) {
+                    if (c[d] > 1.0) {
+                        spdlog::error("Invalid Bouzidi theta > 1 at line {} (x={}, y={}, dir={}, theta={}) in {}",
+                                       (long long)line_no, xi, yi, d, c[d], path.string());
+                        throw std::runtime_error("Bouzidi theta out of range (>1)");
+                    }
+                }
+                count++;
+                if (xi >= 0 && yi >= 0) {
+                    if (xi > max_x) max_x = (typename TRAITS::idx) xi;
+                    if (yi > max_y) max_y = (typename TRAITS::idx) yi;
+                }
+                if (xi < 0 || yi < 0 || xi >= X || yi >= Y) {
+                    out_of_range++;
+                    continue;
+                }
+
+                // Set map according to type
+                typename BC::map_t mapval = BC::GEO_FLUID;
+                switch (cell_type) {
+                    case 0: mapval = BC::GEO_FLUID; break;
+                    case 1:
+                        mapval = gUseBouzidiForType1 ? BC::GEO_FLUID_NEAR_WALL : BC::GEO_FLUID;
+                        break;
+                    case 2: mapval = BC::GEO_WALL; break;
+                    default: mapval = BC::GEO_FLUID; break;
+                }
+                nse.setMap((idx)xi, (idx)yi, 0, mapval);
+                type_sets++;
+                if (mapval == BC::GEO_FLUID_NEAR_WALL) {
+                    if (xi <= 0 || xi >= X - 1 || yi <= 0 || yi >= Y - 1)
+                        near_boundary_nearwall++;
+                }
+
+                // Store Bouzidi coefficients (always store; -1 used as sentinel as provided)
+                static int bouzidi_assign_warnings = 0;
+                bool assigned = false;
+                for (auto& block : nse.blocks) {
+                    if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
+                    if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
+                        spdlog::error(
+                            "Bouzidi host array not allocated for block with offset=({}, {}, {})",
+                            block.offset.x(),
+                            block.offset.y(),
+                            block.offset.z()
+                        );
+                        bouzidi_assign_warnings++;
+                    }
+                    for (int d = 0; d < 8; ++d) {
+                        // Directions order per user spec mapped to indices 0..7
+                        block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
+                    }
+                    coeff_sets++;
+                    assigned = true;
                     break;
-                case 2: mapval = BC::GEO_WALL; break;
-                default: mapval = BC::GEO_FLUID; break;
-            }
-            nse.setMap((idx)xi, (idx)yi, 0, mapval);
-            type_sets++;
-            if (mapval == BC::GEO_FLUID_NEAR_WALL) {
-                if (xi <= 0 || xi >= X - 1 || yi <= 0 || yi >= Y - 1)
-                    near_boundary_nearwall++;
-            }
-
-            // Store Bouzidi coefficients (always store; -1 used as sentinel as provided)
-            static int bouzidi_assign_warnings = 0;
-            bool assigned = false;
-            for (auto& block : nse.blocks) {
-                if (!block.isLocalIndex((idx)xi, (idx)yi, 0)) continue;
-                if (block.hBouzidi.getData() == nullptr && bouzidi_assign_warnings < 5) {
+                }
+                if (!assigned && bouzidi_assign_warnings < 5) {
                     spdlog::error(
-                        "Bouzidi host array not allocated for block with offset=({}, {}, {})",
-                        block.offset.x(),
-                        block.offset.y(),
-                        block.offset.z()
+                        "Bouzidi coefficients for global cell ({},{},{}) did not match any block (blocks={} entries).",
+                        xi,
+                        yi,
+                        0,
+                        nse.blocks.size()
                     );
                     bouzidi_assign_warnings++;
                 }
-                for (int d = 0; d < 8; ++d) {
-                    // Directions order per user spec mapped to indices 0..7
-                    block.hBouzidi(d, (idx)xi, (idx)yi, 0) = (typename TRAITS::dreal) c[d];
-                }
-                coeff_sets++;
-                assigned = true;
-                break;
             }
-            if (!assigned && bouzidi_assign_warnings < 5) {
-                spdlog::error(
-                    "Bouzidi coefficients for global cell ({},{},{}) did not match any block (blocks={} entries).",
-                    xi,
-                    yi,
-                    0,
-                    nse.blocks.size()
-                );
-                bouzidi_assign_warnings++;
-            }
+        } catch (const std::exception& err) {
+            spdlog::error(
+                "Exception while loading geometry '{}': line={} x={} y={} type={} coeffs=[{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f}] message={}",
+                path.string(),
+                last_processed_line,
+                last_x,
+                last_y,
+                last_type,
+                last_coeffs[0],
+                last_coeffs[1],
+                last_coeffs[2],
+                last_coeffs[3],
+                last_coeffs[4],
+                last_coeffs[5],
+                last_coeffs[6],
+                last_coeffs[7],
+                err.what()
+            );
+            throw;
         }
 
         // Basic dimension checks — ensure the file matches XxY domain
