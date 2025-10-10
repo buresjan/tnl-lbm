@@ -27,7 +27,10 @@ struct D2Q9_BC_All
 		GEO_SYM_BOTTOM,
 		GEO_SYM_LEFT,
 		GEO_SYM_RIGHT,
-		GEO_FLUID_NEAR_WALL
+		GEO_FLUID_NEAR_WALL,
+		GEO_TRANSFER_FS,
+		GEO_TRANSFER_SF,
+		GEO_TRANSFER_SW
 	};
 
 	__cuda_callable__ static bool isPeriodic(map_t mapgi)
@@ -43,6 +46,13 @@ struct D2Q9_BC_All
 	__cuda_callable__ static bool isWall(map_t mapgi)
 	{
 		return mapgi == GEO_WALL;
+	}
+
+	// D2Q9 setup does not expose any solid phase, but the generic LBM_BLOCK helper
+	// expects this predicate to exist (used for D3Q7 phi-transfer tagging). Return false.
+	__cuda_callable__ static bool isSolid(map_t)
+	{
+		return false;
 	}
 
 	// Bouzidi interpolation helper (only used for D2Q9 GEO_FLUID_NEAR_WALL)
