@@ -10,4 +10,4 @@ set -euo pipefail
 
 cd "$SLURM_SUBMIT_DIR"
 
-python3 run_all_geometries.py --start 0 --end 179 --type1-bouzidi auto
+python3 run_all_geometries.py --start 0 --end 179 --type1-bouzidi off
