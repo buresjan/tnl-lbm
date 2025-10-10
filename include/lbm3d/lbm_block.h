@@ -29,10 +29,6 @@ struct LBM_BLOCK
 	using hboollat_array_t = typename CONFIG::hboollat_array_t;
 	using dboollat_array_t = typename CONFIG::dboollat_array_t;
 
-	// Bouzidi coefficients: 8 directions x X x Y x Z
-	using hbouzidi_array_t = typename TRAITS::template array4d<8, typename TRAITS::dreal, TNL::Devices::Host>;
-	using dbouzidi_array_t = typename TRAITS::template array4d<8, typename TRAITS::dreal, DeviceType>;
-
 	// KernelData contains only the necessary data for the CUDA kernel. these are copied just before the kernel is called
 	typename CONFIG::DATA data;
 
@@ -57,10 +53,6 @@ struct LBM_BLOCK
 	// `allocatePhiTransferDirectionArrays` to initialize these arrays.
 	hboollat_array_t hphiTransferDirection;
 	dboollat_array_t dphiTransferDirection;
-
-	// Bouzidi coefficients
-	hbouzidi_array_t hBouzidi;
-	dbouzidi_array_t dBouzidi;
 
 	// distribution functions
 	hlat_array_t hfs[DFMAX];
@@ -183,7 +175,6 @@ struct LBM_BLOCK
 	void allocateDeviceData();
 	void allocateDiffusionCoefficientArrays();
 	void allocatePhiTransferDirectionArrays();
-	void allocateBouzidiCoeffArrays();
 
 	template <typename F>
 	void forLocalLatticeSites(F f);

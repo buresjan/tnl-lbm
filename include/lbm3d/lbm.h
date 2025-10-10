@@ -92,7 +92,6 @@ struct LBM
 	void allocateDeviceData();
 	void allocateDiffusionCoefficientArrays();
 	void allocatePhiTransferDirectionArrays();
-	void allocateBouzidiCoeffArrays();
 	void updateKernelData();  // copy physical parameters to data structure accessible by the CUDA kernel
 
 	template <typename F>
