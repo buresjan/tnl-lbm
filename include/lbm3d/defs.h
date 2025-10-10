@@ -203,6 +203,8 @@ struct LBM_CONFIG
 
 	using __hmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, TNL::Devices::Host>;
 	using __dmacro_array_t = typename TRAITS::template array4d<MACRO::N, typename TRAITS::dreal, DeviceType>;
+	using __hbouzidi_array_t = typename TRAITS::template array4d<8, typename TRAITS::dreal, TNL::Devices::Host>;
+	using __dbouzidi_array_t = typename TRAITS::template array4d<8, typename TRAITS::dreal, DeviceType>;
 
 #ifdef HAVE_MPI
 	using hmap_array_t = TNL::Containers::DistributedNDArray<__hmap_array_t>;
@@ -219,6 +221,8 @@ struct LBM_CONFIG
 
 	using hmacro_array_t = TNL::Containers::DistributedNDArray<__hmacro_array_t>;
 	using dmacro_array_t = TNL::Containers::DistributedNDArray<__dmacro_array_t>;
+	using hbouzidi_array_t = TNL::Containers::DistributedNDArray<__hbouzidi_array_t>;
+	using dbouzidi_array_t = TNL::Containers::DistributedNDArray<__dbouzidi_array_t>;
 #else
 	using hmap_array_t = __hmap_array_t;
 	using dmap_array_t = __dmap_array_t;
@@ -234,6 +238,8 @@ struct LBM_CONFIG
 
 	using hmacro_array_t = __hmacro_array_t;
 	using dmacro_array_t = __dmacro_array_t;
+	using hbouzidi_array_t = __hbouzidi_array_t;
+	using dbouzidi_array_t = __dbouzidi_array_t;
 #endif
 
 	using hmap_view_t = typename hmap_array_t::ViewType;

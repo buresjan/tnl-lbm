@@ -30,8 +30,8 @@ struct LBM_BLOCK
 	using dboollat_array_t = typename CONFIG::dboollat_array_t;
 
 	// Bouzidi coefficients: 8 directions x X x Y x Z
-	using hbouzidi_array_t = typename TRAITS::template array4d<8, typename TRAITS::dreal, TNL::Devices::Host>;
-	using dbouzidi_array_t = typename TRAITS::template array4d<8, typename TRAITS::dreal, DeviceType>;
+	using hbouzidi_array_t = typename CONFIG::hbouzidi_array_t;
+	using dbouzidi_array_t = typename CONFIG::dbouzidi_array_t;
 
 	// KernelData contains only the necessary data for the CUDA kernel. these are copied just before the kernel is called
 	typename CONFIG::DATA data;
