@@ -740,9 +740,8 @@ template <typename CONFIG>
 void LBM_BLOCK<CONFIG>::allocateBouzidiCoeffArrays()
 {
     // Allocate 8 x X x Y x Z arrays on host and device (no MPI distribution wiring for this aux array).
-    // First dimension is compile-time fixed (8 directions); pass 0 to respect static size.
-    hBouzidi.setSizes(0, global.x(), global.y(), global.z());
-    dBouzidi.setSizes(0, global.x(), global.y(), global.z());
+    hBouzidi.setSizes(global.x(), global.y(), global.z());
+    dBouzidi.setSizes(global.x(), global.y(), global.z());
 	// Initialize to sentinel -1 for all entries
 	hBouzidi.setValue((typename TRAITS::dreal) -1);
 }
