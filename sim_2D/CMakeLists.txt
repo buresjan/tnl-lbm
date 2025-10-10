@@ -1,5 +1,4 @@
 set(TARGETS
-    sim2d_1
     sim2d_2
 )
 
