@@ -12,8 +12,9 @@ Usage example::
     python run_all_geometries.py --start 0 --end 180 --resolution 8
 
 The script always waits for submitted jobs; use ``--dry-run`` to inspect the
-work that *would* be performed without contacting Slurm. All heavy lifting
-happens in :func:`run_lbm_simulation.prepare_submission`.
+work that *would* be performed without contacting Slurm. Ensure the solver
+binary is built once (``cmake --build build --target sim2d_2``) before running.
+All heavy lifting happens in :func:`run_lbm_simulation.prepare_submission`.
 """
 
 from __future__ import annotations

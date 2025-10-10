@@ -16,6 +16,13 @@ The CLI exposes these steps with sensible defaults::
 
 For programmatic use, ``prepare_submission`` returns a :class:`Submission`
 object that can be fed into ``submit_prepared`` and ``collect_submission``.
+
+The solver binary must be built ahead of time, for example::
+
+    cmake -S . -B build
+    cmake --build build --target sim2d_2
+
+If the binary is missing, submissions abort before hitting the queue.
 """
 
 from __future__ import annotations
@@ -68,6 +75,7 @@ class Submission:
     walltime: str
     job_name: str
     type1_bouzidi: str
+    solver_binary: Path
     job_id: Optional[str] = None
 
     @property
@@ -127,6 +135,11 @@ def ensure_ascii(text: str) -> str:
     return text
 
 
+def default_solver_binary(project_root: Path) -> Path:
+    """Return the expected path to the pre-built sim2d_2 binary."""
+    return project_root / "build" / "sim_2D" / "sim2d_2"
+
+
 def build_sbatch_script(
     *,
     project_root: Path,
@@ -142,13 +155,13 @@ def build_sbatch_script(
     job_name: str,
     result_filename: str,
     type1_bouzidi: str,
+    solver_binary: Path,
 ) -> str:
     """Return the contents of the ``sbatch`` script for a single run."""
     stdout_name = "stdout.log"
     stderr_name = "stderr.log"
 
     project_root_quoted = shlex.quote(str(project_root))
-    run_script_quoted = shlex.quote(str(project_root / "sim_2D" / "run"))
     geometry_name = staged_geometry.name
     geometry_name_quoted = shlex.quote(geometry_name)
     geometry_abs_quoted = shlex.quote(str(staged_geometry))
@@ -158,6 +171,7 @@ def build_sbatch_script(
     result_name_quoted = shlex.quote(result_filename)
     type1_mode = ensure_ascii(type1_bouzidi)
     type1_mode_quoted = shlex.quote(type1_mode)
+    solver_binary_quoted = shlex.quote(str(solver_binary))
 
     script = f"""#!/bin/bash
 #SBATCH --job-name={ensure_ascii(job_name)}
@@ -173,12 +187,12 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 
 PROJECT_ROOT={project_root_quoted}
-RUN_SCRIPT={run_script_quoted}
 GEOMETRY_FILE={geometry_name_quoted}
 GEOMETRY_ABS={geometry_abs_quoted}
 VALUE_SOURCE={value_source_abs_quoted}
 RESULT_FILE={result_name_quoted}
 TYPE1_BOUZIDI={type1_mode_quoted}
+SOLVER_BINARY={solver_binary_quoted}
 
 EXTRA_ARGS=()
 if [ "$TYPE1_BOUZIDI" != "auto" ]; then
@@ -187,10 +201,17 @@ fi
 
 rm -f "$VALUE_SOURCE"
 
+# make sure the solver exists; it must be pre-built via cmake
+if [ ! -x "$SOLVER_BINARY" ]; then
+    echo "Solver binary $SOLVER_BINARY is missing or not executable." >&2
+    echo "Build it first: cmake --build build --target sim2d_2" >&2
+    exit 3
+fi
+
 # run the solver from the repo root so values land under sim_2D/values
 (
     cd "$PROJECT_ROOT"
-    "$RUN_SCRIPT" sim2d_2 {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
+    "$SOLVER_BINARY" {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
 )
 
 if [ ! -f "$VALUE_SOURCE" ]; then
@@ -376,10 +397,18 @@ def prepare_submission(
     runs_root: str,
     job_name: Optional[str],
     type1_bouzidi: str,
+    solver_binary: Optional[Path] = None,
 ) -> Submission:
     """Prepare on-disk artefacts for a single Slurm submission."""
     project_root = Path(__file__).resolve().parent
     geometry_path = resolve_geometry(geometry, project_root)
+    solver_binary_path = Path(solver_binary) if solver_binary else default_solver_binary(project_root)
+    solver_binary_path = solver_binary_path.resolve()
+    if not solver_binary_path.is_file():
+        raise FileNotFoundError(
+            f"Solver binary '{solver_binary_path}' not found. "
+            "Build it first: cmake --build build --target sim2d_2."
+        )
 
     run_id = generate_run_id()
     run_dir = create_run_directory(project_root, runs_root, run_id)
@@ -401,6 +430,7 @@ def prepare_submission(
         job_name=actual_job_name,
         result_filename=result_filename,
         type1_bouzidi=type1_bouzidi,
+        solver_binary=solver_binary_path,
     )
 
     sbatch_path = write_sbatch(run_dir, sbatch_text)
@@ -420,6 +450,7 @@ def prepare_submission(
         "prepared_at": prepared_at,
         "job_name": actual_job_name,
         "type1_bouzidi": type1_bouzidi,
+        "solver_binary": str(solver_binary_path),
     }
     manifest_path = make_manifest(run_dir, manifest)
 
@@ -440,6 +471,7 @@ def prepare_submission(
         walltime=walltime,
         job_name=actual_job_name,
         type1_bouzidi=type1_bouzidi,
+        solver_binary=solver_binary_path,
     )
 
 
