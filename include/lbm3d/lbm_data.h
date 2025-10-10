@@ -69,9 +69,17 @@ struct LBM_Data
 	// Accessor for Bouzidi coefficients. 'dir' in [0..7] follows order:
 	// 0:east,1:north,2:west,3:south,4:ne,5:nw,6:sw,7:se. Pointer may be nullptr.
 
-	CUDA_HOSTDEV dreal& bouzidiCoeff(int dir, idx x, idx y, idx z)
+	CUDA_HOSTDEV dreal bouzidiCoeff(int dir, idx x, idx y, idx z) const
 	{
-		return bouzidi_coeff_ptr[dir * XYZ + indexer.getStorageIndex(x, y, z)];
+		if (bouzidi_coeff_ptr == nullptr)
+			return (dreal) -1;
+		if (dir < 0 || dir >= 8)
+			return (dreal) -1;
+		const idx storage_index = indexer.getStorageIndex(x, y, z);
+		if (storage_index < 0 || storage_index >= XYZ)
+			return (dreal) -1;
+		const idx offset = storage_index + (idx) dir * XYZ;
+		return bouzidi_coeff_ptr[offset];
 	}
 };
 
