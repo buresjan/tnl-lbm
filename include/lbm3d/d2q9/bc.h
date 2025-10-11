@@ -58,32 +58,29 @@ struct D2Q9_BC_All
 	// Bouzidi interpolation helper (only used for D2Q9 GEO_FLUID_NEAR_WALL)
 	// Returns the interpolated incoming DF using the coefficient theta for the given direction.
 	// If theta < 0 or neighbor indices are out of bounds, returns ordinary streaming from the opposite DF.
-    template <typename LBM_DATA>
-    __cuda_callable__ static dreal f_bouzidi(LBM_DATA& SD, dreal theta, int k, int k_opposite, idx x, idx y, idx z,
-                                           idx xff, idx yff, idx xs, idx ys)
-    {
-        const dreal one = (dreal)1.0;
-        const dreal two = (dreal)2.0;
-        const dreal half = (dreal)0.5;
+	template <typename LBM_DATA>
+	__cuda_callable__ static dreal f_bouzidi(
+		LBM_DATA& SD, dreal theta,
+		int k, int kbar,              // k = unknown incoming population, kbar = opposite(k)
+		idx xA, idx yA, idx zA,       // fluid boundary node x_fA
+		idx xB, idx yB                // interior neighbor x_fB = xA - e_k
+	){
+		const dreal half = (dreal)0.5;
 
-        // No Bouzidi on this dir -> ordinary streaming from opposite DF at neighbor
-        if (theta < (dreal)0)
-            return SD.df(df_cur, k_opposite, xs, ys, z);
+		// Link does not hit wall → keep normally streamed value.
+		if (theta < (dreal)0) return SD.df(df_cur, k, xA, yA, zA);
 
-        if (theta <= half) {
-			// (1 - 2*theta) * f_k(x+e, y+e) + (2*theta) * f_k(x, y)
-            dreal out = (one - two * theta) * SD.df(df_cur, k, xff, yff, z)
-                      + (two * theta) * SD.df(df_cur, k, x, y, z);
-            return out;
-        }
-        else {
-            // (1 - 1/(2*theta)) * f_k_opposite(x,y) + (1/(2*theta)) * f_k(x,y)
-            const dreal w = half / theta;
-            dreal out = (one - w) * SD.df(df_cur, k_opposite, x, y, z)
-                      + w * SD.df(df_cur, k, x, y, z);
-            return out;
-        }
-    }
+		const dreal fOppA = SD.df(df_cur, kbar, xA, yA, zA);
+
+		if (theta <= half) {
+			const dreal fOppB = SD.df(df_cur, kbar, xB, yB, zA);
+			return (dreal)2*theta * fOppA + ((dreal)1 - (dreal)2*theta) * fOppB;
+		} else {
+			const dreal w = half / theta;
+			const dreal fA = SD.df(df_cur, k, xA, yA, zA);
+			return ((dreal)1 - w) * fOppA + w * fA;
+		}
+	}
 
 	template <typename LBM_KS>
 	__cuda_callable__ static void preCollision(DATA& SD, LBM_KS& KS, map_t mapgi, idx xm, idx x, idx xp, idx ym, idx y, idx yp, idx zm, idx z, idx zp)
@@ -150,15 +147,15 @@ struct D2Q9_BC_All
                     const dreal th_sw = SD.bouzidiCoeff(6, x, y, z);
                     const dreal th_se = SD.bouzidiCoeff(7, x, y, z);
 
-                    // Use opposite-direction theta for each incoming population
-                    KS.f[pz] = f_bouzidi(SD, th_w,  mz, pz, x, y, z, xp, y,  xm, y ); // +x uses theta_west
-                    KS.f[zp] = f_bouzidi(SD, th_s,  zm, zp, x, y, z, x,  yp, x,  ym); // +y uses theta_south
-                    KS.f[mz] = f_bouzidi(SD, th_e,  pz, mz, x, y, z, xm, y,  xp, y ); // -x uses theta_east
-                    KS.f[zm] = f_bouzidi(SD, th_n,  zp, zm, x, y, z, x,  ym, x,  yp); // -y uses theta_north
-                    KS.f[pp] = f_bouzidi(SD, th_sw, mm, pp, x, y, z, xp, yp, xm, ym); // +x,+y uses theta_sw
-                    KS.f[mp] = f_bouzidi(SD, th_se, pm, mp, x, y, z, xm, yp, xp, ym); // -x,+y uses theta_se
-                    KS.f[mm] = f_bouzidi(SD, th_ne, pp, mm, x, y, z, xm, ym, xp, yp); // -x,-y uses theta_ne
-                    KS.f[pm] = f_bouzidi(SD, th_nw, mp, pm, x, y, z, xp, ym, xm, yp); // +x,-y uses theta_nw
+					KS.f[pz] = f_bouzidi(SD, th_e,  pz, mz, x,y,z,  xm, y);
+					KS.f[zp] = f_bouzidi(SD, th_n,  zp, zm, x,y,z,   x, ym);
+					KS.f[mz] = f_bouzidi(SD, th_w,  mz, pz, x,y,z,  xp, y);
+					KS.f[zm] = f_bouzidi(SD, th_s,  zm, zp, x,y,z,   x, yp);
+
+					KS.f[pp] = f_bouzidi(SD, th_ne, pp, mm, x,y,z,  xm, ym);
+					KS.f[mp] = f_bouzidi(SD, th_nw, mp, pm, x,y,z,  xp, ym);
+					KS.f[mm] = f_bouzidi(SD, th_sw, mm, pp, x,y,z,  xp, yp);
+					KS.f[pm] = f_bouzidi(SD, th_se, pm, mp, x,y,z,  xm, yp);
 
                     // Rest particle from ordinary streaming (already loaded), but ensure consistent with df_cur
                     KS.f[zz] = SD.df(df_cur, zz, x, y, z);
