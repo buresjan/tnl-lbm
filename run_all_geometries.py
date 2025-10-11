@@ -42,7 +42,7 @@ class GeometryRecord:
     error: Optional[str] = None
 
 
-BATCH_SIZE = 6
+BATCH_SIZE = 4
 
 
 def parse_args() -> argparse.Namespace:
