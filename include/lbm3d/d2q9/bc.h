@@ -62,8 +62,8 @@ struct D2Q9_BC_All
     __cuda_callable__ static dreal f_bouzidi(LBM_DATA& SD, dreal theta, int k, int k_opposite, idx x, idx y, idx z,
                                            idx xff, idx yff, idx xs, idx ys)
     {
-        const dreal one = (dreal)1;
-        const dreal two = (dreal)2;
+        const dreal one = (dreal)1.0;
+        const dreal two = (dreal)2.0;
         const dreal half = (dreal)0.5;
 
         // No Bouzidi on this dir -> ordinary streaming from opposite DF at neighbor
@@ -71,16 +71,9 @@ struct D2Q9_BC_All
             return SD.df(df_cur, k_opposite, xs, ys, z);
 
         if (theta <= half) {
-            // Bounds safety needed only for the neighbor access branch
-            auto in_range = [&](idx xx, idx yy) -> bool {
-                return (xx >= 0 && xx < SD.X() && yy >= 0 && yy < SD.Y());
-            };
-            if (!in_range(xff, yff) || !in_range(xs, ys))
-                return SD.df(df_cur, k_opposite, xs, ys, z);
-            // (1 - 2*theta) * f_k(x+e, y+e) + (2*theta) * f_k(x, y)
+			// (1 - 2*theta) * f_k(x+e, y+e) + (2*theta) * f_k(x, y)
             dreal out = (one - two * theta) * SD.df(df_cur, k, xff, yff, z)
                       + (two * theta) * SD.df(df_cur, k, x, y, z);
-            if (!(out == out)) return SD.df(df_cur, k_opposite, xs, ys, z); // NaN guard -> ordinary streaming
             return out;
         }
         else {
@@ -88,7 +81,6 @@ struct D2Q9_BC_All
             const dreal w = half / theta;
             dreal out = (one - w) * SD.df(df_cur, k_opposite, x, y, z)
                       + w * SD.df(df_cur, k, x, y, z);
-            if (!(out == out)) return SD.df(df_cur, k_opposite, xs, ys, z); // NaN guard -> ordinary streaming
             return out;
         }
     }
