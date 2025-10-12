@@ -160,7 +160,7 @@ struct StateLocal : State<NSE>
 
   // host-side statistics control
   real stats_start_time = 1.5; // start collecting running mean
-  real stats_end_time   = 3.5; // force-freeze deadline
+  real stats_end_time   = 5.5; // force-freeze deadline
   int  mean_samples = 0;
 
   // stabilization thresholds and cadence
@@ -191,9 +191,9 @@ struct StateLocal : State<NSE>
 
   bool tke_value_written       = false;
 
-  // ROI in physical meters: integrate in [1.0, 1.5] x [0, 0.5] with y wall offsets
-  real roi_x0_phys = 1.0; // [m]
-  real roi_x1_phys = 1.5; // [m]
+  // ROI expressed as fractions of domain length in x plus wall offsets in y
+  real roi_x0_fraction = (real)0.5;  // start at 50% of domain width
+  real roi_x1_fraction = (real)0.75; // end at 75% of domain width
   int  roi_y_offset_cells = 3;
 
   // -------------------- boundaries and geometry --------------------
@@ -448,15 +448,16 @@ struct StateLocal : State<NSE>
 
   // -------------------- ROI helpers --------------------
 
-  // convert ROI meters to lattice indices and clamp to interior
+  // convert ROI fractions to lattice indices and clamp to interior
   void roiIndices(idx& x0, idx& x1, idx& y0, idx& y1) const
   {
     const idx Nx = nse.lat.global.x();
     const idx Ny = nse.lat.global.y();
-    const real dl = nse.lat.physDl;
+    const real x0_pos = roi_x0_fraction * (real)Nx;
+    const real x1_pos = roi_x1_fraction * (real)Nx;
 
-    x0 = (idx)std::max<idx>(1, (idx)std::llround(std::floor(roi_x0_phys / dl)));
-    x1 = (idx)std::min<idx>(Nx - 1, (idx)std::llround(std::ceil(roi_x1_phys / dl)));
+    x0 = std::max<idx>(1, (idx)std::floor(x0_pos));
+    x1 = std::min<idx>(Nx - 1, (idx)std::ceil(x1_pos));
     y0 = std::max<idx>(1, (idx)roi_y_offset_cells);
     y1 = std::min<idx>(Ny - 1, (idx)(Ny - roi_y_offset_cells));
 
@@ -817,7 +818,7 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool
   real LBM_VISCOSITY  = 1.0e-3; // lattice nu (gives tau ~ 0.56)
   real PHYS_HEIGHT    = 0.50;   // meters
   real PHYS_VISCOSITY = 1.0e-3; // m^2/s
-  real PHYS_VELOCITY  = 1.5;    // mean inflow m/s
+  real PHYS_VELOCITY  = 1.0;    // mean inflow m/s
 
   // conversions
   real PHYS_DL = PHYS_HEIGHT / ((real)Y - 2); // exclude walls
@@ -848,15 +849,10 @@ int sim(int RESOLUTION = 2, const std::string& object_file = std::string(), bool
   real U_max_phys = 1.5 * PHYS_VELOCITY;
   state.u_max_lbm = lat.phys2lbmVelocity(U_max_phys);
 
-  // ROI setup
-  state.roi_x0_phys = 1.0;
-  state.roi_x1_phys = 1.5;
-  state.roi_y_offset_cells = 3;
-
   // timing and outputs
-  state.nse.physFinalTime = 8.0;
+  state.nse.physFinalTime = 10.0;
   state.cnt[PRINT].period = 0.05;
-  state.cnt[VTK2D].period = 0.05;
+  state.cnt[VTK2D].period = -0.05;
   state.add2Dcut_Z(0, "");
 
   execute(state);
