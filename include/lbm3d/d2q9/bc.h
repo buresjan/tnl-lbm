@@ -63,22 +63,26 @@ struct D2Q9_BC_All
 		LBM_DATA& SD, dreal theta,
 		int k, int kbar,              // k = unknown incoming population, kbar = opposite(k)
 		idx xA, idx yA, idx zA,       // fluid boundary node x_fA
-		idx xB, idx yB                // interior neighbor x_fB = xA - e_k
-	){
-		const dreal half = (dreal)0.5;
-
+		idx xB, idx yB,               // interior neighbor x_fB = xA + e_k
+		idx xS, idx yS                // standard streaming neighbor
+									  // zA = zB = zS
+	)
+	{
 		// Link does not hit wall → keep normally streamed value.
-		if (theta < (dreal)0) return SD.df(df_cur, k, xA, yA, zA);
+		if (theta < (dreal)0) return SD.df(df_cur, kbar, xS, yS, zA);
 
+		const dreal fA = SD.df(df_cur, k, xA, yA, zA);
 		const dreal fOppA = SD.df(df_cur, kbar, xA, yA, zA);
+		const dreal fB = SD.df(df_cur, k, xB, yB, zA);
 
-		if (theta <= half) {
-			const dreal fOppB = SD.df(df_cur, kbar, xB, yB, zA);
-			return (dreal)2*theta * fOppA + ((dreal)1 - (dreal)2*theta) * fOppB;
-		} else {
-			const dreal w = half / theta;
-			const dreal fA = SD.df(df_cur, k, xA, yA, zA);
-			return ((dreal)1 - w) * fOppA + w * fA;
+		if (theta <= n1o2)
+		{
+			return no2 * theta * fA + (no1 - no2 * theta) * fB;
+		}
+		else
+		{
+			const dreal w = n1o2 / theta;
+			return (no1 - w) * fOppA + w * fA;
 		}
 	}
 
@@ -135,38 +139,29 @@ struct D2Q9_BC_All
 				break;
             case GEO_FLUID_NEAR_WALL:
             {
-                if (SD.bouzidi_coeff_ptr != nullptr && SD.use_bouzidi) {
-                    // Apply Bouzidi interpolation using theta from the OPPOSITE direction (central inversion).
-                    // Coefficient order: 0:east(pz),1:north(zp),2:west(mz),3:south(zm),4:ne(pp),5:nw(mp),6:sw(mm),7:se(pm)
-                    const dreal th_e  = SD.bouzidiCoeff(0, x, y, z);
-                    const dreal th_n  = SD.bouzidiCoeff(1, x, y, z);
-                    const dreal th_w  = SD.bouzidiCoeff(2, x, y, z);
-                    const dreal th_s  = SD.bouzidiCoeff(3, x, y, z);
-                    const dreal th_ne = SD.bouzidiCoeff(4, x, y, z);
-                    const dreal th_nw = SD.bouzidiCoeff(5, x, y, z);
-                    const dreal th_sw = SD.bouzidiCoeff(6, x, y, z);
-                    const dreal th_se = SD.bouzidiCoeff(7, x, y, z);
+				// Apply Bouzidi interpolation using theta from the opposite (incoming) direction.
+				const dreal th_e  = SD.bouzidiCoeff(0, x, y, z);
+				const dreal th_n  = SD.bouzidiCoeff(1, x, y, z);
+				const dreal th_w  = SD.bouzidiCoeff(2, x, y, z);
+				const dreal th_s  = SD.bouzidiCoeff(3, x, y, z);
+				const dreal th_ne = SD.bouzidiCoeff(4, x, y, z);
+				const dreal th_nw = SD.bouzidiCoeff(5, x, y, z);
+				const dreal th_sw = SD.bouzidiCoeff(6, x, y, z);
+				const dreal th_se = SD.bouzidiCoeff(7, x, y, z);
 
-					KS.f[pz] = f_bouzidi(SD, th_e,  pz, mz, x,y,z,  xm, y);
-					KS.f[zp] = f_bouzidi(SD, th_n,  zp, zm, x,y,z,   x, ym);
-					KS.f[mz] = f_bouzidi(SD, th_w,  mz, pz, x,y,z,  xp, y);
-					KS.f[zm] = f_bouzidi(SD, th_s,  zm, zp, x,y,z,   x, yp);
+				KS.f[pz] = f_bouzidi(SD, th_w,  mz, pz, x,y,z,  xp, y,  xm, y);
+				KS.f[zp] = f_bouzidi(SD, th_s,  zm, zp, x,y,z,   x, yp,  x, ym);
+				KS.f[mz] = f_bouzidi(SD, th_e,  pz, mz, x,y,z,  xm, y,  xp, y);
+				KS.f[zm] = f_bouzidi(SD, th_n,  zp, zm, x,y,z,   x, ym,  x, yp);
 
-					KS.f[pp] = f_bouzidi(SD, th_ne, pp, mm, x,y,z,  xm, ym);
-					KS.f[mp] = f_bouzidi(SD, th_nw, mp, pm, x,y,z,  xp, ym);
-					KS.f[mm] = f_bouzidi(SD, th_sw, mm, pp, x,y,z,  xp, yp);
-					KS.f[pm] = f_bouzidi(SD, th_se, pm, mp, x,y,z,  xm, yp);
+				KS.f[pp] = f_bouzidi(SD, th_sw, mm, pp, x,y,z,  xp, yp, xm, ym);
+				KS.f[mp] = f_bouzidi(SD, th_se, pm, mp, x,y,z,  xm, yp, xp, ym);
+				KS.f[mm] = f_bouzidi(SD, th_ne, pp, mm, x,y,z,  xm, ym, xp, yp);
+				KS.f[pm] = f_bouzidi(SD, th_nw, mp, pm, x,y,z,  xp, ym, xm, yp);
 
-                    // Rest particle from ordinary streaming (already loaded), but ensure consistent with df_cur
-                    KS.f[zz] = SD.df(df_cur, zz, x, y, z);
-                }
-                else {
-                    // Bouzidi disabled or missing coefficients: treat as classic bounce-back boundary
-                    TNL::swap(KS.f[mm], KS.f[pp]);
-                    TNL::swap(KS.f[zm], KS.f[zp]);
-                    TNL::swap(KS.f[mz], KS.f[pz]);
-                    TNL::swap(KS.f[mp], KS.f[pm]);
-                }
+				// Rest particle from ordinary streaming
+				KS.f[zz] = SD.df(df_cur, zz, x, y, z);
+                
                 COLL::computeDensityAndVelocity(KS);
                 break;
             }
