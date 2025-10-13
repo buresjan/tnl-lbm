@@ -402,13 +402,31 @@ def prepare_submission(
     """Prepare on-disk artefacts for a single Slurm submission."""
     project_root = Path(__file__).resolve().parent
     geometry_path = resolve_geometry(geometry, project_root)
-    solver_binary_path = Path(solver_binary) if solver_binary else default_solver_binary(project_root)
-    solver_binary_path = solver_binary_path.resolve()
-    if not solver_binary_path.is_file():
-        raise FileNotFoundError(
-            f"Solver binary '{solver_binary_path}' not found. "
-            "Build it first: cmake --build build --target sim2d_2."
-        )
+    # Resolve solver binary path. If provided, accept:
+    #  - absolute path
+    #  - path relative to project root
+    #  - path relative to build/ under project root (e.g., sim_2D/sim2d_3)
+    if solver_binary is not None:
+        raw = Path(solver_binary)
+        cand = (raw if raw.is_absolute() else (project_root / raw))
+        solver_binary_path = cand.resolve()
+        if not solver_binary_path.is_file():
+            # try build/ prefix for convenience
+            alt = (project_root / "build" / raw).resolve()
+            if alt.is_file():
+                solver_binary_path = alt
+            else:
+                raise FileNotFoundError(
+                    f"Solver binary '{raw}' not found. "
+                    "Build it first (e.g., cmake --build build --target <target>)."
+                )
+    else:
+        solver_binary_path = default_solver_binary(project_root).resolve()
+        if not solver_binary_path.is_file():
+            raise FileNotFoundError(
+                f"Solver binary '{solver_binary_path}' not found. "
+                "Build it first (e.g., cmake --build build --target sim2d_2)."
+            )
 
     run_id = generate_run_id()
     run_dir = create_run_directory(project_root, runs_root, run_id)
@@ -559,6 +577,7 @@ def submit_and_collect(
     timeout: Optional[float] = None,
     result_timeout: Optional[float] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
+    solver_binary: Optional[Path] = None,
 ) -> SimulationResult:
     """Convenience helper that prepares, submits, and collects in one call."""
     submission = prepare_submission(
@@ -572,6 +591,7 @@ def submit_and_collect(
         runs_root=runs_root,
         job_name=job_name,
         type1_bouzidi=type1_bouzidi,
+        solver_binary=solver_binary,
     )
     submission = submit_prepared(submission)
     return collect_submission(
@@ -610,6 +630,17 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         choices=["auto", "on", "off"],
         default="auto",
         help="Control mapping of geometry type 1 cells to Bouzidi near-wall (auto|on|off); 'auto' uses build default.",
+    )
+    parser.add_argument(
+        "--binary",
+        "--solver-binary",
+        dest="solver_binary",
+        type=Path,
+        default=None,
+        help=(
+            "Path to the solver binary (absolute, or relative to repo root). "
+            "If not found, a 'build/' prefixed path is also attempted."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -658,6 +689,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             runs_root=args.runs_root,
             job_name=args.job_name,
             type1_bouzidi=args.type1_bouzidi,
+            solver_binary=args.solver_binary,
         )
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
