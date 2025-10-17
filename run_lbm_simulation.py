@@ -5,8 +5,8 @@ This script is intended to be both an importable helper module and a small CLI.
 The typical lifecycle is:
 
 1. Locate and copy a geometry file into a dedicated run directory.
-2. Generate an ``sbatch`` file that launches ``sim_2D/run`` with the requested
-   resolution and optional solver flags, or run the solver locally.
+2. Generate an ``sbatch`` file that launches the requested solver binary
+   (e.g. ``build/sim_2D/sim2d_2``) with the desired resolution, or run the solver locally.
 3. Submit the job to Slurm (or execute it immediately) and optionally wait
    until a numerical result is produced.
 
@@ -28,6 +28,7 @@ If the binary is missing, submissions abort before hitting the queue.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import shlex
 import shutil
@@ -71,11 +72,10 @@ class Submission:
     result_filename: str
     manifest_path: Path
     executor: str
-    run_script: Path
+    solver_binary: Path
+    simulation_target: str
     stdout_path: Path
     stderr_path: Path
-    simulation_target: str
-    sbatch_path: Optional[Path] = None
     resolution: int
     partition: str
     gpus: int
@@ -84,6 +84,7 @@ class Submission:
     walltime: str
     job_name: str
     type1_bouzidi: str
+    sbatch_path: Optional[Path] = None
     job_id: Optional[str] = None
     state: Optional[str] = None
     finished_at: Optional[str] = None
@@ -145,9 +146,9 @@ def ensure_ascii(text: str) -> str:
     return text
 
 
-def default_run_script(project_root: Path) -> Path:
-    """Return the canonical launcher script that builds and runs solver targets."""
-    return project_root / "sim_2D" / "run"
+def default_solver_binary(project_root: Path, simulation_target: str) -> Path:
+    """Return the expected path to the pre-built solver binary for ``simulation_target``."""
+    return project_root / "build" / "sim_2D" / ensure_ascii(simulation_target)
 
 
 def build_sbatch_script(
@@ -165,7 +166,7 @@ def build_sbatch_script(
     job_name: str,
     result_filename: str,
     type1_bouzidi: str,
-    run_script: Path,
+    solver_binary: Path,
     simulation_target: str,
 ) -> str:
     """Return the contents of the ``sbatch`` script for a single run."""
@@ -182,9 +183,7 @@ def build_sbatch_script(
     result_name_quoted = shlex.quote(result_filename)
     type1_mode = ensure_ascii(type1_bouzidi)
     type1_mode_quoted = shlex.quote(type1_mode)
-    run_script_quoted = shlex.quote(str(run_script))
-    simulation_target = ensure_ascii(simulation_target)
-    simulation_target_quoted = shlex.quote(simulation_target)
+    solver_binary_quoted = shlex.quote(str(solver_binary.resolve()))
 
     script = f"""#!/bin/bash
 #SBATCH --job-name={ensure_ascii(job_name)}
@@ -200,8 +199,7 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 
 PROJECT_ROOT={project_root_quoted}
-RUN_SCRIPT={run_script_quoted}
-SIM_TARGET={simulation_target_quoted}
+SOLVER_BINARY={solver_binary_quoted}
 GEOMETRY_FILE={geometry_name_quoted}
 GEOMETRY_ABS={geometry_abs_quoted}
 VALUE_SOURCE={value_source_abs_quoted}
@@ -215,16 +213,16 @@ fi
 
 rm -f "$VALUE_SOURCE"
 
-# the launcher ensures the target is built before execution
-if [ ! -x "$RUN_SCRIPT" ]; then
-    echo "Launcher script $RUN_SCRIPT is missing or not executable." >&2
+# make sure the solver exists; it must be pre-built ahead of time
+if [ ! -x "$SOLVER_BINARY" ]; then
+    echo "Solver binary $SOLVER_BINARY is missing or not executable." >&2
     exit 3
 fi
 
 # run the solver from the repo root so values land under sim_2D/values
 (
     cd "$PROJECT_ROOT"
-    "$RUN_SCRIPT" "$SIM_TARGET" {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
+    "$SOLVER_BINARY" {resolution} "$GEOMETRY_ABS" "${{EXTRA_ARGS[@]}}"
 )
 
 if [ ! -f "$VALUE_SOURCE" ]; then
@@ -399,7 +397,7 @@ def read_result_file(path: Path) -> tuple[str, Optional[float]]:
 
 
 def execute_local(submission: Submission) -> None:
-    """Run the sim_2D launcher directly and capture artefacts locally."""
+    """Run the solver binary directly and capture artefacts locally."""
     values_dir = submission.project_root / "sim_2D" / "values"
     values_dir.mkdir(parents=True, exist_ok=True)
     value_source = values_dir / f"value_{submission.staged_geometry.name}"
@@ -407,8 +405,7 @@ def execute_local(submission: Submission) -> None:
         value_source.unlink()
 
     cmd = [
-        str(submission.run_script),
-        submission.simulation_target,
+        str(submission.solver_binary),
         str(submission.resolution),
         str(submission.staged_geometry),
     ]
@@ -483,6 +480,7 @@ def prepare_submission(
     type1_bouzidi: str,
     executor: str = EXECUTOR_SLURM,
     simulation_target: str = DEFAULT_SIMULATION_TARGET,
+    solver_binary: Optional[Path] = None,
 ) -> Submission:
     """Prepare on-disk artefacts for a single run, regardless of executor."""
     project_root = Path(__file__).resolve().parent
@@ -496,10 +494,35 @@ def prepare_submission(
     if not simulation_target:
         raise ValueError("Simulation target must be a non-empty string.")
 
-    run_script = default_run_script(project_root)
-    if not run_script.is_file():
+    if solver_binary is not None:
+        raw_binary = Path(solver_binary)
+        candidate_paths: Iterable[Path]
+        if raw_binary.is_absolute():
+            candidate_paths = (raw_binary,)
+        else:
+            candidate_paths = (
+                project_root / raw_binary,
+                project_root / "build" / raw_binary,
+            )
+        solver_binary_path: Optional[Path] = next((cand.resolve() for cand in candidate_paths if cand.is_file()), None)
+        if solver_binary_path is None:
+            raise FileNotFoundError(
+                f"Solver binary '{raw_binary}' not found. "
+                "Provide an absolute path or a path relative to the repository root."
+            )
+    else:
+        solver_binary_path = default_solver_binary(project_root, simulation_target).resolve()
+        if not solver_binary_path.is_file():
+            raise FileNotFoundError(
+                f"Solver binary '{solver_binary_path}' not found. "
+                "Build it first (e.g., cmake --build build --target "
+                f"{simulation_target})."
+            )
+
+    if not os.access(solver_binary_path, os.X_OK):
         raise FileNotFoundError(
-            f"Launcher script '{run_script}' not found. Ensure submodules are initialised."
+            f"Solver binary '{solver_binary_path}' is not executable. "
+            "Adjust permissions (chmod +x) after building."
         )
 
     run_id = generate_run_id()
@@ -527,7 +550,7 @@ def prepare_submission(
             job_name=actual_job_name,
             result_filename=result_filename,
             type1_bouzidi=type1_bouzidi,
-            run_script=run_script,
+            solver_binary=solver_binary_path,
             simulation_target=simulation_target,
         )
         sbatch_path = write_sbatch(run_dir, sbatch_text)
@@ -550,8 +573,8 @@ def prepare_submission(
         "executor": normalized_executor,
         "stdout": stdout_path.name,
         "stderr": stderr_path.name,
-        "run_script": str(run_script),
         "simulation_target": simulation_target,
+        "solver_binary": str(solver_binary_path),
     }
     manifest_path = make_manifest(run_dir, manifest)
 
@@ -564,10 +587,10 @@ def prepare_submission(
         result_filename=result_filename,
         manifest_path=manifest_path,
         executor=normalized_executor,
-        run_script=run_script,
+        solver_binary=solver_binary_path,
+        simulation_target=simulation_target,
         stdout_path=stdout_path,
         stderr_path=stderr_path,
-        simulation_target=simulation_target,
         sbatch_path=sbatch_path,
         resolution=resolution,
         partition=partition,
@@ -700,6 +723,7 @@ def submit_and_collect(
     progress_callback: Optional[Callable[[str], None]] = None,
     executor: str = EXECUTOR_SLURM,
     simulation_target: str = DEFAULT_SIMULATION_TARGET,
+    solver_binary: Optional[Path] = None,
 ) -> SimulationResult:
     """Convenience helper that prepares, submits, and collects in one call."""
     submission = prepare_submission(
@@ -715,6 +739,7 @@ def submit_and_collect(
         type1_bouzidi=type1_bouzidi,
         executor=executor,
         simulation_target=simulation_target,
+        solver_binary=solver_binary,
     )
     submission = submit_prepared(submission)
     return collect_submission(
@@ -763,7 +788,13 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--target",
         default=DEFAULT_SIMULATION_TARGET,
-        help="Simulation target passed to sim_2D/run (default: sim2d_2).",
+        help="Simulation target name; used to derive the default binary path (default: sim2d_2).",
+    )
+    parser.add_argument(
+        "--binary",
+        type=Path,
+        default=None,
+        help="Path to the solver binary (absolute or relative to the repo root). Defaults to build/sim_2D/<target>.",
     )
     parser.add_argument(
         "--dry-run",
@@ -814,6 +845,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             type1_bouzidi=args.type1_bouzidi,
             executor=args.executor,
             simulation_target=args.target,
+            solver_binary=args.binary,
         )
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
@@ -827,6 +859,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print(f"Geometry staged as {submission.staged_geometry.name}")
         print(f"Executor: {submission.executor}")
         print(f"Target: {submission.simulation_target}")
+        print(f"Solver binary: {submission.solver_binary}")
         if submission.sbatch_path:
             print(f"Job script: {submission.sbatch_path.name}")
         else:
@@ -847,6 +880,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print("Submitted job", submission.job_id)
         print("Run directory:", submission.run_dir)
         print("Target:", submission.simulation_target)
+        print("Solver binary:", submission.solver_binary)
         print("Result will be copied to:", submission.result_path)
         print("Monitor with: squeue -j", submission.job_id)
         print("After completion, see:", submission.stdout_path)
@@ -854,6 +888,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print("Executed local run", submission.job_id)
         print("Run directory:", submission.run_dir)
         print("Target:", submission.simulation_target)
+        print("Solver binary:", submission.solver_binary)
         print("Stdout:", submission.stdout_path)
         print("Stderr:", submission.stderr_path)
         print("Result stored at:", submission.result_path)
